@@ -16,6 +16,7 @@ Firmware for the **Waveshare ESP32-S3-POE-ETH-8DI-8RO** module. Controls 8 relay
 cinerelais_modul/
 ├── CLAUDE.md              # This file — AI assistant guide
 ├── README.md              # Project documentation (German)
+├── README_EN.md           # Project documentation (English)
 ├── LICENSE                # MIT License
 ├── platformio.ini         # PlatformIO build configuration
 ├── src/
@@ -96,12 +97,12 @@ The firmware is a single-file monolith with these logical sections:
 ```
 r<1-8>_on          → Turn relay on
 r<1-8>_off         → Turn relay off
-r<1-8>_impuls      → Pulse relay (default duration)
-r<1-8>_impuls_<ms> → Pulse relay for <ms> milliseconds
+r<1-8>_pulse       → Pulse relay (default duration)
+r<1-8>_pulse_<ms>  → Pulse relay for <ms> milliseconds
 all_on             → Turn all relays on
 all_off            → Turn all relays off
-all_impuls         → Pulse all relays (default duration)
-all_impuls_<ms>    → Pulse all relays for <ms> milliseconds
+all_pulse          → Pulse all relays (default duration)
+all_pulse_<ms>     → Pulse all relays for <ms> milliseconds
 status             → JSON status response
 help               → Command list
 ```
@@ -154,9 +155,9 @@ Network changes require device restart to take effect.
 
 ### Language
 
-- Project naming and UI: **German** (Relais, Modul, Eingänge, Ausgänge, Impuls, etc.)
-- Code (variables, functions, comments): **English**
-- README and user-facing docs: **German**
+- Project naming and UI: **German** (Relais, Modul, Eingänge, Ausgänge, etc.)
+- Code, TCP commands, variables, functions, comments: **English**
+- README: **German** (`README.md`) + **English** (`README_EN.md`)
 
 ### Code Style
 
@@ -181,6 +182,7 @@ Network changes require device restart to take effect.
 | `data/index.html` | Web interface SPA — uploaded to LittleFS |
 | `platformio.ini` | Build config, dependencies, board settings |
 | `README.md` | User documentation (German) |
+| `README_EN.md` | User documentation (English) |
 
 ## AI Assistant Guidelines
 
@@ -201,4 +203,5 @@ Network changes require device restart to take effect.
 |------|--------|
 | 2026-02-01 | Initial CLAUDE.md created for empty repository |
 | 2026-02-01 | Updated with full project analysis after source code upload |
-| 2026-02-01 | TCP protocol changed: `ON:1` → `r1_on`, `PULSE:3:1000` → `r3_impuls_1000`, lowercase, underscore-separated |
+| 2026-02-01 | TCP protocol changed: `ON:1` → `r1_on`, `PULSE:3:1000` → `r3_pulse_1000`, lowercase, underscore-separated |
+| 2026-02-01 | Renamed `impuls` → `pulse` in TCP commands for English consistency; added `README_EN.md` |

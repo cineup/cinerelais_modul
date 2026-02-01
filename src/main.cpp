@@ -12,12 +12,12 @@
  * TCP Commands (Port configurable, default 5000):
  *   r1_on          - Turn relay 1 on (r1-r8)
  *   r1_off         - Turn relay 1 off (r1-r8)
- *   r1_impuls      - Pulse relay 1 with default duration (r1-r8)
- *   r1_impuls_1000 - Pulse relay 1 for 1000ms (r1-r8)
+ *   r1_pulse       - Pulse relay 1 with default duration (r1-r8)
+ *   r1_pulse_1000  - Pulse relay 1 for 1000ms (r1-r8)
  *   all_on         - Turn all relays on
  *   all_off        - Turn all relays off
- *   all_impuls     - Pulse all relays with default duration
- *   all_impuls_500 - Pulse all relays for 500ms
+ *   all_pulse      - Pulse all relays with default duration
+ *   all_pulse_500  - Pulse all relays for 500ms
  *   status         - Get status of all relays and inputs
  *   help           - Show available commands
  */
@@ -425,7 +425,7 @@ void handleTCPCommand(AsyncClient* client, String command) {
     String response = "";
 
     if (command.startsWith("r") && command.length() >= 4) {
-        // Parse relay number: r1_on, r8_off, r3_impuls, r3_impuls_1000
+        // Parse relay number: r1_on, r8_off, r3_pulse, r3_pulse_1000
         char relayChar = command.charAt(1);
         int relay = relayChar - '0';
 
@@ -438,16 +438,16 @@ void handleTCPCommand(AsyncClient* client, String command) {
             } else if (action == "off") {
                 setRelay(relay, false);
                 response = "OK: r" + String(relay) + " off\r\n";
-            } else if (action == "impuls") {
+            } else if (action == "pulse") {
                 pulseRelay(relay, config.pulseDuration);
-                response = "OK: r" + String(relay) + " impuls (" + String(config.pulseDuration) + "ms)\r\n";
-            } else if (action.startsWith("impuls_")) {
-                unsigned long duration = action.substring(7).toInt();
+                response = "OK: r" + String(relay) + " pulse (" + String(config.pulseDuration) + "ms)\r\n";
+            } else if (action.startsWith("pulse_")) {
+                unsigned long duration = action.substring(6).toInt();
                 if (duration == 0) duration = config.pulseDuration;
                 pulseRelay(relay, duration);
-                response = "OK: r" + String(relay) + " impuls (" + String(duration) + "ms)\r\n";
+                response = "OK: r" + String(relay) + " pulse (" + String(duration) + "ms)\r\n";
             } else {
-                response = "ERROR: Unknown action. Use on, off, impuls, impuls_<ms>\r\n";
+                response = "ERROR: Unknown action. Use on, off, pulse, pulse_<ms>\r\n";
             }
         } else {
             response = "ERROR: Invalid relay number (r1-r8)\r\n";
@@ -462,16 +462,16 @@ void handleTCPCommand(AsyncClient* client, String command) {
         } else if (action == "off") {
             setAllRelays(false);
             response = "OK: all off\r\n";
-        } else if (action == "impuls") {
+        } else if (action == "pulse") {
             pulseAllRelays(config.pulseDuration);
-            response = "OK: all impuls (" + String(config.pulseDuration) + "ms)\r\n";
-        } else if (action.startsWith("impuls_")) {
-            unsigned long duration = action.substring(7).toInt();
+            response = "OK: all pulse (" + String(config.pulseDuration) + "ms)\r\n";
+        } else if (action.startsWith("pulse_")) {
+            unsigned long duration = action.substring(6).toInt();
             if (duration == 0) duration = config.pulseDuration;
             pulseAllRelays(duration);
-            response = "OK: all impuls (" + String(duration) + "ms)\r\n";
+            response = "OK: all pulse (" + String(duration) + "ms)\r\n";
         } else {
-            response = "ERROR: Unknown action. Use on, off, impuls, impuls_<ms>\r\n";
+            response = "ERROR: Unknown action. Use on, off, pulse, pulse_<ms>\r\n";
         }
     }
     else if (command == "status") {
@@ -481,12 +481,12 @@ void handleTCPCommand(AsyncClient* client, String command) {
         response = "Available commands:\r\n";
         response += "  r<1-8>_on          - Turn relay on\r\n";
         response += "  r<1-8>_off         - Turn relay off\r\n";
-        response += "  r<1-8>_impuls      - Pulse relay (default duration)\r\n";
-        response += "  r<1-8>_impuls_<ms> - Pulse relay for <ms> milliseconds\r\n";
+        response += "  r<1-8>_pulse       - Pulse relay (default duration)\r\n";
+        response += "  r<1-8>_pulse_<ms>  - Pulse relay for <ms> milliseconds\r\n";
         response += "  all_on             - Turn all relays on\r\n";
         response += "  all_off            - Turn all relays off\r\n";
-        response += "  all_impuls         - Pulse all relays (default duration)\r\n";
-        response += "  all_impuls_<ms>    - Pulse all relays for <ms> milliseconds\r\n";
+        response += "  all_pulse          - Pulse all relays (default duration)\r\n";
+        response += "  all_pulse_<ms>     - Pulse all relays for <ms> milliseconds\r\n";
         response += "  status             - Get JSON status of all I/O\r\n";
         response += "  help               - Show this help\r\n";
     }
