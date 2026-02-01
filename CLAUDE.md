@@ -1,86 +1,199 @@
-# CLAUDE.md — AI Assistant Guide for cinerelais_modul
+# CLAUDE.md — AI Assistant Guide for CineRelais Modul
 
 ## Project Overview
 
 **Repository**: `cineup/cinerelais_modul`
-**Status**: Newly initialized (no source code yet)
-**Domain**: Cinema relay module — part of the CineUp ecosystem
+**Language**: C++ (Arduino framework) + HTML/CSS/JavaScript (Web-Interface)
+**Build System**: PlatformIO
+**License**: MIT
+**Domain**: Cinema relay automation — part of the CineUp ecosystem
 
-This project is a relay module for cinema automation, belonging to the `cineup` organization. The name suggests German-language origins ("Relais" = relay, "Modul" = module). The module likely controls relay-based switching for cinema infrastructure (e.g., lighting, curtains, projector control, audio routing).
+Firmware for the **Waveshare ESP32-S3-POE-ETH-8DI-8RO** module. Controls 8 relay outputs and monitors 8 digital inputs via Ethernet (W5500), with a web interface, TCP command protocol, and OTA firmware updates. Used for cinema infrastructure automation (lighting, curtains, projector control, audio routing).
 
 ## Repository Structure
 
 ```
 cinerelais_modul/
 ├── CLAUDE.md              # This file — AI assistant guide
-└── .git/                  # Git repository metadata
+├── README.md              # Project documentation (German)
+├── LICENSE                # MIT License
+├── platformio.ini         # PlatformIO build configuration
+├── src/
+│   ├── config.h           # Pin definitions, defaults, NetworkConfig struct
+│   └── main.cpp           # Main firmware (~650 lines)
+└── data/
+    └── index.html         # Single-page web interface (LittleFS)
 ```
-
-> **Note**: This repository is in its initial state. Update this section as the project structure evolves.
 
 ## Development Setup
 
 ### Prerequisites
 
-_To be determined as the project takes shape. Likely candidates based on the domain:_
+- [PlatformIO](https://platformio.org/) CLI or IDE plugin
+- USB-C cable for initial flash
+- Waveshare ESP32-S3-POE-ETH-8DI-8RO board
 
-- Embedded toolchain (e.g., PlatformIO, Arduino IDE, or arm-none-eabi-gcc)
-- Hardware relay module for testing
-- Serial/UART debugging tools
+### Build & Flash
 
-### Building
+```bash
+# Compile firmware
+pio run
 
-_No build system configured yet. Update this section when build tooling is added._
+# Upload firmware via USB
+pio run -t upload
 
-### Testing
+# Upload web interface (LittleFS filesystem)
+pio run -t uploadfs
 
-_No test infrastructure configured yet. Update this section when tests are added._
+# Serial monitor (115200 baud)
+pio device monitor
+```
+
+### PlatformIO Configuration
+
+- **Platform**: espressif32
+- **Board**: esp32-s3-devkitc-1 (240MHz)
+- **Framework**: Arduino
+- **Filesystem**: LittleFS (16MB flash, `default_16MB.csv` partition table)
+- **Build flags**: `CORE_DEBUG_LEVEL=3`, `ARDUINO_USB_CDC_ON_BOOT=1`, `BOARD_HAS_PSRAM`
+
+### Dependencies (lib_deps)
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| ArduinoJson | ^7.0.0 | JSON serialization for config and API |
+| ElegantOTA | ^3.1.0 | Over-the-air firmware updates |
+| AsyncTCP | ^1.1.1 | Async TCP server for command protocol |
+| ESPAsyncWebServer | ^1.2.3 | Async HTTP server for web interface and REST API |
+
+## Architecture
+
+### Hardware Abstraction (`src/config.h`)
+
+- **8 Digital Inputs** (DI1-DI8): GPIOs 4, 5, 6, 7, 15, 16, 17, 18 — optocoupler isolated, active LOW
+- **8 Relay Outputs** (RO1-RO8): GPIOs 33-40 — via ULN2803 driver
+- **Ethernet**: W5500 via SPI (MISO=11, MOSI=13, SCLK=12, CS=10, INT=14)
+- **Status LED**: GPIO 48
+
+### Firmware Components (`src/main.cpp`)
+
+The firmware is a single-file monolith with these logical sections:
+
+| Section | Lines | Description |
+|---------|-------|-------------|
+| Includes & globals | 1-46 | Libraries, state arrays, config |
+| `setup()` | 68-115 | Init LittleFS, config, pins, Ethernet, servers |
+| `loop()` | 121-134 | Poll inputs, update pulses, ElegantOTA tick |
+| Config management | 140-198 | `loadConfig()` / `saveConfig()` — JSON on LittleFS (`/config.json`) |
+| Hardware setup | 204-290 | `setupPins()`, `WiFiEvent()`, `setupEthernet()` |
+| Relay control | 296-345 | `setRelay()`, `setAllRelays()`, `pulseRelay()`, `updatePulses()` |
+| Status JSON | 351-384 | `getStatusJSON()` — combined relay/input/network state |
+| TCP server | 390-509 | Async TCP on configurable port, text command protocol |
+| Web server | 515-653 | AsyncWebServer on port 80, REST API endpoints, ElegantOTA |
+
+### TCP Command Protocol (default port 5000)
+
+```
+ON:X        → Relay X on (X = 1-8 or ALL)
+OFF:X       → Relay X off (X = 1-8 or ALL)
+PULSE:X     → Pulse relay X (default duration)
+PULSE:X:T   → Pulse relay X for T ms
+STATUS      → JSON status response
+HELP        → Command list
+```
+
+Commands are case-insensitive (uppercased on receive). Responses prefixed with `OK:` or `ERROR:`.
+
+### REST API (port 80)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | Full status JSON (relays, inputs, network, uptime) |
+| `/api/config` | GET | Current configuration JSON |
+| `/api/config` | POST | Save configuration (form data) |
+| `/api/relay` | POST | Control single relay (params: `relay`, `state`, `duration`) |
+| `/api/relays` | POST | Control all relays (params: `state`, `duration`) |
+| `/api/restart` | POST | Restart ESP32 |
+| `/update` | GET | ElegantOTA update page |
+
+### Web Interface (`data/index.html`)
+
+Single-page application with dark theme. German UI labels. Features:
+- 4x2 grid of relay toggle buttons (click = toggle, right-click = pulse)
+- 4x2 grid of digital input status indicators
+- Network configuration (DHCP toggle, static IP fields)
+- TCP port and pulse duration settings
+- System info (IP, MAC, uptime)
+- Device restart button
+- OTA firmware update link
+
+Polls `/api/status` every 2 seconds. Uses `FormData` for POST requests. Fonts: Space Grotesk + JetBrains Mono (loaded from Google Fonts CDN).
+
+### Configuration Persistence
+
+Stored as `/config.json` on LittleFS. Fields:
+
+| Field | Type | Default |
+|-------|------|---------|
+| `useDHCP` | bool | `true` |
+| `staticIP` | string | `192.168.1.100` |
+| `gateway` | string | `192.168.1.1` |
+| `subnet` | string | `255.255.255.0` |
+| `dns` | string | `8.8.8.8` |
+| `hostname` | string | `esp32-relay` |
+| `tcpPort` | uint16 | `5000` |
+| `pulseDuration` | uint16 | `500` (ms) |
+
+Network changes require device restart to take effect.
 
 ## Conventions
 
 ### Language
 
-- Project naming uses German terminology (Relais, Modul)
-- Code comments and documentation language: _to be established_
-
-### Git Workflow
-
-- **Branch naming**: Feature branches use descriptive names
-- **Commits**: Use clear, descriptive commit messages in imperative mood
-- **Main branch**: Not yet established — first commit will define it
+- Project naming and UI: **German** (Relais, Modul, Eingänge, Ausgänge, Impuls, etc.)
+- Code (variables, functions, comments): **English**
+- README and user-facing docs: **German**
 
 ### Code Style
 
-_To be established. Update this section with linting rules, formatters, and style guides as they are adopted._
+- Arduino/C++ with standard ESP32 patterns
+- Section headers with `// ============` block comments
+- Global state arrays for relay/input states
+- 1-indexed relay numbering in API/protocol (converted to 0-indexed internally)
+- `strlcpy()` for safe string copies into fixed-size buffers
+- ArduinoJson `JsonDocument` (v7 API, no explicit size)
 
-## Architecture
+### Git Workflow
 
-_To be documented as the project develops. Expected components for a cinema relay module:_
-
-- **Hardware abstraction layer** — GPIO and relay driver interfaces
-- **Communication protocol** — Serial, I2C, CAN, or network-based control interface
-- **State management** — Relay state tracking and safety interlocks
-- **Configuration** — Persistent settings for relay mapping and behavior
+- Commits: clear, descriptive messages in imperative mood
+- Branch naming: feature branches with descriptive names
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `CLAUDE.md` | AI assistant context and project guide |
-
-> Update this table as key files are added to the project.
+| `src/main.cpp` | Main firmware — all logic in one file |
+| `src/config.h` | Hardware pin mapping, default values, `NetworkConfig` struct |
+| `data/index.html` | Web interface SPA — uploaded to LittleFS |
+| `platformio.ini` | Build config, dependencies, board settings |
+| `README.md` | User documentation (German) |
 
 ## AI Assistant Guidelines
 
 1. **Read before modifying** — Always read existing files before proposing changes
 2. **Minimal changes** — Make only the changes requested; avoid unnecessary refactoring
-3. **Preserve conventions** — Follow established patterns in the codebase
-4. **Hardware awareness** — This is an embedded/hardware project; consider memory constraints, real-time requirements, and hardware safety
-5. **Safety first** — Relay modules interact with physical equipment; never bypass safety checks or interlocks
-6. **Update this file** — When significant structural changes are made, update CLAUDE.md to reflect the current state
+3. **Preserve conventions** — English code, German UI/docs; keep section comment style
+4. **Hardware awareness** — This runs on ESP32-S3 with 16MB flash; consider memory constraints and real-time requirements
+5. **Safety first** — Relay modules control physical equipment; never bypass safety checks or remove input validation on relay indices (1-8)
+6. **Single-file architecture** — `main.cpp` is monolithic by design; don't split into multiple files unless explicitly requested
+7. **Async patterns** — Web server and TCP server are async (ESPAsyncWebServer/AsyncTCP); avoid blocking calls in handlers
+8. **LittleFS filesystem** — Web files go in `data/`; changes to `data/` require `pio run -t uploadfs`
+9. **Pin changes** — Only modify pin assignments in `config.h`; verify against the actual board revision
+10. **Update this file** — When significant structural changes are made, update CLAUDE.md to reflect the current state
 
 ## Maintenance Log
 
 | Date | Change |
 |------|--------|
 | 2026-02-01 | Initial CLAUDE.md created for empty repository |
+| 2026-02-01 | Updated with full project analysis after source code upload |
