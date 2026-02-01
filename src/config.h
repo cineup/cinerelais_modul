@@ -50,7 +50,7 @@ const int RO_PINS[8] = {
 // Default Configuration Values
 // ============================================
 
-#define DEFAULT_HOSTNAME        "esp32-relay"
+#define DEFAULT_HOSTNAME        "cinerelais1"
 #define DEFAULT_TCP_PORT        5000
 #define DEFAULT_PULSE_DURATION  500     // ms
 #define CONFIG_FILE             "/config.json"
