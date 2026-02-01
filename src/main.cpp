@@ -10,12 +10,16 @@
  * - 8 Relay Outputs with ON/OFF/PULSE commands
  * 
  * TCP Commands (Port configurable, default 5000):
- *   ON:X      - Turn relay X on (X = 1-8 or ALL)
- *   OFF:X     - Turn relay X off (X = 1-8 or ALL)
- *   PULSE:X   - Pulse relay X (X = 1-8 or ALL)
- *   PULSE:X:T - Pulse relay X for T milliseconds
- *   STATUS    - Get status of all relays and inputs
- *   HELP      - Show available commands
+ *   r1_on          - Turn relay 1 on (r1-r8)
+ *   r1_off         - Turn relay 1 off (r1-r8)
+ *   r1_impuls      - Pulse relay 1 with default duration (r1-r8)
+ *   r1_impuls_1000 - Pulse relay 1 for 1000ms (r1-r8)
+ *   all_on         - Turn all relays on
+ *   all_off        - Turn all relays off
+ *   all_impuls     - Pulse all relays with default duration
+ *   all_impuls_500 - Pulse all relays for 500ms
+ *   status         - Get status of all relays and inputs
+ *   help           - Show available commands
  */
 
 #include <Arduino.h>
@@ -390,7 +394,7 @@ String getStatusJSON() {
 void handleTCPData(void* arg, AsyncClient* client, void* data, size_t len) {
     String command = String((char*)data).substring(0, len);
     command.trim();
-    command.toUpperCase();
+    command.toLowerCase();
     
     Serial.printf("TCP [%s]: %s\n", client->remoteIP().toString().c_str(), command.c_str());
     
@@ -414,83 +418,80 @@ void handleTCPClient(void* arg, AsyncClient* client) {
     });
     
     // Send welcome message
-    client->write("ESP32-S3 Relay Controller\r\nType HELP for commands\r\n");
+    client->write("ESP32-S3 Relay Controller\r\nType help for commands\r\n");
 }
 
 void handleTCPCommand(AsyncClient* client, String command) {
     String response = "";
-    
-    if (command.startsWith("ON:")) {
-        String target = command.substring(3);
-        if (target == "ALL") {
-            setAllRelays(true);
-            response = "OK: All relays ON\r\n";
-        } else {
-            int relay = target.toInt();
-            if (relay >= 1 && relay <= 8) {
+
+    if (command.startsWith("r") && command.length() >= 4) {
+        // Parse relay number: r1_on, r8_off, r3_impuls, r3_impuls_1000
+        char relayChar = command.charAt(1);
+        int relay = relayChar - '0';
+
+        if (relay >= 1 && relay <= 8 && command.charAt(2) == '_') {
+            String action = command.substring(3);
+
+            if (action == "on") {
                 setRelay(relay, true);
-                response = "OK: Relay " + String(relay) + " ON\r\n";
-            } else {
-                response = "ERROR: Invalid relay number (1-8 or ALL)\r\n";
-            }
-        }
-    }
-    else if (command.startsWith("OFF:")) {
-        String target = command.substring(4);
-        if (target == "ALL") {
-            setAllRelays(false);
-            response = "OK: All relays OFF\r\n";
-        } else {
-            int relay = target.toInt();
-            if (relay >= 1 && relay <= 8) {
+                response = "OK: r" + String(relay) + " on\r\n";
+            } else if (action == "off") {
                 setRelay(relay, false);
-                response = "OK: Relay " + String(relay) + " OFF\r\n";
-            } else {
-                response = "ERROR: Invalid relay number (1-8 or ALL)\r\n";
-            }
-        }
-    }
-    else if (command.startsWith("PULSE:")) {
-        String params = command.substring(6);
-        int colonPos = params.indexOf(':');
-        String target;
-        unsigned long duration = config.pulseDuration;
-        
-        if (colonPos > 0) {
-            target = params.substring(0, colonPos);
-            duration = params.substring(colonPos + 1).toInt();
-            if (duration == 0) duration = config.pulseDuration;
-        } else {
-            target = params;
-        }
-        
-        if (target == "ALL") {
-            pulseAllRelays(duration);
-            response = "OK: All relays PULSE (" + String(duration) + "ms)\r\n";
-        } else {
-            int relay = target.toInt();
-            if (relay >= 1 && relay <= 8) {
+                response = "OK: r" + String(relay) + " off\r\n";
+            } else if (action == "impuls") {
+                pulseRelay(relay, config.pulseDuration);
+                response = "OK: r" + String(relay) + " impuls (" + String(config.pulseDuration) + "ms)\r\n";
+            } else if (action.startsWith("impuls_")) {
+                unsigned long duration = action.substring(7).toInt();
+                if (duration == 0) duration = config.pulseDuration;
                 pulseRelay(relay, duration);
-                response = "OK: Relay " + String(relay) + " PULSE (" + String(duration) + "ms)\r\n";
+                response = "OK: r" + String(relay) + " impuls (" + String(duration) + "ms)\r\n";
             } else {
-                response = "ERROR: Invalid relay number (1-8 or ALL)\r\n";
+                response = "ERROR: Unknown action. Use on, off, impuls, impuls_<ms>\r\n";
             }
+        } else {
+            response = "ERROR: Invalid relay number (r1-r8)\r\n";
         }
     }
-    else if (command == "STATUS") {
+    else if (command.startsWith("all_")) {
+        String action = command.substring(4);
+
+        if (action == "on") {
+            setAllRelays(true);
+            response = "OK: all on\r\n";
+        } else if (action == "off") {
+            setAllRelays(false);
+            response = "OK: all off\r\n";
+        } else if (action == "impuls") {
+            pulseAllRelays(config.pulseDuration);
+            response = "OK: all impuls (" + String(config.pulseDuration) + "ms)\r\n";
+        } else if (action.startsWith("impuls_")) {
+            unsigned long duration = action.substring(7).toInt();
+            if (duration == 0) duration = config.pulseDuration;
+            pulseAllRelays(duration);
+            response = "OK: all impuls (" + String(duration) + "ms)\r\n";
+        } else {
+            response = "ERROR: Unknown action. Use on, off, impuls, impuls_<ms>\r\n";
+        }
+    }
+    else if (command == "status") {
         response = getStatusJSON() + "\r\n";
     }
-    else if (command == "HELP") {
+    else if (command == "help") {
         response = "Available commands:\r\n";
-        response += "  ON:X       - Turn relay X on (X=1-8 or ALL)\r\n";
-        response += "  OFF:X      - Turn relay X off (X=1-8 or ALL)\r\n";
-        response += "  PULSE:X    - Pulse relay X with default duration\r\n";
-        response += "  PULSE:X:T  - Pulse relay X for T milliseconds\r\n";
-        response += "  STATUS     - Get JSON status of all I/O\r\n";
-        response += "  HELP       - Show this help\r\n";
+        response += "  r<1-8>_on          - Turn relay on\r\n";
+        response += "  r<1-8>_off         - Turn relay off\r\n";
+        response += "  r<1-8>_impuls      - Pulse relay (default duration)\r\n";
+        response += "  r<1-8>_impuls_<ms> - Pulse relay for <ms> milliseconds\r\n";
+        response += "  all_on             - Turn all relays on\r\n";
+        response += "  all_off            - Turn all relays off\r\n";
+        response += "  all_impuls         - Pulse all relays (default duration)\r\n";
+        response += "  all_impuls_<ms>    - Pulse all relays for <ms> milliseconds\r\n";
+        response += "  status             - Get JSON status of all I/O\r\n";
+        response += "  help               - Show this help\r\n";
     }
     else {
-        response = "ERROR: Unknown command. Type HELP for available commands.\r\n";
+        response = "ERROR: Unknown command. Type help for available commands.\r\n";
     }
     
     if (client && client->connected()) {

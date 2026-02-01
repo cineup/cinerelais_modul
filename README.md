@@ -9,7 +9,7 @@ Firmware für das Waveshare ESP32-S3-POE-ETH-8DI-8RO Modul mit Web-Interface, TC
 - **TCP-Befehlsschnittstelle** für Relaissteuerung
 - **OTA-Firmware-Updates** über das Web-Interface
 - **8 Digitale Eingänge** (optokoppler-isoliert)
-- **8 Relaisausgänge** mit ON/OFF/PULSE-Befehlen
+- **8 Relaisausgänge** mit on/off/impuls-Befehlen
 
 ## Installation
 
@@ -109,12 +109,16 @@ Verbinden Sie sich mit einem TCP-Client (z.B. `nc`, `telnet`, oder eigene Softwa
 
 | Befehl | Beschreibung |
 |--------|--------------|
-| `ON:X` | Relais X einschalten (X = 1-8 oder ALL) |
-| `OFF:X` | Relais X ausschalten (X = 1-8 oder ALL) |
-| `PULSE:X` | Relais X pulsen mit Standard-Dauer |
-| `PULSE:X:T` | Relais X für T Millisekunden pulsen |
-| `STATUS` | JSON-Status aller Ein-/Ausgänge |
-| `HELP` | Hilfe anzeigen |
+| `r1_on` | Relais 1 einschalten (r1-r8) |
+| `r1_off` | Relais 1 ausschalten (r1-r8) |
+| `r1_impuls` | Relais 1 pulsen mit Standard-Dauer (r1-r8) |
+| `r1_impuls_1000` | Relais 1 für 1000ms pulsen (r1-r8) |
+| `all_on` | Alle Relais einschalten |
+| `all_off` | Alle Relais ausschalten |
+| `all_impuls` | Alle Relais pulsen mit Standard-Dauer |
+| `all_impuls_500` | Alle Relais für 500ms pulsen |
+| `status` | JSON-Status aller Ein-/Ausgänge |
+| `help` | Hilfe anzeigen |
 
 **Beispiele:**
 
@@ -123,16 +127,16 @@ Verbinden Sie sich mit einem TCP-Client (z.B. `nc`, `telnet`, oder eigene Softwa
 nc 192.168.1.100 5000
 
 # Relais 1 einschalten
-ON:1
+r1_on
 
 # Relais 3 für 1000ms pulsen
-PULSE:3:1000
+r3_impuls_1000
 
 # Alle Relais ausschalten
-OFF:ALL
+all_off
 
 # Status abfragen
-STATUS
+status
 ```
 
 ### OTA-Updates

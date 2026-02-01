@@ -94,15 +94,19 @@ The firmware is a single-file monolith with these logical sections:
 ### TCP Command Protocol (default port 5000)
 
 ```
-ON:X        → Relay X on (X = 1-8 or ALL)
-OFF:X       → Relay X off (X = 1-8 or ALL)
-PULSE:X     → Pulse relay X (default duration)
-PULSE:X:T   → Pulse relay X for T ms
-STATUS      → JSON status response
-HELP        → Command list
+r<1-8>_on          → Turn relay on
+r<1-8>_off         → Turn relay off
+r<1-8>_impuls      → Pulse relay (default duration)
+r<1-8>_impuls_<ms> → Pulse relay for <ms> milliseconds
+all_on             → Turn all relays on
+all_off            → Turn all relays off
+all_impuls         → Pulse all relays (default duration)
+all_impuls_<ms>    → Pulse all relays for <ms> milliseconds
+status             → JSON status response
+help               → Command list
 ```
 
-Commands are case-insensitive (uppercased on receive). Responses prefixed with `OK:` or `ERROR:`.
+Commands are case-insensitive (lowercased on receive). Responses prefixed with `OK:` or `ERROR:`.
 
 ### REST API (port 80)
 
@@ -197,3 +201,4 @@ Network changes require device restart to take effect.
 |------|--------|
 | 2026-02-01 | Initial CLAUDE.md created for empty repository |
 | 2026-02-01 | Updated with full project analysis after source code upload |
+| 2026-02-01 | TCP protocol changed: `ON:1` → `r1_on`, `PULSE:3:1000` → `r3_impuls_1000`, lowercase, underscore-separated |
