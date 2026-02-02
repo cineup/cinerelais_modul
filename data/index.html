@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Relay Controller</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-        
         :root {
             --bg-dark: #0a0a0f;
             --bg-card: #12121a;
@@ -28,7 +26,7 @@
         }
         
         body {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-dark);
             color: var(--text);
             min-height: 100vh;
@@ -77,7 +75,7 @@
         .logo span {
             font-size: 0.875rem;
             color: var(--text-dim);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
         
         .status-indicator {
@@ -87,7 +85,7 @@
             padding: 0.5rem 1rem;
             background: var(--bg-dark);
             border-radius: 9999px;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
         
@@ -152,7 +150,7 @@
             border-radius: 12px;
             background: var(--bg-dark);
             color: var(--text);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 1.25rem;
             font-weight: 700;
             cursor: pointer;
@@ -196,7 +194,7 @@
             border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 0.875rem;
             font-weight: 500;
             cursor: pointer;
@@ -234,7 +232,7 @@
             align-items: center;
             justify-content: center;
             gap: 0.25rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
         
         .input-indicator.active {
@@ -273,7 +271,7 @@
             border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
         
@@ -362,7 +360,7 @@
         }
         
         .info-value {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
         
@@ -627,19 +625,27 @@
                 <div class="info-grid">
                     <div class="info-item">
                         <span class="info-label">Relais EIN</span>
-                        <span class="info-value">ON:1-8 oder ON:ALL</span>
+                        <span class="info-value">r1_on ... r8_on</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Relais AUS</span>
-                        <span class="info-value">OFF:1-8 oder OFF:ALL</span>
+                        <span class="info-value">r1_off ... r8_off</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Impuls</span>
-                        <span class="info-value">PULSE:1-8 oder PULSE:1:500</span>
+                        <span class="info-value">r1_pulse / r1_pulse_500</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">Status</span>
-                        <span class="info-value">STATUS</span>
+                        <span class="info-label">Alle EIN/AUS</span>
+                        <span class="info-value">all_on / all_off</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Alle Impuls</span>
+                        <span class="info-value">all_pulse / all_pulse_500</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Status / Hilfe</span>
+                        <span class="info-value">status / help</span>
                     </div>
                 </div>
             </div>
