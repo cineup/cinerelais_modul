@@ -1,30 +1,34 @@
 /*
- * ESP32-S3-POE-ETH-8DI-8RO Relay Controller
- * 
+ * CineRelais Modul — ESP32-S3 Relay Controller
+ * For Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO
+ *
  * Features:
- * - DHCP (default) or Static IP configuration
- * - Web Interface for configuration and control
+ * - 8 Relay outputs via TCA9554 I2C I/O expander
+ * - 8 Digital inputs (optocoupler isolated)
+ * - Ethernet (W5500) with DHCP or static IP
+ * - WiFi AP mode for initial configuration
+ * - WiFi STA mode (optional, connect to existing network)
+ * - Web interface for configuration and control
  * - TCP command interface for relay control
- * - OTA firmware updates via web
- * - 8 Digital Inputs monitoring
- * - 8 Relay Outputs with ON/OFF/PULSE commands
- * 
+ * - OTA firmware updates via ElegantOTA
+ *
  * TCP Commands (Port configurable, default 5000):
- *   r1_on          - Turn relay 1 on (r1-r8)
- *   r1_off         - Turn relay 1 off (r1-r8)
- *   r1_pulse       - Pulse relay 1 with default duration (r1-r8)
- *   r1_pulse_1000  - Pulse relay 1 for 1000ms (r1-r8)
- *   all_on         - Turn all relays on
- *   all_off        - Turn all relays off
- *   all_pulse      - Pulse all relays with default duration
- *   all_pulse_500  - Pulse all relays for 500ms
- *   status         - Get status of all relays and inputs
- *   help           - Show available commands
+ *   r1_on ... r8_on      - Turn relay on
+ *   r1_off ... r8_off    - Turn relay off
+ *   r1_pulse             - Pulse relay (default duration)
+ *   r1_pulse_1000        - Pulse relay for 1000ms
+ *   all_on / all_off     - All relays on/off
+ *   all_pulse            - Pulse all relays
+ *   all_pulse_500        - Pulse all relays for 500ms
+ *   status               - JSON status
+ *   help                 - Command list
  */
 
 #include <Arduino.h>
+#include <Wire.h>
 #include <SPI.h>
 #include <ETH.h>
+#include <WiFi.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
@@ -44,9 +48,14 @@ std::vector<AsyncClient*> tcpClients;
 bool relayStates[8] = {false};
 bool inputStates[8] = {false};
 bool ethConnected = false;
+bool wifiSTAConnected = false;
+bool wifiAPActive = false;
+bool tca9554Found = false;
 
 unsigned long pulseEndTime[8] = {0};
 bool pulseActive[8] = {false};
+
+unsigned long lastWifiReconnect = 0;
 
 // ============================================
 // Forward Declarations
@@ -55,15 +64,23 @@ bool pulseActive[8] = {false};
 void loadConfig();
 void saveConfig();
 void setupPins();
+void setupI2C();
 void setupEthernet();
+void setupWiFi();
 void setupWebServer();
 void setupTCPServer();
 void handleTCPCommand(AsyncClient* client, String command);
 String getStatusJSON();
 void setRelay(int relay, bool state);
+void setAllRelays(bool state);
 void pulseRelay(int relay, unsigned long duration);
+void pulseAllRelays(unsigned long duration);
 void updatePulses();
 void WiFiEvent(WiFiEvent_t event);
+void tca9554Init();
+void tca9554Write(uint8_t pin, bool state);
+void tca9554WriteAll(uint8_t value);
+uint8_t tca9554Read();
 
 // ============================================
 // Setup
@@ -72,50 +89,56 @@ void WiFiEvent(WiFiEvent_t event);
 void setup() {
     Serial.begin(115200);
     delay(1000);
-    
+
     Serial.println("\n\n========================================");
-    Serial.println("ESP32-S3-POE-ETH-8DI-8RO Relay Controller");
+    Serial.println("CineRelais Modul — ESP32-S3 Relay Controller");
     Serial.println("========================================\n");
-    
+
     // Initialize LittleFS
     if (!LittleFS.begin(true)) {
         Serial.println("ERROR: LittleFS mount failed!");
     } else {
         Serial.println("LittleFS mounted successfully");
     }
-    
+
     // Load configuration
     loadConfig();
-    
+
     // Setup hardware
     setupPins();
-    
-    // Setup Ethernet
+    setupI2C();
+
+    // Setup networking
+    WiFi.onEvent(WiFiEvent);
     setupEthernet();
-    
-    // Wait for Ethernet connection
-    Serial.println("Waiting for Ethernet connection...");
+    setupWiFi();
+
+    // Wait for any network connection
+    Serial.println("Waiting for network connection...");
     unsigned long startTime = millis();
-    while (!ethConnected && (millis() - startTime < 10000)) {
+    while (!ethConnected && !wifiSTAConnected && !wifiAPActive &&
+           (millis() - startTime < 10000)) {
         delay(100);
     }
-    
+
+    // Start servers
+    setupWebServer();
+    setupTCPServer();
+
+    Serial.println("\n========================================");
+    Serial.println("System Ready!");
     if (ethConnected) {
-        // Setup Web Server
-        setupWebServer();
-        
-        // Setup TCP Server
-        setupTCPServer();
-        
-        Serial.println("\n========================================");
-        Serial.println("System Ready!");
-        Serial.printf("IP Address: %s\n", ETH.localIP().toString().c_str());
-        Serial.printf("Web Interface: http://%s\n", ETH.localIP().toString().c_str());
-        Serial.printf("TCP Port: %d\n", config.tcpPort);
-        Serial.println("========================================\n");
-    } else {
-        Serial.println("ERROR: No Ethernet connection!");
+        Serial.printf("Ethernet IP: %s\n", ETH.localIP().toString().c_str());
     }
+    if (wifiSTAConnected) {
+        Serial.printf("WiFi STA IP: %s\n", WiFi.localIP().toString().c_str());
+    }
+    if (wifiAPActive) {
+        Serial.printf("WiFi AP IP: %s (SSID: %s)\n",
+                       WiFi.softAPIP().toString().c_str(), config.hostname);
+    }
+    Serial.printf("TCP Port: %d\n", config.tcpPort);
+    Serial.println("========================================\n");
 }
 
 // ============================================
@@ -125,16 +148,82 @@ void setup() {
 void loop() {
     // Update pulse timers
     updatePulses();
-    
+
     // Read input states
     for (int i = 0; i < 8; i++) {
         inputStates[i] = !digitalRead(DI_PINS[i]); // Active LOW
     }
-    
+
+    // WiFi STA reconnect (every 30s if disconnected)
+    if (config.wifiEnabled && strlen(config.wifiSSID) > 0 &&
+        !wifiSTAConnected && millis() - lastWifiReconnect > 30000) {
+        lastWifiReconnect = millis();
+        Serial.println("WiFi STA: Reconnecting...");
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+    }
+
     // ElegantOTA loop
     ElegantOTA.loop();
-    
+
     delay(10);
+}
+
+// ============================================
+// TCA9554 I2C I/O Expander (Relay Control)
+// ============================================
+
+void tca9554Init() {
+    // Set all pins as outputs
+    Wire.beginTransmission(TCA9554_ADDR);
+    Wire.write(TCA9554_CONFIG_REG);
+    Wire.write(0x00); // All outputs
+    uint8_t err = Wire.endTransmission();
+
+    if (err != 0) {
+        Serial.printf("ERROR: TCA9554 not found at 0x%02X (I2C error %d)\n",
+                       TCA9554_ADDR, err);
+        tca9554Found = false;
+        return;
+    }
+
+    tca9554Found = true;
+    Serial.printf("TCA9554 found at 0x%02X\n", TCA9554_ADDR);
+
+    // Set all outputs LOW (all relays off)
+    tca9554WriteAll(0x00);
+}
+
+uint8_t tca9554Read() {
+    Wire.beginTransmission(TCA9554_ADDR);
+    Wire.write(TCA9554_OUTPUT_REG);
+    Wire.endTransmission();
+    Wire.requestFrom((uint8_t)TCA9554_ADDR, (uint8_t)1);
+    return Wire.available() ? Wire.read() : 0;
+}
+
+void tca9554Write(uint8_t pin, bool state) {
+    if (!tca9554Found || pin > 7) return;
+
+    uint8_t current = tca9554Read();
+    if (state) {
+        current |= (1 << pin);
+    } else {
+        current &= ~(1 << pin);
+    }
+
+    Wire.beginTransmission(TCA9554_ADDR);
+    Wire.write(TCA9554_OUTPUT_REG);
+    Wire.write(current);
+    Wire.endTransmission();
+}
+
+void tca9554WriteAll(uint8_t value) {
+    if (!tca9554Found) return;
+
+    Wire.beginTransmission(TCA9554_ADDR);
+    Wire.write(TCA9554_OUTPUT_REG);
+    Wire.write(value);
+    Wire.endTransmission();
 }
 
 // ============================================
@@ -143,59 +232,92 @@ void loop() {
 
 void loadConfig() {
     Serial.println("Loading configuration...");
-    
+
     // Set defaults first
     config = DEFAULT_CONFIG;
-    
+
     File file = LittleFS.open(CONFIG_FILE, "r");
     if (!file) {
         Serial.println("No config file found, using defaults");
         return;
     }
-    
+
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
-    
+
     if (error) {
         Serial.printf("Config parse error: %s\n", error.c_str());
         return;
     }
-    
+
+    // Ethernet
     config.useDHCP = doc["useDHCP"] | DEFAULT_CONFIG.useDHCP;
     strlcpy(config.staticIP, doc["staticIP"] | DEFAULT_CONFIG.staticIP, sizeof(config.staticIP));
     strlcpy(config.gateway, doc["gateway"] | DEFAULT_CONFIG.gateway, sizeof(config.gateway));
     strlcpy(config.subnet, doc["subnet"] | DEFAULT_CONFIG.subnet, sizeof(config.subnet));
     strlcpy(config.dns, doc["dns"] | DEFAULT_CONFIG.dns, sizeof(config.dns));
+
+    // WiFi
+    config.wifiEnabled = doc["wifiEnabled"] | DEFAULT_CONFIG.wifiEnabled;
+    config.wifiAPEnabled = doc["wifiAPEnabled"] | DEFAULT_CONFIG.wifiAPEnabled;
+    strlcpy(config.wifiSSID, doc["wifiSSID"] | DEFAULT_CONFIG.wifiSSID, sizeof(config.wifiSSID));
+    strlcpy(config.wifiPassword, doc["wifiPassword"] | DEFAULT_CONFIG.wifiPassword, sizeof(config.wifiPassword));
+    strlcpy(config.wifiAPPassword, doc["wifiAPPassword"] | DEFAULT_CONFIG.wifiAPPassword, sizeof(config.wifiAPPassword));
+    config.wifiDHCP = doc["wifiDHCP"] | DEFAULT_CONFIG.wifiDHCP;
+    strlcpy(config.wifiIP, doc["wifiIP"] | DEFAULT_CONFIG.wifiIP, sizeof(config.wifiIP));
+    strlcpy(config.wifiGateway, doc["wifiGateway"] | DEFAULT_CONFIG.wifiGateway, sizeof(config.wifiGateway));
+    strlcpy(config.wifiSubnet, doc["wifiSubnet"] | DEFAULT_CONFIG.wifiSubnet, sizeof(config.wifiSubnet));
+    strlcpy(config.wifiDNS, doc["wifiDNS"] | DEFAULT_CONFIG.wifiDNS, sizeof(config.wifiDNS));
+
+    // General
     strlcpy(config.hostname, doc["hostname"] | DEFAULT_CONFIG.hostname, sizeof(config.hostname));
     config.tcpPort = doc["tcpPort"] | DEFAULT_CONFIG.tcpPort;
     config.pulseDuration = doc["pulseDuration"] | DEFAULT_CONFIG.pulseDuration;
-    
+
     Serial.println("Configuration loaded:");
     Serial.printf("  DHCP: %s\n", config.useDHCP ? "enabled" : "disabled");
     Serial.printf("  Hostname: %s\n", config.hostname);
+    Serial.printf("  WiFi: %s\n", config.wifiEnabled ? "enabled" : "disabled");
+    Serial.printf("  WiFi SSID: %s\n", strlen(config.wifiSSID) > 0 ? config.wifiSSID : "(none)");
     Serial.printf("  TCP Port: %d\n", config.tcpPort);
 }
 
 void saveConfig() {
     Serial.println("Saving configuration...");
-    
+
     JsonDocument doc;
+
+    // Ethernet
     doc["useDHCP"] = config.useDHCP;
     doc["staticIP"] = config.staticIP;
     doc["gateway"] = config.gateway;
     doc["subnet"] = config.subnet;
     doc["dns"] = config.dns;
+
+    // WiFi
+    doc["wifiEnabled"] = config.wifiEnabled;
+    doc["wifiAPEnabled"] = config.wifiAPEnabled;
+    doc["wifiSSID"] = config.wifiSSID;
+    doc["wifiPassword"] = config.wifiPassword;
+    doc["wifiAPPassword"] = config.wifiAPPassword;
+    doc["wifiDHCP"] = config.wifiDHCP;
+    doc["wifiIP"] = config.wifiIP;
+    doc["wifiGateway"] = config.wifiGateway;
+    doc["wifiSubnet"] = config.wifiSubnet;
+    doc["wifiDNS"] = config.wifiDNS;
+
+    // General
     doc["hostname"] = config.hostname;
     doc["tcpPort"] = config.tcpPort;
     doc["pulseDuration"] = config.pulseDuration;
-    
+
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {
         Serial.println("ERROR: Failed to open config file for writing");
         return;
     }
-    
+
     serializeJson(doc, file);
     file.close();
     Serial.println("Configuration saved");
@@ -207,30 +329,24 @@ void saveConfig() {
 
 void setupPins() {
     Serial.println("Setting up GPIO pins...");
-    
-    // Setup Digital Inputs
+
+    // Setup Digital Inputs (active LOW with internal pull-up)
     for (int i = 0; i < 8; i++) {
-        pinMode(DI_PINS[i], INPUT);
+        pinMode(DI_PINS[i], INPUT_PULLUP);
     }
-    
-    // Setup Relay Outputs
-    for (int i = 0; i < 8; i++) {
-        pinMode(RO_PINS[i], OUTPUT);
-        digitalWrite(RO_PINS[i], LOW);
-        relayStates[i] = false;
-    }
-    
-    // Status LED
-    #ifdef STATUS_LED_PIN
-    pinMode(STATUS_LED_PIN, OUTPUT);
-    digitalWrite(STATUS_LED_PIN, LOW);
-    #endif
-    
+
     Serial.println("GPIO pins configured");
 }
 
+void setupI2C() {
+    Serial.println("Setting up I2C bus...");
+
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 100000);
+    tca9554Init();
+}
+
 // ============================================
-// Ethernet Setup
+// Network Events
 // ============================================
 
 void WiFiEvent(WiFiEvent_t event) {
@@ -244,44 +360,53 @@ void WiFiEvent(WiFiEvent_t event) {
             break;
         case ARDUINO_EVENT_ETH_GOT_IP:
             Serial.printf("ETH Got IP: %s\n", ETH.localIP().toString().c_str());
-            Serial.printf("  Gateway: %s\n", ETH.gatewayIP().toString().c_str());
-            Serial.printf("  Subnet: %s\n", ETH.subnetMask().toString().c_str());
             ethConnected = true;
-            #ifdef STATUS_LED_PIN
-            digitalWrite(STATUS_LED_PIN, HIGH);
-            #endif
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             Serial.println("ETH Disconnected");
             ethConnected = false;
-            #ifdef STATUS_LED_PIN
-            digitalWrite(STATUS_LED_PIN, LOW);
-            #endif
             break;
         case ARDUINO_EVENT_ETH_STOP:
             Serial.println("ETH Stopped");
             ethConnected = false;
+            break;
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            Serial.printf("WiFi STA Got IP: %s\n", WiFi.localIP().toString().c_str());
+            wifiSTAConnected = true;
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+            Serial.println("WiFi STA Disconnected");
+            wifiSTAConnected = false;
+            break;
+        case ARDUINO_EVENT_WIFI_AP_START:
+            Serial.printf("WiFi AP Started (IP: %s)\n", WiFi.softAPIP().toString().c_str());
+            wifiAPActive = true;
+            break;
+        case ARDUINO_EVENT_WIFI_AP_STOP:
+            Serial.println("WiFi AP Stopped");
+            wifiAPActive = false;
             break;
         default:
             break;
     }
 }
 
+// ============================================
+// Ethernet Setup
+// ============================================
+
 void setupEthernet() {
     Serial.println("Setting up Ethernet...");
-    
-    WiFi.onEvent(WiFiEvent);
-    
-    // Initialize Ethernet with W5500
-    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
-    
-    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, ETH_SPI_HOST)) {
-        Serial.println("ERROR: ETH.begin() failed!");
+
+    // W5500 Ethernet: pass all SPI pins directly to ETH.begin()
+    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN,
+                   ETH_SPI_HOST, ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN)) {
+        Serial.println("WARNING: ETH.begin() failed — no Ethernet available");
         return;
     }
-    
+
     if (!config.useDHCP) {
-        Serial.println("Configuring static IP...");
+        Serial.println("Configuring Ethernet static IP...");
         IPAddress ip, gateway, subnet, dns;
         ip.fromString(config.staticIP);
         gateway.fromString(config.gateway);
@@ -289,62 +414,134 @@ void setupEthernet() {
         dns.fromString(config.dns);
         ETH.config(ip, gateway, subnet, dns);
     }
-    
+
     Serial.println("Ethernet initialized");
 }
 
 // ============================================
-// Relay Control
+// WiFi Setup
+// ============================================
+
+void setupWiFi() {
+    if (!config.wifiEnabled) {
+        Serial.println("WiFi disabled in configuration");
+        WiFi.mode(WIFI_OFF);
+        return;
+    }
+
+    Serial.println("Setting up WiFi...");
+
+    bool hasSSID = strlen(config.wifiSSID) > 0;
+
+    // Determine WiFi mode
+    if (config.wifiAPEnabled && hasSSID) {
+        WiFi.mode(WIFI_AP_STA);
+    } else if (config.wifiAPEnabled) {
+        WiFi.mode(WIFI_AP);
+    } else if (hasSSID) {
+        WiFi.mode(WIFI_STA);
+    } else {
+        Serial.println("WiFi enabled but no AP or STA configured");
+        WiFi.mode(WIFI_OFF);
+        return;
+    }
+
+    // Start AP if enabled
+    if (config.wifiAPEnabled) {
+        const char* apPassword = strlen(config.wifiAPPassword) >= 8 ?
+                                 config.wifiAPPassword : NULL;
+        WiFi.softAP(config.hostname, apPassword);
+        Serial.printf("WiFi AP started: SSID=%s, Password=%s\n",
+                       config.hostname, apPassword ? "****" : "(open)");
+    }
+
+    // Connect STA if SSID is configured
+    if (hasSSID) {
+        WiFi.setHostname(config.hostname);
+
+        if (!config.wifiDHCP) {
+            IPAddress ip, gateway, subnet, dns;
+            ip.fromString(config.wifiIP);
+            gateway.fromString(config.wifiGateway);
+            subnet.fromString(config.wifiSubnet);
+            dns.fromString(config.wifiDNS);
+            WiFi.config(ip, gateway, subnet, dns);
+        }
+
+        WiFi.begin(config.wifiSSID, config.wifiPassword);
+        Serial.printf("WiFi STA connecting to: %s\n", config.wifiSSID);
+    }
+}
+
+// ============================================
+// Relay Control (via TCA9554)
 // ============================================
 
 void setRelay(int relay, bool state) {
     if (relay < 1 || relay > 8) return;
-    
+
     int index = relay - 1;
-    digitalWrite(RO_PINS[index], state ? HIGH : LOW);
+    tca9554Write(index, state);
     relayStates[index] = state;
-    
+
     // Cancel any active pulse
     pulseActive[index] = false;
     pulseEndTime[index] = 0;
-    
+
     Serial.printf("Relay %d: %s\n", relay, state ? "ON" : "OFF");
 }
 
 void setAllRelays(bool state) {
-    for (int i = 1; i <= 8; i++) {
-        setRelay(i, state);
+    tca9554WriteAll(state ? 0xFF : 0x00);
+    for (int i = 0; i < 8; i++) {
+        relayStates[i] = state;
+        pulseActive[i] = false;
+        pulseEndTime[i] = 0;
     }
+    Serial.printf("All relays: %s\n", state ? "ON" : "OFF");
 }
 
 void pulseRelay(int relay, unsigned long duration) {
     if (relay < 1 || relay > 8) return;
-    
+
     int index = relay - 1;
-    digitalWrite(RO_PINS[index], HIGH);
+    tca9554Write(index, true);
     relayStates[index] = true;
     pulseActive[index] = true;
     pulseEndTime[index] = millis() + duration;
-    
+
     Serial.printf("Relay %d: PULSE (%lu ms)\n", relay, duration);
 }
 
 void pulseAllRelays(unsigned long duration) {
-    for (int i = 1; i <= 8; i++) {
-        pulseRelay(i, duration);
+    tca9554WriteAll(0xFF);
+    unsigned long endTime = millis() + duration;
+    for (int i = 0; i < 8; i++) {
+        relayStates[i] = true;
+        pulseActive[i] = true;
+        pulseEndTime[i] = endTime;
     }
+    Serial.printf("All relays: PULSE (%lu ms)\n", duration);
 }
 
 void updatePulses() {
     unsigned long now = millis();
+    bool needsWrite = false;
+    uint8_t outputState = tca9554Found ? tca9554Read() : 0;
+
     for (int i = 0; i < 8; i++) {
         if (pulseActive[i] && now >= pulseEndTime[i]) {
-            digitalWrite(RO_PINS[i], LOW);
+            outputState &= ~(1 << i);
             relayStates[i] = false;
             pulseActive[i] = false;
             pulseEndTime[i] = 0;
+            needsWrite = true;
             Serial.printf("Relay %d: PULSE ended\n", i + 1);
         }
+    }
+
+    if (needsWrite) {
+        tca9554WriteAll(outputState);
     }
 }
 
@@ -354,34 +551,67 @@ void updatePulses() {
 
 String getStatusJSON() {
     JsonDocument doc;
-    
+
     // Network info
-    doc["ip"] = ETH.localIP().toString();
-    doc["mac"] = ETH.macAddress();
     doc["hostname"] = config.hostname;
-    doc["dhcp"] = config.useDHCP;
     doc["tcpPort"] = config.tcpPort;
     doc["pulseDuration"] = config.pulseDuration;
     doc["uptime"] = millis() / 1000;
-    
-    // Static IP config
+
+    // Ethernet
+    doc["ethConnected"] = ethConnected;
+    doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
+    doc["ethMAC"] = ETH.macAddress();
+    doc["dhcp"] = config.useDHCP;
     doc["staticIP"] = config.staticIP;
     doc["gateway"] = config.gateway;
     doc["subnet"] = config.subnet;
     doc["dns"] = config.dns;
-    
+
+    // WiFi
+    doc["wifiEnabled"] = config.wifiEnabled;
+    doc["wifiAPEnabled"] = config.wifiAPEnabled;
+    doc["wifiAPActive"] = wifiAPActive;
+    doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";
+    doc["wifiSTAConnected"] = wifiSTAConnected;
+    doc["wifiSTAIP"] = wifiSTAConnected ? WiFi.localIP().toString() : "";
+    doc["wifiSSID"] = config.wifiSSID;
+    doc["wifiDHCP"] = config.wifiDHCP;
+    doc["wifiIP"] = config.wifiIP;
+    doc["wifiGateway"] = config.wifiGateway;
+    doc["wifiSubnet"] = config.wifiSubnet;
+    doc["wifiDNS"] = config.wifiDNS;
+
+    // For backwards compatibility: "ip" returns first available IP
+    if (ethConnected) {
+        doc["ip"] = ETH.localIP().toString();
+        doc["mac"] = ETH.macAddress();
+    } else if (wifiSTAConnected) {
+        doc["ip"] = WiFi.localIP().toString();
+        doc["mac"] = WiFi.macAddress();
+    } else if (wifiAPActive) {
+        doc["ip"] = WiFi.softAPIP().toString();
+        doc["mac"] = WiFi.softAPmacAddress();
+    } else {
+        doc["ip"] = "";
+        doc["mac"] = "";
+    }
+
+    // Hardware
+    doc["tca9554"] = tca9554Found;
+
     // Relay states
     JsonArray relays = doc["relays"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
         relays.add(relayStates[i]);
     }
-    
+
     // Input states
     JsonArray inputs = doc["inputs"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
         inputs.add(inputStates[i]);
     }
-    
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -395,30 +625,30 @@ void handleTCPData(void* arg, AsyncClient* client, void* data, size_t len) {
     String command = String((char*)data).substring(0, len);
     command.trim();
     command.toLowerCase();
-    
+
     Serial.printf("TCP [%s]: %s\n", client->remoteIP().toString().c_str(), command.c_str());
-    
+
     handleTCPCommand(client, command);
 }
 
 void handleTCPClient(void* arg, AsyncClient* client) {
     Serial.printf("TCP Client connected: %s\n", client->remoteIP().toString().c_str());
-    
+
     tcpClients.push_back(client);
-    
+
     client->onData(handleTCPData);
-    
+
     client->onDisconnect([](void* arg, AsyncClient* client) {
         Serial.printf("TCP Client disconnected: %s\n", client->remoteIP().toString().c_str());
         tcpClients.erase(std::remove(tcpClients.begin(), tcpClients.end(), client), tcpClients.end());
     });
-    
+
     client->onError([](void* arg, AsyncClient* client, int8_t error) {
         Serial.printf("TCP Error: %d\n", error);
     });
-    
+
     // Send welcome message
-    client->write("ESP32-S3 Relay Controller\r\nType help for commands\r\n");
+    client->write("CineRelais Modul — ESP32-S3 Relay Controller\r\nType help for commands\r\n");
 }
 
 void handleTCPCommand(AsyncClient* client, String command) {
@@ -493,7 +723,7 @@ void handleTCPCommand(AsyncClient* client, String command) {
     else {
         response = "ERROR: Unknown command. Type help for available commands.\r\n";
     }
-    
+
     if (client && client->connected()) {
         client->write(response.c_str());
     }
@@ -501,11 +731,11 @@ void handleTCPCommand(AsyncClient* client, String command) {
 
 void setupTCPServer() {
     Serial.printf("Starting TCP server on port %d...\n", config.tcpPort);
-    
+
     tcpServer = new AsyncServer(config.tcpPort);
     tcpServer->onClient(handleTCPClient, NULL);
     tcpServer->begin();
-    
+
     Serial.println("TCP server started");
 }
 
@@ -515,21 +745,21 @@ void setupTCPServer() {
 
 void setupWebServer() {
     Serial.println("Setting up Web Server...");
-    
+
     // Serve static files from LittleFS
     webServer.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
-    
+
     // API: Get status
     webServer.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", getStatusJSON());
     });
-    
+
     // API: Set relay
     webServer.on("/api/relay", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("relay", true) && request->hasParam("state", true)) {
             int relay = request->getParam("relay", true)->value().toInt();
             String state = request->getParam("state", true)->value();
-            
+
             if (relay >= 1 && relay <= 8) {
                 if (state == "on") {
                     setRelay(relay, true);
@@ -550,7 +780,7 @@ void setupWebServer() {
             request->send(400, "application/json", "{\"error\":\"Missing parameters\"}");
         }
     });
-    
+
     // API: Set all relays
     webServer.on("/api/relays", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("state", true)) {
@@ -571,28 +801,41 @@ void setupWebServer() {
             request->send(400, "application/json", "{\"error\":\"Missing state parameter\"}");
         }
     });
-    
+
     // API: Get config
     webServer.on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
+        // Ethernet
         doc["useDHCP"] = config.useDHCP;
         doc["staticIP"] = config.staticIP;
         doc["gateway"] = config.gateway;
         doc["subnet"] = config.subnet;
         doc["dns"] = config.dns;
+        // WiFi
+        doc["wifiEnabled"] = config.wifiEnabled;
+        doc["wifiAPEnabled"] = config.wifiAPEnabled;
+        doc["wifiSSID"] = config.wifiSSID;
+        doc["wifiAPPassword"] = config.wifiAPPassword;
+        doc["wifiDHCP"] = config.wifiDHCP;
+        doc["wifiIP"] = config.wifiIP;
+        doc["wifiGateway"] = config.wifiGateway;
+        doc["wifiSubnet"] = config.wifiSubnet;
+        doc["wifiDNS"] = config.wifiDNS;
+        // General
         doc["hostname"] = config.hostname;
         doc["tcpPort"] = config.tcpPort;
         doc["pulseDuration"] = config.pulseDuration;
-        
+
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);
     });
-    
+
     // API: Save config
     webServer.on("/api/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         bool changed = false;
-        
+
+        // Ethernet
         if (request->hasParam("useDHCP", true)) {
             config.useDHCP = request->getParam("useDHCP", true)->value() == "true";
             changed = true;
@@ -613,6 +856,48 @@ void setupWebServer() {
             strlcpy(config.dns, request->getParam("dns", true)->value().c_str(), sizeof(config.dns));
             changed = true;
         }
+        // WiFi
+        if (request->hasParam("wifiEnabled", true)) {
+            config.wifiEnabled = request->getParam("wifiEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("wifiAPEnabled", true)) {
+            config.wifiAPEnabled = request->getParam("wifiAPEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("wifiSSID", true)) {
+            strlcpy(config.wifiSSID, request->getParam("wifiSSID", true)->value().c_str(), sizeof(config.wifiSSID));
+            changed = true;
+        }
+        if (request->hasParam("wifiPassword", true)) {
+            strlcpy(config.wifiPassword, request->getParam("wifiPassword", true)->value().c_str(), sizeof(config.wifiPassword));
+            changed = true;
+        }
+        if (request->hasParam("wifiAPPassword", true)) {
+            strlcpy(config.wifiAPPassword, request->getParam("wifiAPPassword", true)->value().c_str(), sizeof(config.wifiAPPassword));
+            changed = true;
+        }
+        if (request->hasParam("wifiDHCP", true)) {
+            config.wifiDHCP = request->getParam("wifiDHCP", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("wifiIP", true)) {
+            strlcpy(config.wifiIP, request->getParam("wifiIP", true)->value().c_str(), sizeof(config.wifiIP));
+            changed = true;
+        }
+        if (request->hasParam("wifiGateway", true)) {
+            strlcpy(config.wifiGateway, request->getParam("wifiGateway", true)->value().c_str(), sizeof(config.wifiGateway));
+            changed = true;
+        }
+        if (request->hasParam("wifiSubnet", true)) {
+            strlcpy(config.wifiSubnet, request->getParam("wifiSubnet", true)->value().c_str(), sizeof(config.wifiSubnet));
+            changed = true;
+        }
+        if (request->hasParam("wifiDNS", true)) {
+            strlcpy(config.wifiDNS, request->getParam("wifiDNS", true)->value().c_str(), sizeof(config.wifiDNS));
+            changed = true;
+        }
+        // General
         if (request->hasParam("hostname", true)) {
             strlcpy(config.hostname, request->getParam("hostname", true)->value().c_str(), sizeof(config.hostname));
             changed = true;
@@ -625,7 +910,7 @@ void setupWebServer() {
             config.pulseDuration = request->getParam("pulseDuration", true)->value().toInt();
             changed = true;
         }
-        
+
         if (changed) {
             saveConfig();
             request->send(200, "application/json", "{\"success\":true,\"message\":\"Configuration saved. Restart required for network changes.\"}");
@@ -633,22 +918,22 @@ void setupWebServer() {
             request->send(400, "application/json", "{\"error\":\"No parameters provided\"}");
         }
     });
-    
+
     // API: Restart
     webServer.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", "{\"success\":true,\"message\":\"Restarting...\"}");
         delay(500);
         ESP.restart();
     });
-    
+
     // Setup ElegantOTA
     ElegantOTA.begin(&webServer);
-    
+
     // Handle 404
     webServer.onNotFound([](AsyncWebServerRequest *request) {
         request->send(404, "text/plain", "Not Found");
     });
-    
+
     webServer.begin();
     Serial.println("Web server started on port 80");
 }

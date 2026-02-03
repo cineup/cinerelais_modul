@@ -8,7 +8,7 @@
 **License**: MIT
 **Domain**: Cinema relay automation — part of the CineUp ecosystem
 
-Firmware for the **Waveshare ESP32-S3-POE-ETH-8DI-8RO** module. Controls 8 relay outputs and monitors 8 digital inputs via Ethernet (W5500), with a web interface, TCP command protocol, and OTA firmware updates. Used for cinema infrastructure automation (lighting, curtains, projector control, audio routing).
+Firmware for the **Waveshare ESP32-S3-ETH-8DI-8RO** / **ESP32-S3-POE-ETH-8DI-8RO** module. Controls 8 relay outputs (via TCA9554 I2C expander) and monitors 8 digital inputs. Supports Ethernet (W5500), WiFi (AP/STA), web interface, TCP command protocol, and OTA firmware updates. Used for cinema infrastructure automation (lighting, curtains, projector control, audio routing).
 
 ## Repository Structure
 
@@ -21,7 +21,7 @@ cinerelais_modul/
 ├── platformio.ini         # PlatformIO build configuration
 ├── src/
 │   ├── config.h           # Pin definitions, defaults, NetworkConfig struct
-│   └── main.cpp           # Main firmware (~650 lines)
+│   └── main.cpp           # Main firmware (~940 lines)
 └── data/
     └── index.html         # Single-page web interface (LittleFS)
 ```
@@ -32,7 +32,7 @@ cinerelais_modul/
 
 - [PlatformIO](https://platformio.org/) CLI or IDE plugin
 - USB-C cable for initial flash
-- Waveshare ESP32-S3-POE-ETH-8DI-8RO board
+- Waveshare ESP32-S3-ETH-8DI-8RO or ESP32-S3-POE-ETH-8DI-8RO board
 
 ### Build & Flash
 
@@ -71,26 +71,43 @@ pio device monitor
 
 ### Hardware Abstraction (`src/config.h`)
 
-- **8 Digital Inputs** (DI1-DI8): GPIOs 4, 5, 6, 7, 15, 16, 17, 18 — optocoupler isolated, active LOW
-- **8 Relay Outputs** (RO1-RO8): GPIOs 33-40 — via ULN2803 driver
-- **Ethernet**: W5500 via SPI (MISO=11, MOSI=13, SCLK=12, CS=10, INT=14)
-- **Status LED**: GPIO 48
+**Digital Inputs** (DI1-DI8): GPIOs 4, 5, 6, 7, 8, 9, 10, 11 — optocoupler isolated, active LOW with internal pull-up
+
+**Relay Outputs** (RO1-RO8): Controlled via **TCA9554 I2C I/O Expander** at address 0x20
+- I2C SDA: GPIO 42
+- I2C SCL: GPIO 41
+- TCA9554 pins P0-P7 → Relays CH1-CH8
+
+**Ethernet** (W5500 via SPI):
+- SCLK: GPIO 15
+- MOSI: GPIO 13
+- MISO: GPIO 14
+- CS: GPIO 16
+- INT: GPIO 12
+- RST: Not connected (-1)
+
+**Additional Peripherals**:
+- RS485: TX=GPIO17, RX=GPIO18 (reserved for Modbus extension)
+- RGB LED (WS2812): GPIO 38
+- Buzzer: GPIO 46
 
 ### Firmware Components (`src/main.cpp`)
 
 The firmware is a single-file monolith with these logical sections:
 
-| Section | Lines | Description |
-|---------|-------|-------------|
-| Includes & globals | 1-46 | Libraries, state arrays, config |
-| `setup()` | 68-115 | Init LittleFS, config, pins, Ethernet, servers |
-| `loop()` | 121-134 | Poll inputs, update pulses, ElegantOTA tick |
-| Config management | 140-198 | `loadConfig()` / `saveConfig()` — JSON on LittleFS (`/config.json`) |
-| Hardware setup | 204-290 | `setupPins()`, `WiFiEvent()`, `setupEthernet()` |
-| Relay control | 296-345 | `setRelay()`, `setAllRelays()`, `pulseRelay()`, `updatePulses()` |
-| Status JSON | 351-384 | `getStatusJSON()` — combined relay/input/network state |
-| TCP server | 390-509 | Async TCP on configurable port, text command protocol |
-| Web server | 515-653 | AsyncWebServer on port 80, REST API endpoints, ElegantOTA |
+| Section | Description |
+|---------|-------------|
+| Includes & globals | Libraries, state arrays, config |
+| `setup()` | Init LittleFS, config, pins, I2C, Ethernet, WiFi, servers |
+| `loop()` | Poll inputs, update pulses, WiFi reconnect, ElegantOTA tick |
+| TCA9554 driver | `tca9554Init()`, `tca9554Read()`, `tca9554Write()`, `tca9554WriteAll()` |
+| Config management | `loadConfig()` / `saveConfig()` — JSON on LittleFS (`/config.json`) |
+| Hardware setup | `setupPins()`, `setupI2C()`, `setupEthernet()`, `setupWiFi()` |
+| Network events | `WiFiEvent()` — handles ETH and WiFi state changes |
+| Relay control | `setRelay()`, `setAllRelays()`, `pulseRelay()`, `pulseAllRelays()`, `updatePulses()` |
+| Status JSON | `getStatusJSON()` — combined relay/input/network/WiFi state |
+| TCP server | Async TCP on configurable port, text command protocol |
+| Web server | AsyncWebServer on port 80, REST API endpoints, ElegantOTA |
 
 ### TCP Command Protocol (default port 5000)
 
@@ -113,7 +130,7 @@ Commands are case-insensitive (lowercased on receive). Responses prefixed with `
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/status` | GET | Full status JSON (relays, inputs, network, uptime) |
+| `/api/status` | GET | Full status JSON (relays, inputs, Ethernet, WiFi, TCA9554, uptime) |
 | `/api/config` | GET | Current configuration JSON |
 | `/api/config` | POST | Save configuration (form data) |
 | `/api/relay` | POST | Control single relay (params: `relay`, `state`, `duration`) |
@@ -126,13 +143,14 @@ Commands are case-insensitive (lowercased on receive). Responses prefixed with `
 Single-page application with dark theme. German UI labels. Features:
 - 4x2 grid of relay toggle buttons (click = toggle, right-click = pulse)
 - 4x2 grid of digital input status indicators
-- Network configuration (DHCP toggle, static IP fields)
+- Ethernet configuration (DHCP toggle, static IP fields, hostname)
+- WiFi configuration (enable/disable, AP settings, STA settings with DHCP/static IP)
 - TCP port and pulse duration settings
-- System info (IP, MAC, uptime)
+- System info (Ethernet status/IP, WiFi STA/AP status, TCA9554 status, uptime)
 - Device restart button
 - OTA firmware update link
 
-Polls `/api/status` every 2 seconds. Uses `FormData` for POST requests. Fonts: Space Grotesk + JetBrains Mono (loaded from Google Fonts CDN).
+Polls `/api/status` every 2 seconds. Uses `FormData` for POST requests. System fonts (no external dependencies).
 
 ### Configuration Persistence
 
@@ -145,11 +163,29 @@ Stored as `/config.json` on LittleFS. Fields:
 | `gateway` | string | `192.168.1.1` |
 | `subnet` | string | `255.255.255.0` |
 | `dns` | string | `8.8.8.8` |
-| `hostname` | string | `esp32-relay` |
+| `wifiEnabled` | bool | `true` |
+| `wifiAPEnabled` | bool | `true` |
+| `wifiSSID` | string | `""` (empty = no STA) |
+| `wifiPassword` | string | `""` |
+| `wifiAPPassword` | string | `""` (empty = open AP) |
+| `wifiDHCP` | bool | `true` |
+| `wifiIP` | string | `192.168.4.100` |
+| `wifiGateway` | string | `192.168.4.1` |
+| `wifiSubnet` | string | `255.255.255.0` |
+| `wifiDNS` | string | `8.8.8.8` |
+| `hostname` | string | `cinerelais1` |
 | `tcpPort` | uint16 | `5000` |
 | `pulseDuration` | uint16 | `500` (ms) |
 
 Network changes require device restart to take effect.
+
+### WiFi Behavior
+
+- **Default**: WiFi enabled, AP enabled, STA disabled (no SSID configured)
+- **AP mode**: SSID = hostname, password from `wifiAPPassword` (min 8 chars for WPA2, empty = open)
+- **STA mode**: Connects to configured `wifiSSID`, auto-reconnect every 30s if disconnected
+- **AP+STA**: Both can run simultaneously
+- WiFi can be completely disabled via `wifiEnabled = false`
 
 ## Conventions
 
@@ -167,6 +203,7 @@ Network changes require device restart to take effect.
 - 1-indexed relay numbering in API/protocol (converted to 0-indexed internally)
 - `strlcpy()` for safe string copies into fixed-size buffers
 - ArduinoJson `JsonDocument` (v7 API, no explicit size)
+- TCA9554 uses read-modify-write for single pins, bulk write for all relays
 
 ### Git Workflow
 
@@ -178,7 +215,7 @@ Network changes require device restart to take effect.
 | File | Purpose |
 |------|---------|
 | `src/main.cpp` | Main firmware — all logic in one file |
-| `src/config.h` | Hardware pin mapping, default values, `NetworkConfig` struct |
+| `src/config.h` | Hardware pin mapping, I2C/TCA9554 defines, default values, `NetworkConfig` struct |
 | `data/index.html` | Web interface SPA — uploaded to LittleFS |
 | `platformio.ini` | Build config, dependencies, board settings |
 | `README.md` | User documentation (German) |
@@ -190,18 +227,37 @@ Network changes require device restart to take effect.
 2. **Minimal changes** — Make only the changes requested; avoid unnecessary refactoring
 3. **Preserve conventions** — English code, German UI/docs; keep section comment style
 4. **Hardware awareness** — This runs on ESP32-S3 with 16MB flash; consider memory constraints and real-time requirements
-5. **Safety first** — Relay modules control physical equipment; never bypass safety checks or remove input validation on relay indices (1-8)
-6. **Single-file architecture** — `main.cpp` is monolithic by design; don't split into multiple files unless explicitly requested
-7. **Async patterns** — Web server and TCP server are async (ESPAsyncWebServer/AsyncTCP); avoid blocking calls in handlers
-8. **LittleFS filesystem** — Web files go in `data/`; changes to `data/` require `pio run -t uploadfs`
-9. **Pin changes** — Only modify pin assignments in `config.h`; verify against the actual board revision
-10. **Update this file** — When significant structural changes are made, update CLAUDE.md to reflect the current state
+5. **TCA9554 relay control** — Relays are NOT direct GPIO; always use `tca9554Write()` or `tca9554WriteAll()`
+6. **Safety first** — Relay modules control physical equipment; never bypass safety checks or remove input validation on relay indices (1-8)
+7. **Single-file architecture** — `main.cpp` is monolithic by design; don't split into multiple files unless explicitly requested
+8. **Async patterns** — Web server and TCP server are async (ESPAsyncWebServer/AsyncTCP); avoid blocking calls in handlers
+9. **LittleFS filesystem** — Web files go in `data/`; changes to `data/` require `pio run -t uploadfs`
+10. **Pin changes** — Only modify pin assignments in `config.h`; verify against the actual board datasheet
+11. **Update this file** — When significant structural changes are made, update CLAUDE.md to reflect the current state
+
+## Hardware Pin Reference (Verified)
+
+| Function | GPIO | Notes |
+|----------|------|-------|
+| DI1-DI8 | 4, 5, 6, 7, 8, 9, 10, 11 | Optocoupler isolated, active LOW |
+| I2C SDA | 42 | TCA9554 for relays |
+| I2C SCL | 41 | TCA9554 for relays |
+| ETH SCLK | 15 | W5500 SPI |
+| ETH MOSI | 13 | W5500 SPI |
+| ETH MISO | 14 | W5500 SPI |
+| ETH CS | 16 | W5500 SPI |
+| ETH INT | 12 | W5500 interrupt |
+| RS485 TX | 17 | Reserved for Modbus |
+| RS485 RX | 18 | Reserved for Modbus |
+| RGB LED | 38 | WS2812 |
+| Buzzer | 46 | PWM capable |
 
 ## Maintenance Log
 
 | Date | Change |
 |------|--------|
-| 2026-02-01 | Initial CLAUDE.md created for empty repository |
-| 2026-02-01 | Updated with full project analysis after source code upload |
-| 2026-02-01 | TCP protocol changed: `ON:1` → `r1_on`, `PULSE:3:1000` → `r3_pulse_1000`, lowercase, underscore-separated |
-| 2026-02-01 | Renamed `impuls` → `pulse` in TCP commands for English consistency; added `README_EN.md` |
+| 2026-02-01 | Initial CLAUDE.md created |
+| 2026-02-01 | Updated with full project analysis |
+| 2026-02-01 | TCP protocol: `ON:1` → `r1_on`, lowercase, underscore-separated |
+| 2026-02-01 | Renamed `impuls` → `pulse` for English consistency; added `README_EN.md` |
+| 2026-02-03 | **Major rewrite**: Fixed GPIO pins, added TCA9554 I2C relay driver, added WiFi AP/STA support, corrected Ethernet W5500 SPI pins |

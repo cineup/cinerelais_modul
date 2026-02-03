@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Relay Controller</title>
+    <title>CineRelais Controller</title>
     <style>
         :root {
             --bg-dark: #0a0a0f;
@@ -18,13 +18,13 @@
             --warning: #f59e0b;
             --info: #3b82f6;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-dark);
@@ -32,13 +32,13 @@
             min-height: 100vh;
             line-height: 1.6;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
         }
-        
+
         header {
             display: flex;
             justify-content: space-between;
@@ -48,13 +48,13 @@
             border-bottom: 1px solid var(--border);
             margin-bottom: 2rem;
         }
-        
+
         .logo {
             display: flex;
             align-items: center;
             gap: 1rem;
         }
-        
+
         .logo-icon {
             width: 48px;
             height: 48px;
@@ -65,19 +65,19 @@
             justify-content: center;
             font-size: 1.5rem;
         }
-        
+
         .logo h1 {
             font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: -0.02em;
         }
-        
+
         .logo span {
             font-size: 0.875rem;
             color: var(--text-dim);
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
-        
+
         .status-indicator {
             display: flex;
             align-items: center;
@@ -88,7 +88,7 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
-        
+
         .status-dot {
             width: 10px;
             height: 10px;
@@ -96,18 +96,18 @@
             background: var(--accent);
             animation: pulse 2s infinite;
         }
-        
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
-        
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 1.5rem;
         }
-        
+
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -115,12 +115,12 @@
             padding: 1.5rem;
             transition: all 0.2s ease;
         }
-        
+
         .card:hover {
             background: var(--bg-card-hover);
             border-color: #3a3a4a;
         }
-        
+
         .card-header {
             display: flex;
             justify-content: space-between;
@@ -129,7 +129,7 @@
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border);
         }
-        
+
         .card-title {
             font-size: 1.125rem;
             font-weight: 600;
@@ -137,13 +137,13 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .relay-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0.75rem;
         }
-        
+
         .relay-btn {
             aspect-ratio: 1;
             border: 2px solid var(--border);
@@ -161,32 +161,32 @@
             justify-content: center;
             gap: 0.25rem;
         }
-        
+
         .relay-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
-        
+
         .relay-btn.active {
             background: var(--accent);
             border-color: var(--accent);
             color: #000;
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
         }
-        
+
         .relay-btn span {
             font-size: 0.625rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             opacity: 0.7;
         }
-        
+
         .relay-actions {
             display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
         }
-        
+
         .btn {
             flex: 1;
             padding: 0.75rem 1rem;
@@ -200,28 +200,28 @@
             cursor: pointer;
             transition: all 0.15s ease;
         }
-        
+
         .btn:hover {
             background: var(--bg-card-hover);
             border-color: var(--accent);
         }
-        
+
         .btn-danger:hover {
             border-color: var(--danger);
             color: var(--danger);
         }
-        
+
         .btn-warning:hover {
             border-color: var(--warning);
             color: var(--warning);
         }
-        
+
         .input-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0.75rem;
         }
-        
+
         .input-indicator {
             aspect-ratio: 1;
             border: 2px solid var(--border);
@@ -234,36 +234,36 @@
             gap: 0.25rem;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
-        
+
         .input-indicator.active {
             background: rgba(59, 130, 246, 0.2);
             border-color: var(--info);
             box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
         }
-        
+
         .input-indicator .num {
             font-size: 1.25rem;
             font-weight: 700;
         }
-        
+
         .input-indicator span {
             font-size: 0.625rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-dim);
         }
-        
+
         .form-group {
             margin-bottom: 1rem;
         }
-        
+
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
             font-size: 0.875rem;
             color: var(--text-dim);
         }
-        
+
         .form-group input, .form-group select {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -274,37 +274,37 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
-        
+
         .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: var(--accent);
         }
-        
+
         .form-row {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
         }
-        
+
         .toggle-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0.75rem 0;
         }
-        
+
         .toggle {
             position: relative;
             width: 52px;
             height: 28px;
         }
-        
+
         .toggle input {
             opacity: 0;
             width: 0;
             height: 0;
         }
-        
+
         .toggle-slider {
             position: absolute;
             cursor: pointer;
@@ -317,7 +317,7 @@
             border-radius: 9999px;
             transition: all 0.2s ease;
         }
-        
+
         .toggle-slider:before {
             position: absolute;
             content: "";
@@ -329,22 +329,22 @@
             border-radius: 50%;
             transition: all 0.2s ease;
         }
-        
+
         .toggle input:checked + .toggle-slider {
             background: var(--accent-dim);
             border-color: var(--accent);
         }
-        
+
         .toggle input:checked + .toggle-slider:before {
             transform: translateX(24px);
             background: var(--accent);
         }
-        
+
         .info-grid {
             display: grid;
             gap: 0.75rem;
         }
-        
+
         .info-item {
             display: flex;
             justify-content: space-between;
@@ -353,17 +353,17 @@
             background: var(--bg-dark);
             border-radius: 8px;
         }
-        
+
         .info-label {
             color: var(--text-dim);
             font-size: 0.875rem;
         }
-        
+
         .info-value {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
         }
-        
+
         .btn-full {
             width: 100%;
             margin-top: 1rem;
@@ -372,23 +372,23 @@
             border: 1px solid var(--accent);
             color: var(--accent);
         }
-        
+
         .btn-full:hover {
             background: var(--accent);
             color: #000;
         }
-        
+
         .btn-danger-full {
             background: rgba(239, 68, 68, 0.1);
             border-color: var(--danger);
             color: var(--danger);
         }
-        
+
         .btn-danger-full:hover {
             background: var(--danger);
             color: #fff;
         }
-        
+
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -403,22 +403,22 @@
             transition: all 0.3s ease;
             z-index: 1000;
         }
-        
+
         .toast.show {
             opacity: 1;
             transform: translateY(0);
         }
-        
+
         .toast.success {
             border-color: var(--accent);
             background: rgba(34, 197, 94, 0.1);
         }
-        
+
         .toast.error {
             border-color: var(--danger);
             background: rgba(239, 68, 68, 0.1);
         }
-        
+
         .section-title {
             font-size: 0.75rem;
             text-transform: uppercase;
@@ -426,13 +426,13 @@
             color: var(--text-dim);
             margin-bottom: 1rem;
         }
-        
+
         .ota-section {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid var(--border);
         }
-        
+
         .ota-link {
             display: block;
             text-align: center;
@@ -444,28 +444,61 @@
             text-decoration: none;
             transition: all 0.2s ease;
         }
-        
+
         .ota-link:hover {
             border-color: var(--info);
             color: var(--info);
             background: rgba(59, 130, 246, 0.1);
         }
-        
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .status-badge.online {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent);
+        }
+
+        .status-badge.offline {
+            background: rgba(113, 113, 122, 0.2);
+            color: var(--text-dim);
+        }
+
+        .wifi-config-section {
+            border-top: 1px solid var(--border);
+            margin-top: 1rem;
+            padding-top: 1rem;
+        }
+
+        .subsection-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
             }
-            
+
             header {
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
             }
-            
+
             .relay-grid, .input-grid {
                 grid-template-columns: repeat(4, 1fr);
             }
-            
+
             .form-row {
                 grid-template-columns: 1fr;
             }
@@ -475,27 +508,26 @@
 <body>
     <header>
         <div class="logo">
-            <div class="logo-icon">⚡</div>
+            <div class="logo-icon">&#9889;</div>
             <div>
-                <h1>ESP32 Relay Controller</h1>
+                <h1>CineRelais Controller</h1>
                 <span id="hostname">cinerelais1</span>
             </div>
         </div>
         <div class="status-indicator">
             <div class="status-dot"></div>
-            <span id="ip-address">Connecting...</span>
+            <span id="ip-address">Verbinde...</span>
         </div>
     </header>
-    
+
     <div class="container">
         <div class="grid">
             <!-- Relay Control -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">🔌 Relais Ausgänge</h2>
+                    <h2 class="card-title">Relais Ausgaenge</h2>
                 </div>
                 <div class="relay-grid" id="relay-grid">
-                    <!-- Relays will be populated by JS -->
                 </div>
                 <div class="relay-actions">
                     <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
@@ -503,23 +535,22 @@
                     <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
                 </div>
             </div>
-            
+
             <!-- Digital Inputs -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">📥 Digitale Eingänge</h2>
+                    <h2 class="card-title">Digitale Eingaenge</h2>
                 </div>
                 <div class="input-grid" id="input-grid">
-                    <!-- Inputs will be populated by JS -->
                 </div>
             </div>
-            
-            <!-- Network Configuration -->
+
+            <!-- Ethernet Configuration -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">🌐 Netzwerk Konfiguration</h2>
+                    <h2 class="card-title">Ethernet Konfiguration</h2>
                 </div>
-                
+
                 <div class="toggle-container">
                     <span>DHCP aktiviert</span>
                     <label class="toggle">
@@ -527,7 +558,7 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                
+
                 <div id="static-ip-config">
                     <div class="form-row">
                         <div class="form-group">
@@ -550,21 +581,102 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Hostname</label>
                     <input type="text" id="hostnameInput" placeholder="cinerelais1">
                 </div>
-                
-                <button class="btn btn-full" onclick="saveNetworkConfig()">Netzwerk speichern</button>
+
+                <button class="btn btn-full" onclick="saveEthernetConfig()">Ethernet speichern</button>
             </div>
-            
+
+            <!-- WiFi Configuration -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">WiFi Konfiguration</h2>
+                </div>
+
+                <div class="toggle-container">
+                    <span>WiFi aktiviert</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="wifiEnabled" checked onchange="toggleWiFiSections()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="wifi-config-details">
+                    <!-- AP Section -->
+                    <div class="subsection-title">Access Point (AP)</div>
+                    <div class="toggle-container">
+                        <span>AP aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="wifiAPEnabled" checked onchange="toggleAPSection()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="ap-config">
+                        <div class="form-group">
+                            <label>AP Passwort (leer = offen, min. 8 Zeichen fuer WPA2)</label>
+                            <input type="text" id="wifiAPPassword" placeholder="(offen)">
+                        </div>
+                    </div>
+
+                    <!-- STA Section -->
+                    <div class="wifi-config-section">
+                        <div class="subsection-title">WLAN Verbindung (STA)</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>WLAN SSID</label>
+                                <input type="text" id="wifiSSID" placeholder="(leer = deaktiviert)">
+                            </div>
+                            <div class="form-group">
+                                <label>WLAN Passwort</label>
+                                <input type="password" id="wifiPassword" placeholder="">
+                            </div>
+                        </div>
+
+                        <div class="toggle-container">
+                            <span>DHCP (STA)</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="wifiDHCP" checked onchange="toggleWiFiDHCP()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div id="wifi-static-config">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>WiFi IP</label>
+                                    <input type="text" id="wifiIP" placeholder="192.168.4.100">
+                                </div>
+                                <div class="form-group">
+                                    <label>WiFi Subnetz</label>
+                                    <input type="text" id="wifiSubnet" placeholder="255.255.255.0">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>WiFi Gateway</label>
+                                    <input type="text" id="wifiGateway" placeholder="192.168.4.1">
+                                </div>
+                                <div class="form-group">
+                                    <label>WiFi DNS</label>
+                                    <input type="text" id="wifiDNS" placeholder="8.8.8.8">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-full" onclick="saveWiFiConfig()">WiFi speichern</button>
+            </div>
+
             <!-- TCP/Control Settings -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">⚙️ Steuerung</h2>
+                    <h2 class="card-title">Steuerung</h2>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label>TCP Port</label>
@@ -575,31 +687,43 @@
                         <input type="number" id="pulseDuration" placeholder="500" min="50" max="30000">
                     </div>
                 </div>
-                
+
                 <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
-                
+
                 <div class="ota-section">
                     <p class="section-title">Firmware Update</p>
                     <a href="/update" class="ota-link">
-                        📦 OTA Firmware Update öffnen
+                        OTA Firmware Update oeffnen
                     </a>
                 </div>
             </div>
-            
+
             <!-- System Info -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">📊 System Info</h2>
+                    <h2 class="card-title">System Info</h2>
                 </div>
-                
+
                 <div class="info-grid">
                     <div class="info-item">
-                        <span class="info-label">IP Adresse</span>
-                        <span class="info-value" id="info-ip">-</span>
+                        <span class="info-label">Ethernet</span>
+                        <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">MAC Adresse</span>
-                        <span class="info-value" id="info-mac">-</span>
+                        <span class="info-label">ETH MAC</span>
+                        <span class="info-value" id="info-eth-mac">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">WiFi STA</span>
+                        <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">WiFi AP</span>
+                        <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">TCA9554</span>
+                        <span class="info-value" id="info-tca9554">-</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">Betriebszeit</span>
@@ -610,18 +734,18 @@
                         <span class="info-value" id="info-tcpport">-</span>
                     </div>
                 </div>
-                
+
                 <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
-                    🔄 Gerät neustarten
+                    Geraet neustarten
                 </button>
             </div>
-            
+
             <!-- TCP Commands Help -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">📖 TCP Befehle</h2>
+                    <h2 class="card-title">TCP Befehle</h2>
                 </div>
-                
+
                 <div class="info-grid">
                     <div class="info-item">
                         <span class="info-label">Relais EIN</span>
@@ -651,17 +775,16 @@
             </div>
         </div>
     </div>
-    
+
     <div class="toast" id="toast"></div>
-    
+
     <script>
         // Initialize relay and input grids
         function initGrids() {
             const relayGrid = document.getElementById('relay-grid');
             const inputGrid = document.getElementById('input-grid');
-            
+
             for (let i = 1; i <= 8; i++) {
-                // Relay buttons
                 const relayBtn = document.createElement('button');
                 relayBtn.className = 'relay-btn';
                 relayBtn.id = `relay-${i}`;
@@ -672,8 +795,7 @@
                     pulseRelay(i);
                 };
                 relayGrid.appendChild(relayBtn);
-                
-                // Input indicators
+
                 const inputInd = document.createElement('div');
                 inputInd.className = 'input-indicator';
                 inputInd.id = `input-${i}`;
@@ -681,37 +803,84 @@
                 inputGrid.appendChild(inputInd);
             }
         }
-        
+
         // Fetch and update status
         async function updateStatus() {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
-                
-                // Update network info
-                document.getElementById('ip-address').textContent = data.ip;
+
+                // Update header
                 document.getElementById('hostname').textContent = data.hostname;
-                document.getElementById('info-ip').textContent = data.ip;
-                document.getElementById('info-mac').textContent = data.mac;
+                document.getElementById('ip-address').textContent = data.ip || 'Keine Verbindung';
+
+                // Ethernet status
+                const ethStatusEl = document.getElementById('info-eth-status');
+                const ethIpEl = document.getElementById('info-eth-ip');
+                if (data.ethConnected) {
+                    ethStatusEl.textContent = 'Online';
+                    ethStatusEl.className = 'status-badge online';
+                    ethIpEl.textContent = data.ethIP;
+                } else {
+                    ethStatusEl.textContent = 'Offline';
+                    ethStatusEl.className = 'status-badge offline';
+                    ethIpEl.textContent = '';
+                }
+                document.getElementById('info-eth-mac').textContent = data.ethMAC || '-';
+
+                // WiFi STA status
+                const wifiStaStatusEl = document.getElementById('info-wifi-sta-status');
+                const wifiStaIpEl = document.getElementById('info-wifi-sta-ip');
+                if (data.wifiSTAConnected) {
+                    wifiStaStatusEl.textContent = 'Online';
+                    wifiStaStatusEl.className = 'status-badge online';
+                    wifiStaIpEl.textContent = data.wifiSTAIP;
+                } else if (data.wifiEnabled && data.wifiSSID) {
+                    wifiStaStatusEl.textContent = 'Verbinde...';
+                    wifiStaStatusEl.className = 'status-badge offline';
+                    wifiStaIpEl.textContent = '';
+                } else {
+                    wifiStaStatusEl.textContent = 'Aus';
+                    wifiStaStatusEl.className = 'status-badge offline';
+                    wifiStaIpEl.textContent = '';
+                }
+
+                // WiFi AP status
+                const wifiApStatusEl = document.getElementById('info-wifi-ap-status');
+                const wifiApIpEl = document.getElementById('info-wifi-ap-ip');
+                if (data.wifiAPActive) {
+                    wifiApStatusEl.textContent = 'Aktiv';
+                    wifiApStatusEl.className = 'status-badge online';
+                    wifiApIpEl.textContent = data.wifiAPIP;
+                } else {
+                    wifiApStatusEl.textContent = 'Aus';
+                    wifiApStatusEl.className = 'status-badge offline';
+                    wifiApIpEl.textContent = '';
+                }
+
+                // TCA9554 status
+                document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
+
+                // TCP port
                 document.getElementById('info-tcpport').textContent = data.tcpPort;
-                
-                // Uptime formatting
+
+                // Uptime
                 const uptime = data.uptime;
                 const hours = Math.floor(uptime / 3600);
                 const minutes = Math.floor((uptime % 3600) / 60);
                 const seconds = uptime % 60;
-                document.getElementById('info-uptime').textContent = 
+                document.getElementById('info-uptime').textContent =
                     `${hours}h ${minutes}m ${seconds}s`;
-                
-                // Update relay states
+
+                // Relay states
                 data.relays.forEach((state, index) => {
                     const btn = document.getElementById(`relay-${index + 1}`);
                     if (btn) {
                         btn.classList.toggle('active', state);
                     }
                 });
-                
-                // Update input states
+
+                // Input states
                 data.inputs.forEach((state, index) => {
                     const ind = document.getElementById(`input-${index + 1}`);
                     if (ind) {
@@ -722,56 +891,88 @@
                 console.error('Status update failed:', error);
             }
         }
-        
+
         // Fetch and populate config
         async function loadConfig() {
             try {
                 const response = await fetch('/api/config');
                 const data = await response.json();
-                
+
+                // Ethernet
                 document.getElementById('useDHCP').checked = data.useDHCP;
                 document.getElementById('staticIP').value = data.staticIP;
                 document.getElementById('gateway').value = data.gateway;
                 document.getElementById('subnet').value = data.subnet;
                 document.getElementById('dns').value = data.dns;
                 document.getElementById('hostnameInput').value = data.hostname;
+
+                // WiFi
+                document.getElementById('wifiEnabled').checked = data.wifiEnabled;
+                document.getElementById('wifiAPEnabled').checked = data.wifiAPEnabled;
+                document.getElementById('wifiAPPassword').value = data.wifiAPPassword || '';
+                document.getElementById('wifiSSID').value = data.wifiSSID || '';
+                document.getElementById('wifiPassword').value = '';
+                document.getElementById('wifiDHCP').checked = data.wifiDHCP;
+                document.getElementById('wifiIP').value = data.wifiIP;
+                document.getElementById('wifiGateway').value = data.wifiGateway;
+                document.getElementById('wifiSubnet').value = data.wifiSubnet;
+                document.getElementById('wifiDNS').value = data.wifiDNS;
+
+                // Control
                 document.getElementById('tcpPort').value = data.tcpPort;
                 document.getElementById('pulseDuration').value = data.pulseDuration;
-                
+
                 toggleDHCP();
+                toggleWiFiSections();
+                toggleAPSection();
+                toggleWiFiDHCP();
             } catch (error) {
                 console.error('Config load failed:', error);
             }
         }
-        
-        // Toggle DHCP visibility
+
+        // Toggle visibility helpers
         function toggleDHCP() {
             const dhcpEnabled = document.getElementById('useDHCP').checked;
-            const staticConfig = document.getElementById('static-ip-config');
-            staticConfig.style.display = dhcpEnabled ? 'none' : 'block';
+            document.getElementById('static-ip-config').style.display = dhcpEnabled ? 'none' : 'block';
         }
-        
+
+        function toggleWiFiSections() {
+            const enabled = document.getElementById('wifiEnabled').checked;
+            document.getElementById('wifi-config-details').style.display = enabled ? 'block' : 'none';
+        }
+
+        function toggleAPSection() {
+            const enabled = document.getElementById('wifiAPEnabled').checked;
+            document.getElementById('ap-config').style.display = enabled ? 'block' : 'none';
+        }
+
+        function toggleWiFiDHCP() {
+            const dhcpEnabled = document.getElementById('wifiDHCP').checked;
+            document.getElementById('wifi-static-config').style.display = dhcpEnabled ? 'none' : 'block';
+        }
+
         // Relay control functions
         async function toggleRelay(relay) {
             const btn = document.getElementById(`relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
-            
+
             try {
                 const formData = new FormData();
                 formData.append('relay', relay);
                 formData.append('state', newState);
-                
+
                 await fetch('/api/relay', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 btn.classList.toggle('active');
             } catch (error) {
                 showToast('Fehler beim Schalten', 'error');
             }
         }
-        
+
         async function pulseRelay(relay) {
             try {
                 const duration = document.getElementById('pulseDuration').value || 500;
@@ -779,55 +980,55 @@
                 formData.append('relay', relay);
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
-                
+
                 await fetch('/api/relay', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 showToast(`Relais ${relay} Impuls`, 'success');
             } catch (error) {
                 showToast('Fehler beim Impuls', 'error');
             }
         }
-        
+
         async function setAllRelays(state) {
             try {
                 const formData = new FormData();
                 formData.append('state', state);
-                
+
                 await fetch('/api/relays', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 updateStatus();
                 showToast(`Alle Relais ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
             } catch (error) {
                 showToast('Fehler beim Schalten', 'error');
             }
         }
-        
+
         async function pulseAllRelays() {
             try {
                 const duration = document.getElementById('pulseDuration').value || 500;
                 const formData = new FormData();
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
-                
+
                 await fetch('/api/relays', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 showToast('Alle Relais Impuls', 'success');
             } catch (error) {
                 showToast('Fehler beim Impuls', 'error');
             }
         }
-        
+
         // Save configurations
-        async function saveNetworkConfig() {
+        async function saveEthernetConfig() {
             try {
                 const formData = new FormData();
                 formData.append('useDHCP', document.getElementById('useDHCP').checked);
@@ -836,67 +1037,94 @@
                 formData.append('subnet', document.getElementById('subnet').value);
                 formData.append('dns', document.getElementById('dns').value);
                 formData.append('hostname', document.getElementById('hostnameInput').value);
-                
+
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                showToast(result.message || 'Konfiguration gespeichert', 'success');
+                showToast(result.message || 'Ethernet Konfiguration gespeichert', 'success');
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
         }
-        
+
+        async function saveWiFiConfig() {
+            try {
+                const formData = new FormData();
+                formData.append('wifiEnabled', document.getElementById('wifiEnabled').checked);
+                formData.append('wifiAPEnabled', document.getElementById('wifiAPEnabled').checked);
+                formData.append('wifiAPPassword', document.getElementById('wifiAPPassword').value);
+                formData.append('wifiSSID', document.getElementById('wifiSSID').value);
+                const wifiPwField = document.getElementById('wifiPassword');
+                if (wifiPwField.value.length > 0) {
+                    formData.append('wifiPassword', wifiPwField.value);
+                }
+                formData.append('wifiDHCP', document.getElementById('wifiDHCP').checked);
+                formData.append('wifiIP', document.getElementById('wifiIP').value);
+                formData.append('wifiGateway', document.getElementById('wifiGateway').value);
+                formData.append('wifiSubnet', document.getElementById('wifiSubnet').value);
+                formData.append('wifiDNS', document.getElementById('wifiDNS').value);
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                showToast(result.message || 'WiFi Konfiguration gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
         async function saveControlConfig() {
             try {
                 const formData = new FormData();
                 formData.append('tcpPort', document.getElementById('tcpPort').value);
                 formData.append('pulseDuration', document.getElementById('pulseDuration').value);
-                
+
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
                 showToast(result.message || 'Konfiguration gespeichert', 'success');
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
         }
-        
+
         async function restartDevice() {
-            if (confirm('Gerät wirklich neustarten?')) {
+            if (confirm('Geraet wirklich neustarten?')) {
                 try {
                     await fetch('/api/restart', { method: 'POST' });
-                    showToast('Gerät wird neugestartet...', 'success');
+                    showToast('Geraet wird neugestartet...', 'success');
                     setTimeout(() => location.reload(), 5000);
                 } catch (error) {
                     showToast('Fehler beim Neustart', 'error');
                 }
             }
         }
-        
+
         // Toast notification
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = `toast show ${type}`;
-            
+
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 3000);
         }
-        
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initGrids();
             loadConfig();
             updateStatus();
-            
-            // Update status every 2 seconds
             setInterval(updateStatus, 2000);
         });
     </script>
