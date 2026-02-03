@@ -13,6 +13,9 @@ Firmware für das Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO Modu
 - **OTA-Firmware-Updates** über das Web-Interface
 - **8 Digitale Eingänge** (optokoppler-isoliert)
 - **8 Relaisausgänge** via TCA9554 I2C-Expander
+- **RGB Status-LED** (WS2812) mit Netzwerk- und Aktivitätsanzeige
+- **NTP-Zeitsynchronisation** mit konfigurierbarem Server
+- **Befehlsprotokoll** (letzte 50 Befehle mit Zeitstempel)
 
 ## Installation
 
@@ -166,6 +169,22 @@ status
 3. `.bin` Datei auswählen und hochladen
 4. Gerät startet automatisch neu
 
+### Status-LED
+
+Die RGB-LED (WS2812 auf GPIO 38) zeigt verschiedene Zustände an:
+
+| Farbe | Muster | Bedeutung |
+|-------|--------|-----------|
+| Grün | Dauerlicht | Ethernet verbunden |
+| Cyan | Dauerlicht | WiFi STA verbunden |
+| Blau | Pulsierend | Nur WiFi AP aktiv |
+| Rot | Schnell blinkend | Keine Netzwerkverbindung |
+| Orange | Kurzer Blitz | Befehl empfangen |
+| Gelb | Kurzer Blitz | Relais-Aktivität |
+| Lila | Pulsierend | OTA-Update läuft |
+
+Die LED-Helligkeit ist im Web-Interface einstellbar (Standard: 20%).
+
 ## Konfiguration
 
 ### Standard-Werte
@@ -180,6 +199,11 @@ status
 | TCP-Port | 5000 |
 | Impulsdauer | 500 ms |
 | Statische IP | 192.168.1.100 |
+| NTP | Aktiviert |
+| NTP-Server | pool.ntp.org |
+| Zeitzone | CET-1CEST (Europa/Berlin) |
+| LED | Aktiviert |
+| LED-Helligkeit | 20% |
 
 ### Konfiguration ändern
 
@@ -196,6 +220,7 @@ Alle Einstellungen können über das Web-Interface geändert werden. Die Konfigu
 | `/api/config` | POST | Konfiguration speichern |
 | `/api/relay` | POST | Einzelnes Relais steuern |
 | `/api/relays` | POST | Alle Relais steuern |
+| `/api/log` | GET | Befehlsprotokoll (letzte 50 Einträge) |
 | `/api/restart` | POST | Gerät neustarten |
 | `/update` | GET | OTA-Update Seite |
 

@@ -35,6 +35,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <time.h>
+#include <Adafruit_NeoPixel.h>
 #include "config.h"
 
 // ============================================
@@ -72,6 +73,48 @@ int logIndex = 0;
 int logCount = 0;
 
 // ============================================
+// RGB LED (WS2812)
+// ============================================
+
+Adafruit_NeoPixel rgbLed(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// LED state machine
+enum LedState {
+    LED_OFF,
+    LED_SOLID,
+    LED_PULSE,          // Slow pulse (fade in/out)
+    LED_FAST_BLINK,     // Fast on/off blink
+    LED_FLASH           // Brief flash, then return to background
+};
+
+// LED colors (R, G, B)
+struct LedColor {
+    uint8_t r, g, b;
+};
+
+const LedColor COLOR_OFF     = {0, 0, 0};
+const LedColor COLOR_RED     = {255, 0, 0};
+const LedColor COLOR_GREEN   = {0, 255, 0};
+const LedColor COLOR_BLUE    = {0, 0, 255};
+const LedColor COLOR_CYAN    = {0, 255, 255};
+const LedColor COLOR_YELLOW  = {255, 255, 0};
+const LedColor COLOR_ORANGE  = {255, 128, 0};
+const LedColor COLOR_PURPLE  = {128, 0, 255};
+
+// Current LED state
+LedState ledCurrentState = LED_OFF;
+LedColor ledBackgroundColor = COLOR_OFF;
+LedColor ledCurrentColor = COLOR_OFF;
+unsigned long ledStateStartTime = 0;
+unsigned long ledLastUpdate = 0;
+bool ledOtaActive = false;
+
+// Flash queue (command received -> relay activity)
+bool ledFlashPending = false;
+LedColor ledFlashColor = COLOR_OFF;
+unsigned long ledFlashEndTime = 0;
+
+// ============================================
 // Forward Declarations
 // ============================================
 
@@ -99,6 +142,13 @@ void setupNTP();
 void addLogEntry(const char* source, const char* command);
 String getLogJSON();
 String getTimeString(time_t t);
+void setupLED();
+void updateLED();
+void setLedColor(LedColor color, uint8_t brightness);
+void ledFlash(LedColor color);
+void ledCommandReceived();
+void ledRelayActivity();
+void updateLedBackgroundState();
 
 // ============================================
 // Setup
@@ -125,6 +175,7 @@ void setup() {
     // Setup hardware
     setupPins();
     setupI2C();
+    setupLED();
 
     // Setup networking
     WiFi.onEvent(WiFiEvent);
@@ -169,6 +220,9 @@ void setup() {
 void loop() {
     // Update pulse timers
     updatePulses();
+
+    // Update LED state
+    updateLED();
 
     // Read input states
     for (int i = 0; i < 8; i++) {
@@ -301,6 +355,10 @@ void loadConfig() {
     strlcpy(config.ntpServer, doc["ntpServer"] | DEFAULT_CONFIG.ntpServer, sizeof(config.ntpServer));
     strlcpy(config.ntpTimezone, doc["ntpTimezone"] | DEFAULT_CONFIG.ntpTimezone, sizeof(config.ntpTimezone));
 
+    // LED
+    config.ledEnabled = doc["ledEnabled"] | DEFAULT_CONFIG.ledEnabled;
+    config.ledBrightness = doc["ledBrightness"] | DEFAULT_CONFIG.ledBrightness;
+
     Serial.println("Configuration loaded:");
     Serial.printf("  DHCP: %s\n", config.useDHCP ? "enabled" : "disabled");
     Serial.printf("  Hostname: %s\n", config.hostname);
@@ -342,6 +400,10 @@ void saveConfig() {
     doc["ntpEnabled"] = config.ntpEnabled;
     doc["ntpServer"] = config.ntpServer;
     doc["ntpTimezone"] = config.ntpTimezone;
+
+    // LED
+    doc["ledEnabled"] = config.ledEnabled;
+    doc["ledBrightness"] = config.ledBrightness;
 
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {
@@ -392,30 +454,37 @@ void WiFiEvent(WiFiEvent_t event) {
         case ARDUINO_EVENT_ETH_GOT_IP:
             Serial.printf("ETH Got IP: %s\n", ETH.localIP().toString().c_str());
             ethConnected = true;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             Serial.println("ETH Disconnected");
             ethConnected = false;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_ETH_STOP:
             Serial.println("ETH Stopped");
             ethConnected = false;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
             Serial.printf("WiFi STA Got IP: %s\n", WiFi.localIP().toString().c_str());
             wifiSTAConnected = true;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
             Serial.println("WiFi STA Disconnected");
             wifiSTAConnected = false;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_WIFI_AP_START:
             Serial.printf("WiFi AP Started (IP: %s)\n", WiFi.softAPIP().toString().c_str());
             wifiAPActive = true;
+            updateLedBackgroundState();
             break;
         case ARDUINO_EVENT_WIFI_AP_STOP:
             Serial.println("WiFi AP Stopped");
             wifiAPActive = false;
+            updateLedBackgroundState();
             break;
         default:
             break;
@@ -548,6 +617,152 @@ void setupNTP() {
 }
 
 // ============================================
+// RGB LED Control
+// ============================================
+
+void setupLED() {
+    if (!config.ledEnabled) {
+        Serial.println("LED disabled");
+        return;
+    }
+
+    Serial.println("Setting up RGB LED...");
+    rgbLed.begin();
+    rgbLed.clear();
+    rgbLed.show();
+
+    // Initial state: no network = red
+    updateLedBackgroundState();
+    Serial.println("RGB LED initialized");
+}
+
+void setLedColor(LedColor color, uint8_t brightness) {
+    if (!config.ledEnabled) return;
+
+    // Scale color by brightness (0-255)
+    uint8_t r = (color.r * brightness) / 255;
+    uint8_t g = (color.g * brightness) / 255;
+    uint8_t b = (color.b * brightness) / 255;
+
+    rgbLed.setPixelColor(0, rgbLed.Color(r, g, b));
+    rgbLed.show();
+}
+
+void updateLedBackgroundState() {
+    // Determine background color based on network status
+    // Priority: Ethernet (green) > WiFi STA (cyan) > WiFi AP only (blue) > No network (red)
+    if (ethConnected) {
+        ledBackgroundColor = COLOR_GREEN;
+        ledCurrentState = LED_SOLID;
+    } else if (wifiSTAConnected) {
+        ledBackgroundColor = COLOR_CYAN;
+        ledCurrentState = LED_SOLID;
+    } else if (wifiAPActive) {
+        ledBackgroundColor = COLOR_BLUE;
+        ledCurrentState = LED_PULSE;  // Slow pulse for AP-only mode
+    } else {
+        ledBackgroundColor = COLOR_RED;
+        ledCurrentState = LED_FAST_BLINK;  // Error state
+    }
+}
+
+void ledFlash(LedColor color) {
+    if (!config.ledEnabled) return;
+
+    ledFlashPending = true;
+    ledFlashColor = color;
+    ledFlashEndTime = millis() + LED_FLASH_DURATION;
+
+    // Immediately show the flash color
+    setLedColor(color, config.ledBrightness);
+}
+
+void ledCommandReceived() {
+    // Orange flash when command is received
+    ledFlash(COLOR_ORANGE);
+}
+
+void ledRelayActivity() {
+    // Yellow flash when relay state changes
+    // If currently flashing orange (command received), queue the yellow flash
+    if (ledFlashPending && ledFlashColor.r == COLOR_ORANGE.r) {
+        // Will be handled after orange flash ends
+        return;
+    }
+    ledFlash(COLOR_YELLOW);
+}
+
+void updateLED() {
+    if (!config.ledEnabled) return;
+
+    unsigned long now = millis();
+
+    // OTA mode: purple pulsing (highest priority)
+    if (ledOtaActive) {
+        unsigned long elapsed = (now - ledStateStartTime) % LED_PULSE_INTERVAL;
+        float phase = (float)elapsed / LED_PULSE_INTERVAL;
+        // Sine wave pulse: 0 -> 1 -> 0
+        float brightness = sin(phase * PI);
+        uint8_t scaledBrightness = (uint8_t)(brightness * config.ledBrightness);
+        setLedColor(COLOR_PURPLE, scaledBrightness);
+        return;
+    }
+
+    // Handle flash sequence
+    if (ledFlashPending) {
+        if (now < ledFlashEndTime) {
+            // Still flashing
+            return;
+        }
+
+        // Flash ended
+        ledFlashPending = false;
+
+        // If this was an orange flash (command), now do yellow (relay activity)
+        if (ledFlashColor.r == COLOR_ORANGE.r && ledFlashColor.g == COLOR_ORANGE.g) {
+            ledFlash(COLOR_YELLOW);
+            return;
+        }
+
+        // Return to background state
+        updateLedBackgroundState();
+    }
+
+    // Handle background states
+    switch (ledCurrentState) {
+        case LED_OFF:
+            setLedColor(COLOR_OFF, 0);
+            break;
+
+        case LED_SOLID:
+            setLedColor(ledBackgroundColor, config.ledBrightness);
+            break;
+
+        case LED_PULSE: {
+            // Slow pulse (WiFi AP only mode)
+            unsigned long elapsed = (now - ledStateStartTime) % LED_PULSE_INTERVAL;
+            float phase = (float)elapsed / LED_PULSE_INTERVAL;
+            float brightness = (sin(phase * 2 * PI) + 1) / 2;  // 0.5 -> 1 -> 0.5
+            uint8_t scaledBrightness = (uint8_t)(brightness * config.ledBrightness);
+            setLedColor(ledBackgroundColor, scaledBrightness);
+            break;
+        }
+
+        case LED_FAST_BLINK: {
+            // Fast blink (error/no network)
+            unsigned long elapsed = now % LED_FAST_BLINK_INTERVAL;
+            bool on = elapsed < (LED_FAST_BLINK_INTERVAL / 2);
+            setLedColor(ledBackgroundColor, on ? config.ledBrightness : 0);
+            break;
+        }
+
+        case LED_FLASH:
+            // Handled above
+            break;
+    }
+}
+
+// ============================================
 // Command Log
 // ============================================
 
@@ -616,6 +831,9 @@ void setRelay(int relay, bool state) {
     pulseActive[index] = false;
     pulseEndTime[index] = 0;
 
+    // LED feedback
+    ledRelayActivity();
+
     Serial.printf("Relay %d: %s\n", relay, state ? "ON" : "OFF");
 }
 
@@ -626,6 +844,10 @@ void setAllRelays(bool state) {
         pulseActive[i] = false;
         pulseEndTime[i] = 0;
     }
+
+    // LED feedback
+    ledRelayActivity();
+
     Serial.printf("All relays: %s\n", state ? "ON" : "OFF");
 }
 
@@ -638,6 +860,9 @@ void pulseRelay(int relay, unsigned long duration) {
     pulseActive[index] = true;
     pulseEndTime[index] = millis() + duration;
 
+    // LED feedback
+    ledRelayActivity();
+
     Serial.printf("Relay %d: PULSE (%lu ms)\n", relay, duration);
 }
 
@@ -649,6 +874,10 @@ void pulseAllRelays(unsigned long duration) {
         pulseActive[i] = true;
         pulseEndTime[i] = endTime;
     }
+
+    // LED feedback
+    ledRelayActivity();
+
     Serial.printf("All relays: PULSE (%lu ms)\n", duration);
 }
 
@@ -728,6 +957,10 @@ String getStatusJSON() {
     // Hardware
     doc["tca9554"] = tca9554Found;
 
+    // LED
+    doc["ledEnabled"] = config.ledEnabled;
+    doc["ledBrightness"] = config.ledBrightness;
+
     // NTP
     doc["ntpEnabled"] = config.ntpEnabled;
     doc["ntpSynced"] = ntpSynced;
@@ -776,6 +1009,8 @@ void handleTCPData(void* arg, AsyncClient* client, void* data, size_t len) {
     // Log the command (except status and help which are informational)
     if (command != "status" && command != "help") {
         addLogEntry(clientIP.c_str(), command.c_str());
+        // LED flash for command received
+        ledCommandReceived();
     }
 
     handleTCPCommand(client, command);
@@ -912,6 +1147,9 @@ void setupWebServer() {
             String clientIP = request->client()->remoteIP().toString();
 
             if (relay >= 1 && relay <= 8) {
+                // LED flash for command received
+                ledCommandReceived();
+
                 char logCmd[32];
                 if (state == "on") {
                     setRelay(relay, true);
@@ -947,6 +1185,9 @@ void setupWebServer() {
             String state = request->getParam("state", true)->value();
             String clientIP = request->client()->remoteIP().toString();
             char logCmd[32];
+
+            // LED flash for command received
+            ledCommandReceived();
 
             if (state == "on") {
                 setAllRelays(true);
@@ -1000,6 +1241,10 @@ void setupWebServer() {
         doc["ntpEnabled"] = config.ntpEnabled;
         doc["ntpServer"] = config.ntpServer;
         doc["ntpTimezone"] = config.ntpTimezone;
+
+        // LED
+        doc["ledEnabled"] = config.ledEnabled;
+        doc["ledBrightness"] = config.ledBrightness;
 
         String output;
         serializeJson(doc, output);
@@ -1098,6 +1343,15 @@ void setupWebServer() {
             strlcpy(config.ntpTimezone, request->getParam("ntpTimezone", true)->value().c_str(), sizeof(config.ntpTimezone));
             changed = true;
         }
+        // LED
+        if (request->hasParam("ledEnabled", true)) {
+            config.ledEnabled = request->getParam("ledEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("ledBrightness", true)) {
+            config.ledBrightness = request->getParam("ledBrightness", true)->value().toInt();
+            changed = true;
+        }
 
         if (changed) {
             saveConfig();
@@ -1119,8 +1373,18 @@ void setupWebServer() {
         request->send(200, "application/json", getLogJSON());
     });
 
-    // Setup ElegantOTA
+    // Setup ElegantOTA with LED callbacks
     ElegantOTA.begin(&webServer);
+    ElegantOTA.onStart([]() {
+        Serial.println("OTA Update started");
+        ledOtaActive = true;
+        ledStateStartTime = millis();
+    });
+    ElegantOTA.onEnd([](bool success) {
+        Serial.printf("OTA Update %s\n", success ? "successful" : "failed");
+        ledOtaActive = false;
+        updateLedBackgroundState();
+    });
 
     // Handle 404
     webServer.onNotFound([](AsyncWebServerRequest *request) {

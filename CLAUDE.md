@@ -66,6 +66,7 @@ pio device monitor
 | ElegantOTA | ^3.1.0 | Over-the-air firmware updates |
 | AsyncTCP | ^1.1.1 | Async TCP server for command protocol |
 | ESPAsyncWebServer | ^1.2.3 | Async HTTP server for web interface and REST API |
+| Adafruit NeoPixel | ^1.12.0 | RGB LED (WS2812) status indicator |
 
 ## Architecture
 
@@ -97,17 +98,18 @@ The firmware is a single-file monolith with these logical sections:
 
 | Section | Description |
 |---------|-------------|
-| Includes & globals | Libraries, state arrays, config |
-| `setup()` | Init LittleFS, config, pins, I2C, Ethernet, WiFi, servers |
-| `loop()` | Poll inputs, update pulses, WiFi reconnect, ElegantOTA tick |
+| Includes & globals | Libraries, state arrays, config, LED state machine |
+| `setup()` | Init LittleFS, config, pins, I2C, LED, Ethernet, WiFi, NTP, servers |
+| `loop()` | Poll inputs, update pulses, update LED, WiFi reconnect, ElegantOTA tick |
 | TCA9554 driver | `tca9554Init()`, `tca9554Read()`, `tca9554Write()`, `tca9554WriteAll()` |
 | Config management | `loadConfig()` / `saveConfig()` — JSON on LittleFS (`/config.json`) |
-| Hardware setup | `setupPins()`, `setupI2C()`, `setupEthernet()`, `setupWiFi()` |
-| Network events | `WiFiEvent()` — handles ETH and WiFi state changes |
+| Hardware setup | `setupPins()`, `setupI2C()`, `setupLED()`, `setupEthernet()`, `setupWiFi()`, `setupNTP()` |
+| Network events | `WiFiEvent()` — handles ETH and WiFi state changes, updates LED |
 | Relay control | `setRelay()`, `setAllRelays()`, `pulseRelay()`, `pulseAllRelays()`, `updatePulses()` |
-| Status JSON | `getStatusJSON()` — combined relay/input/network/WiFi state |
+| LED control | `updateLED()`, `ledFlash()`, `ledCommandReceived()`, `ledRelayActivity()`, `updateLedBackgroundState()` |
+| Status JSON | `getStatusJSON()` — combined relay/input/network/WiFi/LED state |
 | TCP server | Async TCP on configurable port, text command protocol |
-| Web server | AsyncWebServer on port 80, REST API endpoints, ElegantOTA |
+| Web server | AsyncWebServer on port 80, REST API endpoints, ElegantOTA with LED callbacks |
 
 ### TCP Command Protocol (default port 5000)
 
@@ -180,6 +182,8 @@ Stored as `/config.json` on LittleFS. Fields:
 | `ntpEnabled` | bool | `true` |
 | `ntpServer` | string | `pool.ntp.org` |
 | `ntpTimezone` | string | `CET-1CEST,M3.5.0,M10.5.0/3` |
+| `ledEnabled` | bool | `true` |
+| `ledBrightness` | uint8 | `51` (20% of 255) |
 
 Network changes require device restart to take effect.
 
@@ -205,6 +209,24 @@ Network changes require device restart to take effect.
 - **STA mode**: Connects to configured `wifiSSID`, auto-reconnect every 30s if disconnected
 - **AP+STA**: Both can run simultaneously
 - WiFi can be completely disabled via `wifiEnabled = false`
+
+### RGB LED Status Indicator
+
+The WS2812 RGB LED on GPIO 38 provides visual feedback:
+
+| Color | Pattern | State |
+|-------|---------|-------|
+| Green | Solid | Ethernet connected |
+| Cyan | Solid | WiFi STA connected |
+| Blue | Pulsing | WiFi AP only (no other connection) |
+| Red | Fast blink | No network connection (error) |
+| Orange | Brief flash | Command received (TCP or Web API) |
+| Yellow | Brief flash | Relay activity (follows orange) |
+| Purple | Pulsing | OTA update in progress |
+
+- Flash sequence: Orange (command) → Yellow (relay) provides visual confirmation
+- Brightness configurable (0-255, default 51 = 20%)
+- Can be disabled via `ledEnabled = false`
 
 ## Conventions
 
@@ -281,3 +303,4 @@ Network changes require device restart to take effect.
 | 2026-02-01 | Renamed `impuls` → `pulse` for English consistency; added `README_EN.md` |
 | 2026-02-03 | **Major rewrite**: Fixed GPIO pins, added TCA9554 I2C relay driver, added WiFi AP/STA support, corrected Ethernet W5500 SPI pins |
 | 2026-02-03 | Added NTP time synchronization (configurable server/timezone) and command log (50 entries) |
+| 2026-02-03 | Added RGB LED status indicator: network status (green/cyan/blue/red), command flash (orange), relay activity (yellow), OTA (purple pulsing) |

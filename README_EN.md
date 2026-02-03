@@ -13,6 +13,9 @@ Firmware for the Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO modul
 - **OTA firmware updates** via web interface
 - **8 Digital inputs** (optocoupler-isolated)
 - **8 Relay outputs** via TCA9554 I2C expander
+- **RGB status LED** (WS2812) showing network and activity status
+- **NTP time synchronization** with configurable server
+- **Command log** (last 50 commands with timestamp)
 
 ## Installation
 
@@ -166,6 +169,22 @@ status
 3. Select `.bin` file and upload
 4. Device restarts automatically
 
+### Status LED
+
+The RGB LED (WS2812 on GPIO 38) shows various states:
+
+| Color | Pattern | Meaning |
+|-------|---------|---------|
+| Green | Solid | Ethernet connected |
+| Cyan | Solid | WiFi STA connected |
+| Blue | Pulsing | WiFi AP only active |
+| Red | Fast blinking | No network connection |
+| Orange | Brief flash | Command received |
+| Yellow | Brief flash | Relay activity |
+| Purple | Pulsing | OTA update in progress |
+
+LED brightness is configurable in the web interface (default: 20%).
+
 ## Configuration
 
 ### Default Values
@@ -180,6 +199,11 @@ status
 | TCP Port | 5000 |
 | Pulse Duration | 500 ms |
 | Static IP | 192.168.1.100 |
+| NTP | Enabled |
+| NTP Server | pool.ntp.org |
+| Timezone | CET-1CEST (Europe/Berlin) |
+| LED | Enabled |
+| LED Brightness | 20% |
 
 ### Changing Configuration
 
@@ -196,6 +220,7 @@ All settings can be changed via the web interface. Configuration is stored in fl
 | `/api/config` | POST | Save configuration |
 | `/api/relay` | POST | Control single relay |
 | `/api/relays` | POST | Control all relays |
+| `/api/log` | GET | Command log (last 50 entries) |
 | `/api/restart` | POST | Restart device |
 | `/update` | GET | OTA update page |
 

@@ -76,6 +76,15 @@ const int DI_PINS[8] = {
 // Command log
 #define COMMAND_LOG_SIZE        50
 
+// LED defaults
+#define DEFAULT_LED_ENABLED     true
+#define DEFAULT_LED_BRIGHTNESS  51      // 20% of 255
+
+// LED timing (ms)
+#define LED_FLASH_DURATION      100     // Command/activity flash
+#define LED_PULSE_INTERVAL      1000    // Slow pulse period
+#define LED_FAST_BLINK_INTERVAL 200     // Fast blink period (error)
+
 // ============================================
 // Network Configuration Structure
 // ============================================
@@ -109,6 +118,10 @@ struct NetworkConfig {
     bool ntpEnabled;
     char ntpServer[64];
     char ntpTimezone[48];
+
+    // LED
+    bool ledEnabled;
+    uint8_t ledBrightness;      // 0-255
 };
 
 // Default configuration
@@ -137,7 +150,10 @@ const NetworkConfig DEFAULT_CONFIG = {
     // NTP
     true,                   // ntpEnabled
     DEFAULT_NTP_SERVER,     // ntpServer
-    DEFAULT_NTP_TIMEZONE    // ntpTimezone
+    DEFAULT_NTP_TIMEZONE,   // ntpTimezone
+    // LED
+    DEFAULT_LED_ENABLED,    // ledEnabled
+    DEFAULT_LED_BRIGHTNESS  // ledBrightness
 };
 
 #endif // CONFIG_H

@@ -730,6 +730,63 @@
                 <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
             </div>
 
+            <!-- LED Configuration -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Status LED</h2>
+                </div>
+
+                <div class="toggle-container">
+                    <span>LED aktiviert</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="ledEnabled" checked onchange="toggleLEDSection()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="led-config">
+                    <div class="form-group">
+                        <label>Helligkeit (<span id="brightnessPercent">20</span>%)</label>
+                        <input type="range" id="ledBrightness" min="0" max="255" value="51"
+                               oninput="updateBrightnessPercent(this.value)"
+                               style="width: 100%; cursor: pointer;">
+                    </div>
+
+                    <div class="info-grid" style="margin-top: 1rem;">
+                        <div class="info-item">
+                            <span class="info-label">Gruen</span>
+                            <span class="info-value" style="color: #22c55e;">Ethernet verbunden</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Cyan</span>
+                            <span class="info-value" style="color: #22d3ee;">WiFi STA verbunden</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Blau pulsierend</span>
+                            <span class="info-value" style="color: #3b82f6;">Nur WiFi AP</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Rot blinkend</span>
+                            <span class="info-value" style="color: #ef4444;">Keine Verbindung</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Orange Blitz</span>
+                            <span class="info-value" style="color: #f97316;">Befehl empfangen</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Gelb Blitz</span>
+                            <span class="info-value" style="color: #eab308;">Relais Aktivitaet</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Lila pulsierend</span>
+                            <span class="info-value" style="color: #a855f7;">OTA Update laeuft</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-full" onclick="saveLEDConfig()">LED speichern</button>
+            </div>
+
             <!-- System Info -->
             <div class="card">
                 <div class="card-header">
@@ -993,11 +1050,17 @@
                 document.getElementById('ntpServer').value = data.ntpServer || 'pool.ntp.org';
                 document.getElementById('ntpTimezone').value = data.ntpTimezone || 'CET-1CEST,M3.5.0,M10.5.0/3';
 
+                // LED
+                document.getElementById('ledEnabled').checked = data.ledEnabled !== false;
+                document.getElementById('ledBrightness').value = data.ledBrightness || 51;
+                updateBrightnessPercent(data.ledBrightness || 51);
+
                 toggleDHCP();
                 toggleWiFiSections();
                 toggleAPSection();
                 toggleWiFiDHCP();
                 toggleNTPSection();
+                toggleLEDSection();
             } catch (error) {
                 console.error('Config load failed:', error);
             }
@@ -1027,6 +1090,16 @@
         function toggleNTPSection() {
             const enabled = document.getElementById('ntpEnabled').checked;
             document.getElementById('ntp-config').style.display = enabled ? 'block' : 'none';
+        }
+
+        function toggleLEDSection() {
+            const enabled = document.getElementById('ledEnabled').checked;
+            document.getElementById('led-config').style.display = enabled ? 'block' : 'none';
+        }
+
+        function updateBrightnessPercent(value) {
+            const percent = Math.round((value / 255) * 100);
+            document.getElementById('brightnessPercent').textContent = percent;
         }
 
         // Relay control functions
@@ -1188,6 +1261,24 @@
 
                 const result = await response.json();
                 showToast(result.message || 'NTP Konfiguration gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
+        async function saveLEDConfig() {
+            try {
+                const formData = new FormData();
+                formData.append('ledEnabled', document.getElementById('ledEnabled').checked);
+                formData.append('ledBrightness', document.getElementById('ledBrightness').value);
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                showToast(result.message || 'LED Konfiguration gespeichert', 'success');
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
