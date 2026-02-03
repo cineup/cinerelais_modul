@@ -34,6 +34,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
+#include <time.h>
 #include "config.h"
 
 // ============================================
@@ -56,6 +57,19 @@ unsigned long pulseEndTime[8] = {0};
 bool pulseActive[8] = {false};
 
 unsigned long lastWifiReconnect = 0;
+
+// NTP state
+bool ntpSynced = false;
+
+// Command log (circular buffer)
+struct LogEntry {
+    time_t timestamp;
+    char source[16];    // IP address or "Web"
+    char command[48];
+};
+LogEntry commandLog[COMMAND_LOG_SIZE];
+int logIndex = 0;
+int logCount = 0;
 
 // ============================================
 // Forward Declarations
@@ -81,6 +95,10 @@ void tca9554Init();
 void tca9554Write(uint8_t pin, bool state);
 void tca9554WriteAll(uint8_t value);
 uint8_t tca9554Read();
+void setupNTP();
+void addLogEntry(const char* source, const char* command);
+String getLogJSON();
+String getTimeString(time_t t);
 
 // ============================================
 // Setup
@@ -120,6 +138,9 @@ void setup() {
            (millis() - startTime < 10000)) {
         delay(100);
     }
+
+    // Setup NTP (if enabled and network is available)
+    setupNTP();
 
     // Start servers
     setupWebServer();
@@ -275,6 +296,11 @@ void loadConfig() {
     config.tcpPort = doc["tcpPort"] | DEFAULT_CONFIG.tcpPort;
     config.pulseDuration = doc["pulseDuration"] | DEFAULT_CONFIG.pulseDuration;
 
+    // NTP
+    config.ntpEnabled = doc["ntpEnabled"] | DEFAULT_CONFIG.ntpEnabled;
+    strlcpy(config.ntpServer, doc["ntpServer"] | DEFAULT_CONFIG.ntpServer, sizeof(config.ntpServer));
+    strlcpy(config.ntpTimezone, doc["ntpTimezone"] | DEFAULT_CONFIG.ntpTimezone, sizeof(config.ntpTimezone));
+
     Serial.println("Configuration loaded:");
     Serial.printf("  DHCP: %s\n", config.useDHCP ? "enabled" : "disabled");
     Serial.printf("  Hostname: %s\n", config.hostname);
@@ -311,6 +337,11 @@ void saveConfig() {
     doc["hostname"] = config.hostname;
     doc["tcpPort"] = config.tcpPort;
     doc["pulseDuration"] = config.pulseDuration;
+
+    // NTP
+    doc["ntpEnabled"] = config.ntpEnabled;
+    doc["ntpServer"] = config.ntpServer;
+    doc["ntpTimezone"] = config.ntpTimezone;
 
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {
@@ -474,6 +505,103 @@ void setupWiFi() {
 }
 
 // ============================================
+// NTP Setup
+// ============================================
+
+void setupNTP() {
+    if (!config.ntpEnabled) {
+        Serial.println("NTP disabled");
+        return;
+    }
+
+    if (!ethConnected && !wifiSTAConnected) {
+        Serial.println("NTP: No network connection available");
+        return;
+    }
+
+    Serial.printf("Configuring NTP: server=%s, timezone=%s\n",
+                   config.ntpServer, config.ntpTimezone);
+
+    configTzTime(config.ntpTimezone, config.ntpServer);
+
+    // Wait briefly for time sync
+    Serial.print("NTP: Waiting for time sync");
+    int attempts = 0;
+    while (time(nullptr) < 100000 && attempts < 50) {
+        delay(100);
+        Serial.print(".");
+        attempts++;
+    }
+    Serial.println();
+
+    time_t now = time(nullptr);
+    if (now > 100000) {
+        ntpSynced = true;
+        struct tm timeinfo;
+        localtime_r(&now, &timeinfo);
+        Serial.printf("NTP synced: %04d-%02d-%02d %02d:%02d:%02d\n",
+                       timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                       timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    } else {
+        Serial.println("NTP: Time sync failed (will retry in background)");
+    }
+}
+
+// ============================================
+// Command Log
+// ============================================
+
+String getTimeString(time_t t) {
+    if (t < 100000) {
+        // No valid time, use uptime
+        unsigned long uptime = millis() / 1000;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "+%lus", uptime);
+        return String(buf);
+    }
+    struct tm timeinfo;
+    localtime_r(&t, &timeinfo);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%02d:%02d:%02d",
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    return String(buf);
+}
+
+void addLogEntry(const char* source, const char* command) {
+    LogEntry& entry = commandLog[logIndex];
+    entry.timestamp = time(nullptr);
+    strlcpy(entry.source, source, sizeof(entry.source));
+    strlcpy(entry.command, command, sizeof(entry.command));
+
+    logIndex = (logIndex + 1) % COMMAND_LOG_SIZE;
+    if (logCount < COMMAND_LOG_SIZE) {
+        logCount++;
+    }
+
+    Serial.printf("[LOG] %s | %s | %s\n",
+                   getTimeString(entry.timestamp).c_str(), source, command);
+}
+
+String getLogJSON() {
+    JsonDocument doc;
+    JsonArray logArray = doc.to<JsonArray>();
+
+    // Output in reverse chronological order (newest first)
+    for (int i = 0; i < logCount; i++) {
+        int idx = (logIndex - 1 - i + COMMAND_LOG_SIZE) % COMMAND_LOG_SIZE;
+        JsonObject entry = logArray.add<JsonObject>();
+        entry["time"] = getTimeString(commandLog[idx].timestamp);
+        entry["timestamp"] = (long)commandLog[idx].timestamp;
+        entry["source"] = commandLog[idx].source;
+        entry["command"] = commandLog[idx].command;
+    }
+
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+// ============================================
 // Relay Control (via TCA9554)
 // ============================================
 
@@ -600,6 +728,22 @@ String getStatusJSON() {
     // Hardware
     doc["tca9554"] = tca9554Found;
 
+    // NTP
+    doc["ntpEnabled"] = config.ntpEnabled;
+    doc["ntpSynced"] = ntpSynced;
+    time_t now = time(nullptr);
+    if (now > 100000) {
+        struct tm timeinfo;
+        localtime_r(&now, &timeinfo);
+        char timeBuf[32];
+        snprintf(timeBuf, sizeof(timeBuf), "%04d-%02d-%02d %02d:%02d:%02d",
+                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        doc["currentTime"] = timeBuf;
+    } else {
+        doc["currentTime"] = "";
+    }
+
     // Relay states
     JsonArray relays = doc["relays"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
@@ -626,7 +770,13 @@ void handleTCPData(void* arg, AsyncClient* client, void* data, size_t len) {
     command.trim();
     command.toLowerCase();
 
-    Serial.printf("TCP [%s]: %s\n", client->remoteIP().toString().c_str(), command.c_str());
+    String clientIP = client->remoteIP().toString();
+    Serial.printf("TCP [%s]: %s\n", clientIP.c_str(), command.c_str());
+
+    // Log the command (except status and help which are informational)
+    if (command != "status" && command != "help") {
+        addLogEntry(clientIP.c_str(), command.c_str());
+    }
 
     handleTCPCommand(client, command);
 }
@@ -759,18 +909,28 @@ void setupWebServer() {
         if (request->hasParam("relay", true) && request->hasParam("state", true)) {
             int relay = request->getParam("relay", true)->value().toInt();
             String state = request->getParam("state", true)->value();
+            String clientIP = request->client()->remoteIP().toString();
 
             if (relay >= 1 && relay <= 8) {
+                char logCmd[32];
                 if (state == "on") {
                     setRelay(relay, true);
+                    snprintf(logCmd, sizeof(logCmd), "r%d_on", relay);
                 } else if (state == "off") {
                     setRelay(relay, false);
+                    snprintf(logCmd, sizeof(logCmd), "r%d_off", relay);
                 } else if (state == "pulse") {
                     unsigned long duration = config.pulseDuration;
                     if (request->hasParam("duration", true)) {
                         duration = request->getParam("duration", true)->value().toInt();
                     }
                     pulseRelay(relay, duration);
+                    snprintf(logCmd, sizeof(logCmd), "r%d_pulse_%lu", relay, duration);
+                } else {
+                    logCmd[0] = '\0';
+                }
+                if (logCmd[0]) {
+                    addLogEntry(clientIP.c_str(), logCmd);
                 }
                 request->send(200, "application/json", "{\"success\":true}");
             } else {
@@ -785,16 +945,27 @@ void setupWebServer() {
     webServer.on("/api/relays", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("state", true)) {
             String state = request->getParam("state", true)->value();
+            String clientIP = request->client()->remoteIP().toString();
+            char logCmd[32];
+
             if (state == "on") {
                 setAllRelays(true);
+                strlcpy(logCmd, "all_on", sizeof(logCmd));
             } else if (state == "off") {
                 setAllRelays(false);
+                strlcpy(logCmd, "all_off", sizeof(logCmd));
             } else if (state == "pulse") {
                 unsigned long duration = config.pulseDuration;
                 if (request->hasParam("duration", true)) {
                     duration = request->getParam("duration", true)->value().toInt();
                 }
                 pulseAllRelays(duration);
+                snprintf(logCmd, sizeof(logCmd), "all_pulse_%lu", duration);
+            } else {
+                logCmd[0] = '\0';
+            }
+            if (logCmd[0]) {
+                addLogEntry(clientIP.c_str(), logCmd);
             }
             request->send(200, "application/json", "{\"success\":true}");
         } else {
@@ -825,6 +996,10 @@ void setupWebServer() {
         doc["hostname"] = config.hostname;
         doc["tcpPort"] = config.tcpPort;
         doc["pulseDuration"] = config.pulseDuration;
+        // NTP
+        doc["ntpEnabled"] = config.ntpEnabled;
+        doc["ntpServer"] = config.ntpServer;
+        doc["ntpTimezone"] = config.ntpTimezone;
 
         String output;
         serializeJson(doc, output);
@@ -910,6 +1085,19 @@ void setupWebServer() {
             config.pulseDuration = request->getParam("pulseDuration", true)->value().toInt();
             changed = true;
         }
+        // NTP
+        if (request->hasParam("ntpEnabled", true)) {
+            config.ntpEnabled = request->getParam("ntpEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("ntpServer", true)) {
+            strlcpy(config.ntpServer, request->getParam("ntpServer", true)->value().c_str(), sizeof(config.ntpServer));
+            changed = true;
+        }
+        if (request->hasParam("ntpTimezone", true)) {
+            strlcpy(config.ntpTimezone, request->getParam("ntpTimezone", true)->value().c_str(), sizeof(config.ntpTimezone));
+            changed = true;
+        }
 
         if (changed) {
             saveConfig();
@@ -924,6 +1112,11 @@ void setupWebServer() {
         request->send(200, "application/json", "{\"success\":true,\"message\":\"Restarting...\"}");
         delay(500);
         ESP.restart();
+    });
+
+    // API: Get command log
+    webServer.on("/api/log", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "application/json", getLogJSON());
     });
 
     // Setup ElegantOTA

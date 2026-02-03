@@ -69,6 +69,13 @@ const int DI_PINS[8] = {
 // WiFi AP defaults
 #define DEFAULT_WIFI_AP_PASSWORD ""      // Empty = open AP
 
+// NTP defaults
+#define DEFAULT_NTP_SERVER      "pool.ntp.org"
+#define DEFAULT_NTP_TIMEZONE    "CET-1CEST,M3.5.0,M10.5.0/3"  // Europe/Berlin
+
+// Command log
+#define COMMAND_LOG_SIZE        50
+
 // ============================================
 // Network Configuration Structure
 // ============================================
@@ -97,6 +104,11 @@ struct NetworkConfig {
     char hostname[32];
     uint16_t tcpPort;
     uint16_t pulseDuration;
+
+    // NTP
+    bool ntpEnabled;
+    char ntpServer[64];
+    char ntpTimezone[48];
 };
 
 // Default configuration
@@ -121,7 +133,11 @@ const NetworkConfig DEFAULT_CONFIG = {
     // General
     DEFAULT_HOSTNAME,       // hostname
     DEFAULT_TCP_PORT,       // tcpPort
-    DEFAULT_PULSE_DURATION  // pulseDuration
+    DEFAULT_PULSE_DURATION, // pulseDuration
+    // NTP
+    true,                   // ntpEnabled
+    DEFAULT_NTP_SERVER,     // ntpServer
+    DEFAULT_NTP_TIMEZONE    // ntpTimezone
 };
 
 #endif // CONFIG_H

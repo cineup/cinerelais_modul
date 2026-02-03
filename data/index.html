@@ -698,6 +698,38 @@
                 </div>
             </div>
 
+            <!-- NTP Configuration -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Zeit / NTP</h2>
+                </div>
+
+                <div class="toggle-container">
+                    <span>NTP aktiviert</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="ntp-config">
+                    <div class="form-group">
+                        <label>NTP Server</label>
+                        <input type="text" id="ntpServer" placeholder="pool.ntp.org">
+                    </div>
+                    <div class="form-group">
+                        <label>Zeitzone (POSIX)</label>
+                        <input type="text" id="ntpTimezone" placeholder="CET-1CEST,M3.5.0,M10.5.0/3">
+                    </div>
+                    <div class="info-item" style="margin-top: 0.5rem;">
+                        <span class="info-label">Aktuelle Zeit</span>
+                        <span class="info-value" id="info-current-time">-</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
+            </div>
+
             <!-- System Info -->
             <div class="card">
                 <div class="card-header">
@@ -771,6 +803,28 @@
                         <span class="info-label">Status / Hilfe</span>
                         <span class="info-value">status / help</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Command Log -->
+            <div class="card" style="grid-column: span 2;">
+                <div class="card-header">
+                    <h2 class="card-title">Befehlsprotokoll</h2>
+                    <button class="btn" onclick="loadLog()" style="flex: 0; padding: 0.5rem 1rem;">Aktualisieren</button>
+                </div>
+                <div id="log-container" style="max-height: 300px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="text-align: left; color: var(--text-dim); border-bottom: 1px solid var(--border);">
+                                <th style="padding: 0.5rem;">Zeit</th>
+                                <th style="padding: 0.5rem;">Quelle</th>
+                                <th style="padding: 0.5rem;">Befehl</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table">
+                            <tr><td colspan="3" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -861,6 +915,18 @@
                 // TCA9554 status
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
 
+                // NTP / Current time
+                const timeEl = document.getElementById('info-current-time');
+                if (timeEl) {
+                    if (data.ntpSynced && data.currentTime) {
+                        timeEl.textContent = data.currentTime;
+                    } else if (data.ntpEnabled) {
+                        timeEl.textContent = 'Synchronisiere...';
+                    } else {
+                        timeEl.textContent = 'NTP deaktiviert';
+                    }
+                }
+
                 // TCP port
                 document.getElementById('info-tcpport').textContent = data.tcpPort;
 
@@ -922,10 +988,16 @@
                 document.getElementById('tcpPort').value = data.tcpPort;
                 document.getElementById('pulseDuration').value = data.pulseDuration;
 
+                // NTP
+                document.getElementById('ntpEnabled').checked = data.ntpEnabled;
+                document.getElementById('ntpServer').value = data.ntpServer || 'pool.ntp.org';
+                document.getElementById('ntpTimezone').value = data.ntpTimezone || 'CET-1CEST,M3.5.0,M10.5.0/3';
+
                 toggleDHCP();
                 toggleWiFiSections();
                 toggleAPSection();
                 toggleWiFiDHCP();
+                toggleNTPSection();
             } catch (error) {
                 console.error('Config load failed:', error);
             }
@@ -950,6 +1022,11 @@
         function toggleWiFiDHCP() {
             const dhcpEnabled = document.getElementById('wifiDHCP').checked;
             document.getElementById('wifi-static-config').style.display = dhcpEnabled ? 'none' : 'block';
+        }
+
+        function toggleNTPSection() {
+            const enabled = document.getElementById('ntpEnabled').checked;
+            document.getElementById('ntp-config').style.display = enabled ? 'block' : 'none';
         }
 
         // Relay control functions
@@ -1097,6 +1174,48 @@
             }
         }
 
+        async function saveNTPConfig() {
+            try {
+                const formData = new FormData();
+                formData.append('ntpEnabled', document.getElementById('ntpEnabled').checked);
+                formData.append('ntpServer', document.getElementById('ntpServer').value);
+                formData.append('ntpTimezone', document.getElementById('ntpTimezone').value);
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                showToast(result.message || 'NTP Konfiguration gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
+        async function loadLog() {
+            try {
+                const response = await fetch('/api/log');
+                const data = await response.json();
+                const tbody = document.getElementById('log-table');
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(entry => `
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.4rem 0.5rem; font-family: monospace; color: var(--text-dim);">${entry.time}</td>
+                        <td style="padding: 0.4rem 0.5rem; font-family: monospace;">${entry.source}</td>
+                        <td style="padding: 0.4rem 0.5rem; font-family: monospace; color: var(--accent);">${entry.command}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Log load failed:', error);
+            }
+        }
+
         async function restartDevice() {
             if (confirm('Geraet wirklich neustarten?')) {
                 try {
@@ -1125,7 +1244,9 @@
             initGrids();
             loadConfig();
             updateStatus();
+            loadLog();
             setInterval(updateStatus, 2000);
+            setInterval(loadLog, 10000); // Refresh log every 10 seconds
         });
     </script>
 </body>

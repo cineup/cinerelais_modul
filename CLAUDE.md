@@ -136,6 +136,7 @@ Commands are case-insensitive (lowercased on receive). Responses prefixed with `
 | `/api/relay` | POST | Control single relay (params: `relay`, `state`, `duration`) |
 | `/api/relays` | POST | Control all relays (params: `state`, `duration`) |
 | `/api/restart` | POST | Restart ESP32 |
+| `/api/log` | GET | Command log (last 50 entries, newest first) |
 | `/update` | GET | ElegantOTA update page |
 
 ### Web Interface (`data/index.html`)
@@ -176,8 +177,26 @@ Stored as `/config.json` on LittleFS. Fields:
 | `hostname` | string | `cinerelais1` |
 | `tcpPort` | uint16 | `5000` |
 | `pulseDuration` | uint16 | `500` (ms) |
+| `ntpEnabled` | bool | `true` |
+| `ntpServer` | string | `pool.ntp.org` |
+| `ntpTimezone` | string | `CET-1CEST,M3.5.0,M10.5.0/3` |
 
 Network changes require device restart to take effect.
+
+### NTP Time Synchronization
+
+- **Default**: NTP enabled with `pool.ntp.org` server
+- **Timezone**: POSIX TZ format (default: Europe/Berlin)
+- **Offline mode**: If NTP sync fails, timestamps show uptime instead
+- **Status**: Shown in web interface System Info and `/api/status`
+
+### Command Log
+
+- Circular buffer storing last 50 commands
+- Records: timestamp, source IP, command
+- Commands logged: TCP commands (except `status`/`help`), Web API relay controls
+- Available via `/api/log` endpoint
+- Displayed in web interface with auto-refresh every 10s
 
 ### WiFi Behavior
 
@@ -261,3 +280,4 @@ Network changes require device restart to take effect.
 | 2026-02-01 | TCP protocol: `ON:1` → `r1_on`, lowercase, underscore-separated |
 | 2026-02-01 | Renamed `impuls` → `pulse` for English consistency; added `README_EN.md` |
 | 2026-02-03 | **Major rewrite**: Fixed GPIO pins, added TCA9554 I2C relay driver, added WiFi AP/STA support, corrected Ethernet W5500 SPI pins |
+| 2026-02-03 | Added NTP time synchronization (configurable server/timezone) and command log (50 entries) |
