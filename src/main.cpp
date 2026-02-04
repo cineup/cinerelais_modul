@@ -498,6 +498,11 @@ void WiFiEvent(WiFiEvent_t event) {
 // SPI instance for W5500 Ethernet
 SPIClass ethSPI(HSPI);
 
+// Define ETH_PHY_W5500 if not available in this Arduino Core version
+#ifndef ETH_PHY_W5500
+#define ETH_PHY_W5500 9
+#endif
+
 void setupEthernet() {
     Serial.println("Setting up Ethernet...");
 
@@ -505,7 +510,7 @@ void setupEthernet() {
     ethSPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
 
     // W5500 Ethernet initialization with SPI class
-    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, ethSPI)) {
+    if (!ETH.begin((eth_phy_type_t)ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, ethSPI)) {
         Serial.println("WARNING: ETH.begin() failed — no Ethernet available");
         return;
     }
