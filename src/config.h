@@ -2,7 +2,6 @@
 #define CONFIG_H
 
 #include <Arduino.h>
-#include <hal/spi_types.h>  // For spi_host_device_t (SPI2_HOST, SPI3_HOST)
 
 // ============================================
 // Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO
@@ -34,8 +33,7 @@ const int DI_PINS[8] = {
 #define TCA9554_POLARITY_REG 0x02
 #define TCA9554_CONFIG_REG  0x03
 
-// Ethernet Configuration (W5500 via SPI)
-#define ETH_SPI_HOST    SPI2_HOST
+// Ethernet Configuration (W5500 via SPI - HSPI)
 #define ETH_MISO_PIN    14
 #define ETH_MOSI_PIN    13
 #define ETH_SCLK_PIN    15

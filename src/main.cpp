@@ -495,12 +495,17 @@ void WiFiEvent(WiFiEvent_t event) {
 // Ethernet Setup
 // ============================================
 
+// SPI instance for W5500 Ethernet
+SPIClass ethSPI(HSPI);
+
 void setupEthernet() {
     Serial.println("Setting up Ethernet...");
 
-    // W5500 Ethernet: pass all SPI pins directly to ETH.begin()
-    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN,
-                   ETH_SPI_HOST, ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN)) {
+    // Initialize SPI bus for W5500
+    ethSPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+
+    // W5500 Ethernet initialization with SPI class
+    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, ethSPI)) {
         Serial.println("WARNING: ETH.begin() failed — no Ethernet available");
         return;
     }
