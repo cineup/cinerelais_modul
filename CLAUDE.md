@@ -64,9 +64,11 @@ pio device monitor
 |---------|---------|---------|
 | ArduinoJson | ^7.0.0 | JSON serialization for config and API |
 | ElegantOTA | ^3.1.0 | Over-the-air firmware updates |
-| AsyncTCP | ^1.1.1 | Async TCP server for command protocol |
-| ESPAsyncWebServer | ^1.2.3 | Async HTTP server for web interface and REST API |
+| AsyncTCP (mathieucarbou) | ^3.2.14 | Async TCP server for command protocol |
+| ESPAsyncWebServer (mathieucarbou) | ^3.4.5 | Async HTTP server for web interface and REST API |
 | Adafruit NeoPixel | ^1.12.0 | RGB LED (WS2812) status indicator |
+
+**Note:** Uses `mathieucarbou` forks of AsyncTCP/ESPAsyncWebServer for Arduino Core 3.x compatibility. Build flag `-DELEGANTOTA_USE_ASYNC_WEBSERVER=1` required for ElegantOTA.
 
 ## Architecture
 
