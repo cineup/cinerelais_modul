@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #include <Arduino.h>
+#include <hal/spi_types.h>  // For spi_host_device_t (SPI2_HOST, SPI3_HOST)
 
 // ============================================
 // Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO
