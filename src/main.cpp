@@ -161,12 +161,14 @@ void updateLedBackgroundState();
 // ============================================
 
 void setup() {
+    // Early serial init with longer delay for USB CDC
     Serial.begin(115200);
-    delay(1000);
+    delay(3000);  // Wait for USB CDC to connect
 
     Serial.println("\n\n========================================");
     Serial.println("CineRelais Modul — ESP32-S3 Relay Controller");
     Serial.println("========================================\n");
+    Serial.flush();
 
     // Initialize LittleFS
     if (!LittleFS.begin(true)) {
@@ -485,18 +487,15 @@ void WiFiEvent(WiFiEvent_t event) {
 // MAC address for W5500 (unique per device)
 byte ethMac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 
-// Custom SPI for W5500
-SPIClass ethSPI(FSPI);
-
 void setupEthernet() {
     Serial.println("Setting up Ethernet (W5500)...");
     Serial.flush();
     delay(100);
 
-    // Initialize custom SPI for W5500
-    ethSPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+    // Initialize default SPI with custom pins for W5500
+    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
 
-    // Set Ethernet to use custom SPI and CS pin
+    // Set Ethernet CS pin
     Ethernet.init(ETH_CS_PIN);
 
     Serial.println("Starting Ethernet...");
