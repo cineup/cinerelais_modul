@@ -187,7 +187,7 @@ void setup() {
 
     // Setup networking
     WiFi.onEvent(WiFiEvent);
-    setupEthernet();
+    // setupEthernet();  // TEMPORARILY DISABLED - debugging boot loop
     setupWiFi();
 
     // Wait for any network connection
@@ -233,7 +233,7 @@ void loop() {
     updateLED();
 
     // Check Ethernet link status
-    checkEthernetLink();
+    // checkEthernetLink();  // TEMPORARILY DISABLED
 
     // Read input states
     for (int i = 0; i < 8; i++) {
