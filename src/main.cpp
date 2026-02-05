@@ -27,7 +27,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <Ethernet.h>
+#include <ETH.h>
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -201,7 +201,7 @@ void setup() {
     Serial.println("\n========================================");
     Serial.println("System Ready!");
     if (ethConnected) {
-        Serial.printf("Ethernet IP: %s\n", Ethernet.localIP().toString().c_str());
+        Serial.printf("Ethernet IP: %s\n", ETH.localIP().toString().c_str());
     }
     if (wifiSTAConnected) {
         Serial.printf("WiFi STA IP: %s\n", WiFi.localIP().toString().c_str());
@@ -443,11 +443,33 @@ void setupI2C() {
 }
 
 // ============================================
-// Network Events (WiFi only - Ethernet uses polling)
+// Network Events (ETH and WiFi)
 // ============================================
 
 void WiFiEvent(WiFiEvent_t event) {
     switch (event) {
+        case ARDUINO_EVENT_ETH_START:
+            Serial.println("ETH Started");
+            ETH.setHostname(config.hostname);
+            break;
+        case ARDUINO_EVENT_ETH_CONNECTED:
+            Serial.println("ETH Connected");
+            break;
+        case ARDUINO_EVENT_ETH_GOT_IP:
+            Serial.printf("ETH Got IP: %s\n", ETH.localIP().toString().c_str());
+            ethConnected = true;
+            updateLedBackgroundState();
+            break;
+        case ARDUINO_EVENT_ETH_DISCONNECTED:
+            Serial.println("ETH Disconnected");
+            ethConnected = false;
+            updateLedBackgroundState();
+            break;
+        case ARDUINO_EVENT_ETH_STOP:
+            Serial.println("ETH Stopped");
+            ethConnected = false;
+            updateLedBackgroundState();
+            break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
             Serial.printf("WiFi STA Got IP: %s\n", WiFi.localIP().toString().c_str());
             wifiSTAConnected = true;
@@ -474,81 +496,47 @@ void WiFiEvent(WiFiEvent_t event) {
 }
 
 // ============================================
-// Ethernet Setup (W5500 via SPI using Ethernet library)
+// Ethernet Setup (W5500 via SPI using ESP32 native ETH)
 // ============================================
 
-// MAC address for W5500 (can be any unique address)
-byte ethMac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-EthernetClient ethClient;
+// SPI instance for W5500 Ethernet (use FSPI/SPI2 on ESP32-S3)
+SPIClass ethSPI(FSPI);
 
 void setupEthernet() {
     Serial.println("Setting up Ethernet (W5500)...");
+    Serial.flush();
 
-    // Initialize SPI for W5500
-    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+    // Initialize dedicated SPI bus for W5500
+    ethSPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
 
-    // Initialize Ethernet with CS pin
-    Ethernet.init(ETH_CS_PIN);
-
-    // Start Ethernet
-    if (config.useDHCP) {
-        Serial.println("Ethernet: Starting with DHCP...");
-        if (Ethernet.begin(ethMac, 5000) == 0) {  // 5 second timeout
-            Serial.println("WARNING: Ethernet DHCP failed");
-            // Check if cable is connected
-            if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-                Serial.println("ERROR: W5500 not found!");
-            } else if (Ethernet.linkStatus() == LinkOFF) {
-                Serial.println("WARNING: Ethernet cable not connected");
-            }
-            return;
-        }
-    } else {
-        Serial.println("Ethernet: Starting with static IP...");
+    // Configure static IP if not using DHCP
+    if (!config.useDHCP) {
+        Serial.println("Configuring static IP...");
         IPAddress ip, gateway, subnet, dns;
         ip.fromString(config.staticIP);
         gateway.fromString(config.gateway);
         subnet.fromString(config.subnet);
         dns.fromString(config.dns);
-        Ethernet.begin(ethMac, ip, dns, gateway, subnet);
+        ETH.config(ip, gateway, subnet, dns);
     }
 
-    // Check connection
-    if (Ethernet.hardwareStatus() != EthernetNoHardware && Ethernet.linkStatus() == LinkON) {
-        ethConnected = true;
-        Serial.printf("Ethernet connected! IP: %s\n", Ethernet.localIP().toString().c_str());
-        updateLedBackgroundState();
-    } else {
-        Serial.println("Ethernet: No link detected");
+    // Initialize W5500 Ethernet
+    // ETH.begin(phy_type, phy_addr, cs, irq, rst, spi)
+    Serial.println("Initializing W5500...");
+    Serial.flush();
+
+    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, ethSPI)) {
+        Serial.println("WARNING: ETH.begin() failed — Ethernet not available");
+        return;
     }
+
+    Serial.println("Ethernet initialized, waiting for link...");
 }
 
-// Check Ethernet link status (call from loop)
+// Check Ethernet link status (handled by events, but can be called from loop for safety)
 void checkEthernetLink() {
-    static unsigned long lastCheck = 0;
-    static bool wasConnected = false;
-
-    if (millis() - lastCheck < 2000) return;  // Check every 2 seconds
-    lastCheck = millis();
-
-    bool isConnected = (Ethernet.linkStatus() == LinkON);
-
-    if (isConnected != wasConnected) {
-        wasConnected = isConnected;
-        ethConnected = isConnected;
-
-        if (isConnected) {
-            Serial.printf("Ethernet link UP - IP: %s\n", Ethernet.localIP().toString().c_str());
-        } else {
-            Serial.println("Ethernet link DOWN");
-        }
-        updateLedBackgroundState();
-    }
-
-    // Maintain DHCP lease
-    if (config.useDHCP && ethConnected) {
-        Ethernet.maintain();
-    }
+    // ETH link status is handled by WiFiEvent callbacks
+    // This function is kept for compatibility but does nothing for native ETH
 }
 
 // ============================================
@@ -950,12 +938,8 @@ String getStatusJSON() {
 
     // Ethernet
     doc["ethConnected"] = ethConnected;
-    doc["ethIP"] = ethConnected ? Ethernet.localIP().toString() : "";
-    // Format MAC address from ethMac array
-    char macStr[18];
-    snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-             ethMac[0], ethMac[1], ethMac[2], ethMac[3], ethMac[4], ethMac[5]);
-    doc["ethMAC"] = macStr;
+    doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
+    doc["ethMAC"] = ETH.macAddress();
     doc["dhcp"] = config.useDHCP;
     doc["staticIP"] = config.staticIP;
     doc["gateway"] = config.gateway;
@@ -978,8 +962,8 @@ String getStatusJSON() {
 
     // For backwards compatibility: "ip" returns first available IP
     if (ethConnected) {
-        doc["ip"] = Ethernet.localIP().toString();
-        doc["mac"] = macStr;  // Use the formatted MAC string from above
+        doc["ip"] = ETH.localIP().toString();
+        doc["mac"] = ETH.macAddress();
     } else if (wifiSTAConnected) {
         doc["ip"] = WiFi.localIP().toString();
         doc["mac"] = WiFi.macAddress();
