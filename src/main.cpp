@@ -79,10 +79,10 @@ int logIndex = 0;
 int logCount = 0;
 
 // ============================================
-// RGB LED (WS2812)
+// RGB LED (WS2812) - TEMPORARILY USE POINTER
 // ============================================
 
-Adafruit_NeoPixel rgbLed(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel* rgbLed = nullptr;  // Initialize in setup() instead
 
 // LED state machine
 enum LedState {
@@ -605,9 +605,10 @@ void setupLED() {
     }
 
     Serial.println("Setting up RGB LED...");
-    rgbLed.begin();
-    rgbLed.clear();
-    rgbLed.show();
+    rgbLed = new Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+    rgbLed->begin();
+    rgbLed->clear();
+    rgbLed->show();
 
     // Initial state: no network = red
     updateLedBackgroundState();
@@ -615,15 +616,15 @@ void setupLED() {
 }
 
 void setLedColor(LedColor color, uint8_t brightness) {
-    if (!config.ledEnabled) return;
+    if (!config.ledEnabled || !rgbLed) return;
 
     // Scale color by brightness (0-255)
     uint8_t r = (color.r * brightness) / 255;
     uint8_t g = (color.g * brightness) / 255;
     uint8_t b = (color.b * brightness) / 255;
 
-    rgbLed.setPixelColor(0, rgbLed.Color(r, g, b));
-    rgbLed.show();
+    rgbLed->setPixelColor(0, rgbLed->Color(r, g, b));
+    rgbLed->show();
 }
 
 void updateLedBackgroundState() {
