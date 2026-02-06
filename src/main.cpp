@@ -1,10 +1,9 @@
 /*
- * TEST 6c - I2C init only, NO TCA9554 communication
- * Test if Wire.begin() or TCA9554 commands cause crash
+ * TEST 6d - NO I2C at all
+ * Remove Wire completely to confirm it's the problem
  */
 
 #include <Arduino.h>
-#include <Wire.h>
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -14,8 +13,6 @@
 #include <Adafruit_NeoPixel.h>
 
 // Hardcoded pins
-#define I2C_SDA_PIN         42
-#define I2C_SCL_PIN         41
 #define RGB_LED_PIN         38
 
 // Global variables - CRITICAL: Use pointers!
@@ -31,7 +28,7 @@ void setup() {
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 6c - I2C init only (no TCA9554)");
+    Serial.println("TEST 6d - NO I2C at all");
     Serial.println("========================================\n");
 
     // Test LittleFS
@@ -42,10 +39,8 @@ void setup() {
         Serial.println("   LittleFS OK");
     }
 
-    // Test I2C init ONLY (no communication)
-    Serial.println("2. Testing I2C init...");
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Serial.println("   Wire.begin() OK");
+    // NO I2C - skipped
+    Serial.println("2. I2C SKIPPED");
 
     // Test NeoPixel
     Serial.println("3. Testing NeoPixel...");
@@ -68,8 +63,8 @@ void setup() {
     webServer->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         JsonDocument doc;
         doc["status"] = "ok";
-        doc["test"] = "6c";
-        doc["note"] = "TCA9554 disabled - dummy relays only";
+        doc["test"] = "6d";
+        doc["note"] = "NO I2C - dummy relays only";
         for (int i = 0; i < 8; i++) {
             doc["relays"][i] = relayStates[i];
         }
@@ -83,9 +78,9 @@ void setup() {
             int n = request->getParam("n")->value().toInt();
             int s = request->getParam("s")->value().toInt();
             setRelay(n, s == 1);
-            request->send(200, "text/plain", "OK (dummy - no real relay)");
+            request->send(200, "text/plain", "OK (dummy)");
         } else {
-            request->send(400, "text/plain", "Use /relay?n=1&s=1 or /relay?n=1&s=0");
+            request->send(400, "text/plain", "Use /relay?n=1&s=1");
         }
     });
 
@@ -94,8 +89,7 @@ void setup() {
     Serial.println("   Web server OK");
 
     Serial.println("\n========================================");
-    Serial.println("Setup complete!");
-    Serial.println("TCA9554 DISABLED - relays are dummy only");
+    Serial.println("Setup complete! NO I2C in this test.");
     Serial.println("Try http://192.168.4.1/");
     Serial.println("========================================\n");
 }
@@ -105,10 +99,9 @@ void loop() {
     delay(100);
 }
 
-// DUMMY relay function - no I2C communication
+// DUMMY relay function
 void setRelay(int relay, bool state) {
     if (relay < 1 || relay > 8) return;
-    int index = relay - 1;
-    relayStates[index] = state;
-    Serial.printf("DUMMY Relay %d: %s (no real output)\n", relay, state ? "ON" : "OFF");
+    relayStates[relay - 1] = state;
+    Serial.printf("DUMMY Relay %d: %s\n", relay, state ? "ON" : "OFF");
 }
