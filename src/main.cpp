@@ -1,10 +1,12 @@
 /*
  * CineRelais Controller - Full Version
- * WiFi AP/STA, Web Interface, TCP Server, Relay Control
+ * Ethernet, WiFi AP/STA, Web Interface, TCP Server, Relay Control
  */
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
+#include <ETH.h>
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
@@ -25,6 +27,14 @@
 #define TCA9554_CONFIG_REG 0x03
 #define CONFIG_FILE "/config.json"
 
+// W5500 Ethernet (SPI)
+#define ETH_MISO_PIN 14
+#define ETH_MOSI_PIN 13
+#define ETH_SCLK_PIN 15
+#define ETH_CS_PIN   16
+#define ETH_INT_PIN  12
+#define ETH_RST_PIN  -1
+
 const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
 
 // ============================================
@@ -35,6 +45,15 @@ struct Config {
     uint16_t tcpPort;
     uint16_t pulseDuration;
 
+    // Ethernet
+    bool ethEnabled;
+    bool ethDHCP;
+    char ethIP[16];
+    char ethGateway[16];
+    char ethSubnet[16];
+    char ethDNS[16];
+
+    // WiFi
     bool wifiEnabled;
     bool wifiAPEnabled;
     char wifiSSID[33];
@@ -51,6 +70,14 @@ Config config = {
     "cinerelais1",  // hostname
     5000,           // tcpPort
     500,            // pulseDuration
+    // Ethernet
+    true,           // ethEnabled
+    true,           // ethDHCP
+    "192.168.1.100",// ethIP
+    "192.168.1.1",  // ethGateway
+    "255.255.255.0",// ethSubnet
+    "8.8.8.8",      // ethDNS
+    // WiFi
     true,           // wifiEnabled
     true,           // wifiAPEnabled
     "",             // wifiSSID
@@ -80,7 +107,8 @@ bool inputStates[8] = {false};
 unsigned long pulseEndTime[8] = {0};
 bool pulseActive[8] = {false};
 
-// WiFi state
+// Network state
+bool ethConnected = false;
 bool wifiSTAConnected = false;
 bool wifiAPActive = false;
 unsigned long lastWiFiCheck = 0;
@@ -97,6 +125,8 @@ bool ledEventActive = false;
 // ============================================
 void loadConfig();
 void saveConfig();
+void setupEthernet();
+void onEthEvent(arduino_event_id_t event, arduino_event_info_t info);
 void tca9554Init();
 void setRelay(int relay, bool state);
 void setAllRelays(bool state);
@@ -150,6 +180,9 @@ void setup() {
     rgbLed->setPixelColor(0, rgbLed->Color(0, 0, 50));  // Dim blue during startup
     rgbLed->show();
 
+    // Ethernet
+    setupEthernet();
+
     // WiFi
     setupWiFi();
 
@@ -188,6 +221,29 @@ void setup() {
             config.pulseDuration = request->getParam("pulseDuration", true)->value().toInt();
             changed = true;
         }
+
+        // Ethernet config (useDHCP/staticIP for HTML compatibility)
+        if (request->hasParam("useDHCP", true)) {
+            config.ethDHCP = request->getParam("useDHCP", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("staticIP", true)) {
+            strlcpy(config.ethIP, request->getParam("staticIP", true)->value().c_str(), sizeof(config.ethIP));
+            changed = true;
+        }
+        if (request->hasParam("gateway", true)) {
+            strlcpy(config.ethGateway, request->getParam("gateway", true)->value().c_str(), sizeof(config.ethGateway));
+            changed = true;
+        }
+        if (request->hasParam("subnet", true)) {
+            strlcpy(config.ethSubnet, request->getParam("subnet", true)->value().c_str(), sizeof(config.ethSubnet));
+            changed = true;
+        }
+        if (request->hasParam("dns", true)) {
+            strlcpy(config.ethDNS, request->getParam("dns", true)->value().c_str(), sizeof(config.ethDNS));
+            changed = true;
+        }
+
         if (request->hasParam("wifiEnabled", true)) {
             config.wifiEnabled = request->getParam("wifiEnabled", true)->value() == "true";
             changed = true;
@@ -326,6 +382,9 @@ void setup() {
     Serial.println("\n========================================");
     Serial.println("Setup complete!");
     Serial.printf("Hostname: %s\n", config.hostname);
+    if (ethConnected) {
+        Serial.printf("Ethernet: %s\n", ETH.localIP().toString().c_str());
+    }
     if (wifiAPActive) {
         Serial.printf("WiFi AP: %s @ %s\n", config.hostname, WiFi.softAPIP().toString().c_str());
     }
@@ -351,6 +410,79 @@ void loop() {
     }
 
     delay(10);
+}
+
+// ============================================
+// Ethernet Setup (W5500)
+// ============================================
+void onEthEvent(arduino_event_id_t event, arduino_event_info_t info) {
+    switch (event) {
+        case ARDUINO_EVENT_ETH_START:
+            Serial.println("ETH: Started");
+            ETH.setHostname(config.hostname);
+            break;
+        case ARDUINO_EVENT_ETH_CONNECTED:
+            Serial.println("ETH: Link Up");
+            break;
+        case ARDUINO_EVENT_ETH_GOT_IP:
+            ethConnected = true;
+            Serial.printf("ETH: Got IP %s\n", ETH.localIP().toString().c_str());
+            setStatusLED();
+            break;
+        case ARDUINO_EVENT_ETH_LOST_IP:
+            ethConnected = false;
+            Serial.println("ETH: Lost IP");
+            setStatusLED();
+            break;
+        case ARDUINO_EVENT_ETH_DISCONNECTED:
+            ethConnected = false;
+            Serial.println("ETH: Link Down");
+            setStatusLED();
+            break;
+        case ARDUINO_EVENT_ETH_STOP:
+            ethConnected = false;
+            Serial.println("ETH: Stopped");
+            setStatusLED();
+            break;
+        default:
+            break;
+    }
+}
+
+void setupEthernet() {
+    if (!config.ethEnabled) {
+        Serial.println("Ethernet disabled");
+        return;
+    }
+
+    Serial.println("Initializing Ethernet (W5500)...");
+
+    // Register event handler
+    Network.onEvent(onEthEvent);
+
+    // Configure static IP if not DHCP
+    if (!config.ethDHCP) {
+        IPAddress ip, gateway, subnet, dns;
+        ip.fromString(config.ethIP);
+        gateway.fromString(config.ethGateway);
+        subnet.fromString(config.ethSubnet);
+        dns.fromString(config.ethDNS);
+        ETH.config(ip, gateway, subnet, dns);
+    }
+
+    // Initialize W5500
+    // ETH.begin(type, phy_addr, cs, int, rst, spi, clk, miso, mosi)
+    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+
+    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, SPI)) {
+        Serial.println("ETH: Failed to initialize W5500");
+        return;
+    }
+
+    Serial.println("ETH: W5500 initialized, waiting for link...");
+
+    // Wait a bit for link
+    delay(1000);
 }
 
 // ============================================
@@ -474,6 +606,12 @@ String getStatusJSON() {
         inputs.add(inputStates[i]);
     }
 
+    // Ethernet status
+    doc["ethEnabled"] = config.ethEnabled;
+    doc["ethConnected"] = ethConnected;
+    doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
+    doc["ethMAC"] = ETH.linkUp() ? ETH.macAddress() : "";
+
     // WiFi status
     doc["wifiEnabled"] = config.wifiEnabled;
     doc["wifiSSID"] = config.wifiSSID;
@@ -482,8 +620,10 @@ String getStatusJSON() {
     doc["wifiAPActive"] = wifiAPActive;
     doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";
 
-    // IP for header
-    if (wifiSTAConnected) {
+    // IP for header (priority: Ethernet > WiFi STA > WiFi AP)
+    if (ethConnected) {
+        doc["ip"] = ETH.localIP().toString();
+    } else if (wifiSTAConnected) {
         doc["ip"] = WiFi.localIP().toString();
     } else if (wifiAPActive) {
         doc["ip"] = WiFi.softAPIP().toString();
@@ -501,6 +641,21 @@ String getConfigJSON() {
     doc["hostname"] = config.hostname;
     doc["tcpPort"] = config.tcpPort;
     doc["pulseDuration"] = config.pulseDuration;
+
+    // Ethernet
+    doc["ethEnabled"] = config.ethEnabled;
+    doc["useDHCP"] = config.ethDHCP;  // For compatibility with HTML
+    doc["ethDHCP"] = config.ethDHCP;
+    doc["staticIP"] = config.ethIP;
+    doc["ethIP"] = config.ethIP;
+    doc["gateway"] = config.ethGateway;
+    doc["ethGateway"] = config.ethGateway;
+    doc["subnet"] = config.ethSubnet;
+    doc["ethSubnet"] = config.ethSubnet;
+    doc["dns"] = config.ethDNS;
+    doc["ethDNS"] = config.ethDNS;
+
+    // WiFi
     doc["wifiEnabled"] = config.wifiEnabled;
     doc["wifiAPEnabled"] = config.wifiAPEnabled;
     doc["wifiSSID"] = config.wifiSSID;
@@ -541,6 +696,16 @@ void loadConfig() {
     strlcpy(config.hostname, doc["hostname"] | "cinerelais1", sizeof(config.hostname));
     config.tcpPort = doc["tcpPort"] | 5000;
     config.pulseDuration = doc["pulseDuration"] | 500;
+
+    // Ethernet
+    config.ethEnabled = doc["ethEnabled"] | true;
+    config.ethDHCP = doc["ethDHCP"] | doc["useDHCP"] | true;
+    strlcpy(config.ethIP, doc["ethIP"] | doc["staticIP"] | "192.168.1.100", sizeof(config.ethIP));
+    strlcpy(config.ethGateway, doc["ethGateway"] | doc["gateway"] | "192.168.1.1", sizeof(config.ethGateway));
+    strlcpy(config.ethSubnet, doc["ethSubnet"] | doc["subnet"] | "255.255.255.0", sizeof(config.ethSubnet));
+    strlcpy(config.ethDNS, doc["ethDNS"] | doc["dns"] | "8.8.8.8", sizeof(config.ethDNS));
+
+    // WiFi
     config.wifiEnabled = doc["wifiEnabled"] | true;
     config.wifiAPEnabled = doc["wifiAPEnabled"] | true;
     strlcpy(config.wifiSSID, doc["wifiSSID"] | "", sizeof(config.wifiSSID));
@@ -560,6 +725,16 @@ void saveConfig() {
     doc["hostname"] = config.hostname;
     doc["tcpPort"] = config.tcpPort;
     doc["pulseDuration"] = config.pulseDuration;
+
+    // Ethernet
+    doc["ethEnabled"] = config.ethEnabled;
+    doc["ethDHCP"] = config.ethDHCP;
+    doc["ethIP"] = config.ethIP;
+    doc["ethGateway"] = config.ethGateway;
+    doc["ethSubnet"] = config.ethSubnet;
+    doc["ethDNS"] = config.ethDNS;
+
+    // WiFi
     doc["wifiEnabled"] = config.wifiEnabled;
     doc["wifiAPEnabled"] = config.wifiAPEnabled;
     doc["wifiSSID"] = config.wifiSSID;
@@ -786,12 +961,15 @@ String processCommand(const String& cmd) {
 void setStatusLED() {
     uint8_t r = 0, g = 0, b = 0;
 
-    if (wifiSTAConnected) {
-        // Cyan = STA connected
+    if (ethConnected) {
+        // Green = Ethernet connected (highest priority)
+        g = LED_BRIGHTNESS_STATUS;
+    } else if (wifiSTAConnected) {
+        // Cyan = WiFi STA connected
         g = LED_BRIGHTNESS_STATUS;
         b = LED_BRIGHTNESS_STATUS;
     } else if (wifiAPActive) {
-        // Blue = AP only
+        // Blue = WiFi AP only
         b = LED_BRIGHTNESS_STATUS;
     } else {
         // Red = no connection
