@@ -1,5 +1,5 @@
 /*
- * TEST 6 - Add TCA9554 Relay Control
+ * TEST 7 - Add TCP Command Server
  */
 
 #include <Arduino.h>
@@ -11,6 +11,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <Adafruit_NeoPixel.h>
+#include <vector>
 
 #define RGB_LED_PIN 38
 #define I2C_SDA_PIN 42
@@ -18,10 +19,15 @@
 #define TCA9554_ADDR 0x20
 #define TCA9554_OUTPUT_REG 0x01
 #define TCA9554_CONFIG_REG 0x03
+#define TCP_PORT 5000
 
 // Create as pointers (not global objects!)
 AsyncWebServer* webServer = nullptr;
+AsyncServer* tcpServer = nullptr;
 Adafruit_NeoPixel* rgbLed = nullptr;
+
+// TCP clients
+std::vector<AsyncClient*> tcpClients;
 
 // Relay state
 bool tca9554Found = false;
@@ -32,13 +38,15 @@ uint8_t relayRegister = 0x00;
 void tca9554Init();
 void setRelay(int relay, bool state);
 void setAllRelays(bool state);
+void setupTcpServer();
+String processCommand(const String& cmd);
 
 void setup() {
     Serial.begin(115200);
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 6 - TCA9554 Relay Control");
+    Serial.println("TEST 7 - TCP Command Server");
     Serial.println("========================================\n");
 
     // Test LittleFS
@@ -119,14 +127,16 @@ void setup() {
     webServer->begin();
     Serial.println("Web server started on port 80");
 
+    // TCP Command Server
+    Serial.println("Starting TCP server...");
+    setupTcpServer();
+    Serial.printf("TCP server started on port %d\n", TCP_PORT);
+
     Serial.println("\n========================================");
     Serial.println("Setup complete!");
-    Serial.println("http://192.168.4.1/          - Status JSON");
-    Serial.println("http://192.168.4.1/relay?n=1&s=1 - Relay 1 ON");
-    Serial.println("http://192.168.4.1/relay?n=1&s=0 - Relay 1 OFF");
-    Serial.println("http://192.168.4.1/relays?s=1    - All ON");
-    Serial.println("http://192.168.4.1/relays?s=0    - All OFF");
-    Serial.println("http://192.168.4.1/update    - OTA Update");
+    Serial.println("HTTP: http://192.168.4.1/");
+    Serial.printf("TCP:  nc 192.168.4.1 %d\n", TCP_PORT);
+    Serial.println("Commands: r1_on, r1_off, all_on, all_off, status, help");
     Serial.println("========================================\n");
 }
 
@@ -196,4 +206,88 @@ void setAllRelays(bool state) {
         relayStates[i] = state;
     }
     Serial.printf("All relays: %s\n", state ? "ON" : "OFF");
+}
+
+// ============================================
+// TCP Command Server
+// ============================================
+
+void setupTcpServer() {
+    tcpServer = new AsyncServer(TCP_PORT);
+
+    tcpServer->onClient([](void* arg, AsyncClient* client) {
+        Serial.printf("TCP client connected: %s\n", client->remoteIP().toString().c_str());
+        tcpClients.push_back(client);
+
+        client->onData([](void* arg, AsyncClient* c, void* data, size_t len) {
+            String cmd = String((char*)data).substring(0, len);
+            cmd.trim();
+            cmd.toLowerCase();
+            if (cmd.length() > 0) {
+                Serial.printf("TCP cmd: %s\n", cmd.c_str());
+                String response = processCommand(cmd);
+                if (c->connected()) {
+                    c->write((response + "\n").c_str());
+                }
+            }
+        }, nullptr);
+
+        client->onDisconnect([](void* arg, AsyncClient* c) {
+            Serial.printf("TCP client disconnected\n");
+            for (auto it = tcpClients.begin(); it != tcpClients.end(); ++it) {
+                if (*it == c) {
+                    tcpClients.erase(it);
+                    break;
+                }
+            }
+        }, nullptr);
+
+    }, nullptr);
+
+    tcpServer->begin();
+}
+
+String processCommand(const String& cmd) {
+    // r<1-8>_on / r<1-8>_off
+    if (cmd.startsWith("r") && cmd.length() >= 4) {
+        int relay = cmd.substring(1, 2).toInt();
+        if (relay >= 1 && relay <= 8) {
+            if (cmd.indexOf("_on") > 0) {
+                setRelay(relay, true);
+                return "OK: Relay " + String(relay) + " ON";
+            } else if (cmd.indexOf("_off") > 0) {
+                setRelay(relay, false);
+                return "OK: Relay " + String(relay) + " OFF";
+            }
+        }
+    }
+
+    // all_on / all_off
+    if (cmd == "all_on") {
+        setAllRelays(true);
+        return "OK: All relays ON";
+    }
+    if (cmd == "all_off") {
+        setAllRelays(false);
+        return "OK: All relays OFF";
+    }
+
+    // status
+    if (cmd == "status") {
+        JsonDocument doc;
+        doc["tca9554"] = tca9554Found;
+        for (int i = 0; i < 8; i++) {
+            doc["relays"][i] = relayStates[i];
+        }
+        String output;
+        serializeJson(doc, output);
+        return output;
+    }
+
+    // help
+    if (cmd == "help") {
+        return "Commands: r<1-8>_on, r<1-8>_off, all_on, all_off, status, help";
+    }
+
+    return "ERROR: Unknown command. Type 'help'";
 }
