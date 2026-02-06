@@ -1,5 +1,5 @@
 /*
- * TEST 3 - WiFi + LittleFS + AsyncWebServer
+ * TEST 4 - WiFi + LittleFS + AsyncWebServer + NeoPixel
  */
 
 #include <Arduino.h>
@@ -7,16 +7,20 @@
 #include <LittleFS.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <Adafruit_NeoPixel.h>
 
-// Create web server as pointer (not global object!)
+#define RGB_LED_PIN 38
+
+// Create as pointers (not global objects!)
 AsyncWebServer* webServer = nullptr;
+Adafruit_NeoPixel* rgbLed = nullptr;
 
 void setup() {
     Serial.begin(115200);
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 3 - WiFi + LittleFS + AsyncWebServer");
+    Serial.println("TEST 4 - WiFi + LittleFS + AsyncWebServer + NeoPixel");
     Serial.println("========================================\n");
 
     // Test LittleFS
@@ -26,6 +30,14 @@ void setup() {
     } else {
         Serial.println("LittleFS OK");
     }
+
+    // Test NeoPixel
+    Serial.println("Testing NeoPixel...");
+    rgbLed = new Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+    rgbLed->begin();
+    rgbLed->setPixelColor(0, rgbLed->Color(0, 255, 0));  // Green
+    rgbLed->show();
+    Serial.println("NeoPixel OK (should be GREEN)");
 
     // Test WiFi AP
     Serial.println("Testing WiFi AP...");
@@ -44,7 +56,7 @@ void setup() {
     webServer->begin();
     Serial.println("Web server started on port 80");
 
-    Serial.println("\nSetup complete! Try http://192.168.4.1/");
+    Serial.println("\nSetup complete!");
 }
 
 void loop() {
