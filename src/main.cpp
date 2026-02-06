@@ -1,5 +1,5 @@
 /*
- * TEST 7 - Add TCP Command Server
+ * TEST 8 - Add Digital Inputs
  */
 
 #include <Arduino.h>
@@ -21,6 +21,9 @@
 #define TCA9554_CONFIG_REG 0x03
 #define TCP_PORT 5000
 
+// Digital Input Pins (active LOW, directly on ESP32)
+const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
+
 // Create as pointers (not global objects!)
 AsyncWebServer* webServer = nullptr;
 AsyncServer* tcpServer = nullptr;
@@ -34,11 +37,16 @@ bool tca9554Found = false;
 bool relayStates[8] = {false};
 uint8_t relayRegister = 0x00;
 
+// Input state
+bool inputStates[8] = {false};
+
 // Forward declarations
 void tca9554Init();
 void setRelay(int relay, bool state);
 void setAllRelays(bool state);
 void setupTcpServer();
+void setupDigitalInputs();
+void readDigitalInputs();
 String processCommand(const String& cmd);
 
 void setup() {
@@ -46,7 +54,7 @@ void setup() {
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 7 - TCP Command Server");
+    Serial.println("TEST 8 - Digital Inputs");
     Serial.println("========================================\n");
 
     // Test LittleFS
@@ -61,6 +69,12 @@ void setup() {
     Serial.println("Testing I2C + TCA9554...");
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     tca9554Init();
+
+    // Setup Digital Inputs
+    Serial.println("Setting up Digital Inputs...");
+    setupDigitalInputs();
+    readDigitalInputs();
+    Serial.println("Digital Inputs OK");
 
     // Test NeoPixel
     Serial.println("Testing NeoPixel...");
@@ -81,12 +95,14 @@ void setup() {
     webServer = new AsyncWebServer(80);
 
     webServer->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        readDigitalInputs();  // Fresh read
         JsonDocument doc;
         doc["status"] = "ok";
-        doc["test"] = 6;
+        doc["test"] = 8;
         doc["tca9554"] = tca9554Found;
         for (int i = 0; i < 8; i++) {
             doc["relays"][i] = relayStates[i];
+            doc["inputs"][i] = inputStates[i];
         }
         String output;
         serializeJson(doc, output);
@@ -274,10 +290,12 @@ String processCommand(const String& cmd) {
 
     // status
     if (cmd == "status") {
+        readDigitalInputs();
         JsonDocument doc;
         doc["tca9554"] = tca9554Found;
         for (int i = 0; i < 8; i++) {
             doc["relays"][i] = relayStates[i];
+            doc["inputs"][i] = inputStates[i];
         }
         String output;
         serializeJson(doc, output);
@@ -290,4 +308,21 @@ String processCommand(const String& cmd) {
     }
 
     return "ERROR: Unknown command. Type 'help'";
+}
+
+// ============================================
+// Digital Inputs
+// ============================================
+
+void setupDigitalInputs() {
+    for (int i = 0; i < 8; i++) {
+        pinMode(DI_PINS[i], INPUT_PULLUP);
+    }
+}
+
+void readDigitalInputs() {
+    for (int i = 0; i < 8; i++) {
+        // Active LOW: LOW = triggered (true), HIGH = not triggered (false)
+        inputStates[i] = (digitalRead(DI_PINS[i]) == LOW);
+    }
 }
