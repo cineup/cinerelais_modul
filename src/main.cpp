@@ -1,5 +1,6 @@
 /*
- * TEST 6 - config.h + LittleFS config loading + I2C + Relays
+ * TEST 6b - I2C + TCA9554 Relays (ohne config.h)
+ * Basiert auf Test 5 der funktioniert hat
  */
 
 #include <Arduino.h>
@@ -11,17 +12,22 @@
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <Adafruit_NeoPixel.h>
-#include "config.h"
 
-// Global variables
-NetworkConfig config;
+// Hardcoded pins (statt config.h)
+#define I2C_SDA_PIN         42
+#define I2C_SCL_PIN         41
+#define TCA9554_ADDR        0x20
+#define TCA9554_OUTPUT_REG  0x01
+#define TCA9554_CONFIG_REG  0x03
+#define RGB_LED_PIN         38
+
+// Global variables - CRITICAL: Use pointers!
 AsyncWebServer* webServer = nullptr;
 Adafruit_NeoPixel* rgbLed = nullptr;
 bool tca9554Found = false;
 bool relayStates[8] = {false};
 
 // Forward declarations
-void loadConfig();
 void tca9554Init();
 void tca9554Write(uint8_t pin, bool state);
 void setRelay(int relay, bool state);
@@ -31,7 +37,7 @@ void setup() {
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 6 - Config + I2C + Relays");
+    Serial.println("TEST 6b - I2C + TCA9554 Relays");
     Serial.println("========================================\n");
 
     // Test LittleFS
@@ -42,19 +48,13 @@ void setup() {
         Serial.println("   LittleFS OK");
     }
 
-    // Load config
-    Serial.println("2. Loading config...");
-    loadConfig();
-    Serial.printf("   Hostname: %s\n", config.hostname);
-    Serial.printf("   TCP Port: %d\n", config.tcpPort);
-
     // Test I2C / TCA9554
-    Serial.println("3. Testing I2C...");
+    Serial.println("2. Testing I2C...");
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     tca9554Init();
 
     // Test NeoPixel
-    Serial.println("4. Testing NeoPixel...");
+    Serial.println("3. Testing NeoPixel...");
     rgbLed = new Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
     rgbLed->begin();
     rgbLed->setPixelColor(0, rgbLed->Color(0, 0, 255));  // Blue
@@ -62,21 +62,19 @@ void setup() {
     Serial.println("   NeoPixel OK (should be BLUE)");
 
     // Test WiFi AP
-    Serial.println("5. Testing WiFi AP...");
+    Serial.println("4. Testing WiFi AP...");
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(config.hostname, "12345678");
-    Serial.printf("   WiFi AP IP: %s (SSID: %s)\n",
-                  WiFi.softAPIP().toString().c_str(), config.hostname);
+    WiFi.softAP("cinerelais1", "12345678");
+    Serial.printf("   WiFi AP IP: %s\n", WiFi.softAPIP().toString().c_str());
 
     // Test AsyncWebServer
-    Serial.println("6. Creating AsyncWebServer...");
+    Serial.println("5. Creating AsyncWebServer...");
     webServer = new AsyncWebServer(80);
 
     webServer->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         JsonDocument doc;
         doc["status"] = "ok";
-        doc["test"] = 6;
-        doc["hostname"] = config.hostname;
+        doc["test"] = "6b";
         doc["tca9554"] = tca9554Found;
         for (int i = 0; i < 8; i++) {
             doc["relays"][i] = relayStates[i];
@@ -111,38 +109,6 @@ void setup() {
 void loop() {
     ElegantOTA.loop();
     delay(100);
-}
-
-// ============================================
-// Config loading
-// ============================================
-
-void loadConfig() {
-    config = DEFAULT_CONFIG;
-
-    File file = LittleFS.open(CONFIG_FILE, "r");
-    if (!file) {
-        Serial.println("   No config file, using defaults");
-        return;
-    }
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-
-    if (error) {
-        Serial.printf("   Config parse error: %s\n", error.c_str());
-        return;
-    }
-
-    // Load values
-    strlcpy(config.hostname, doc["hostname"] | DEFAULT_HOSTNAME, sizeof(config.hostname));
-    config.tcpPort = doc["tcpPort"] | DEFAULT_TCP_PORT;
-    config.pulseDuration = doc["pulseDuration"] | DEFAULT_PULSE_DURATION;
-    config.ledEnabled = doc["ledEnabled"] | DEFAULT_LED_ENABLED;
-    config.ledBrightness = doc["ledBrightness"] | DEFAULT_LED_BRIGHTNESS;
-
-    Serial.println("   Config loaded from file");
 }
 
 // ============================================
