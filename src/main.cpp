@@ -6,11 +6,11 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-// #include <ETH.h>  // W5500 not supported in this Arduino Core version
+#include <ETH.h>
 #include <WiFi.h>
 
-// Ethernet disabled for now - ESP32 Arduino Core 6.9.0 doesn't have W5500 support
-#define ETHERNET_DISABLED 1
+// Ethernet enabled - requires Arduino Core 3.x (pioarduino platform)
+// #define ETHERNET_DISABLED 1
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
