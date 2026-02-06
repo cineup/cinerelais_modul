@@ -6,8 +6,11 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <ETH.h>
+// #include <ETH.h>  // W5500 not supported in this Arduino Core version
 #include <WiFi.h>
+
+// Ethernet disabled for now - ESP32 Arduino Core 6.9.0 doesn't have W5500 support
+#define ETHERNET_DISABLED 1
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
@@ -126,7 +129,9 @@ bool ledEventActive = false;
 void loadConfig();
 void saveConfig();
 void setupEthernet();
+#ifndef ETHERNET_DISABLED
 void onEthEvent(arduino_event_id_t event, arduino_event_info_t info);
+#endif
 void tca9554Init();
 void setRelay(int relay, bool state);
 void setAllRelays(bool state);
@@ -382,9 +387,11 @@ void setup() {
     Serial.println("\n========================================");
     Serial.println("Setup complete!");
     Serial.printf("Hostname: %s\n", config.hostname);
+#ifndef ETHERNET_DISABLED
     if (ethConnected) {
         Serial.printf("Ethernet: %s\n", ETH.localIP().toString().c_str());
     }
+#endif
     if (wifiAPActive) {
         Serial.printf("WiFi AP: %s @ %s\n", config.hostname, WiFi.softAPIP().toString().c_str());
     }
@@ -415,6 +422,7 @@ void loop() {
 // ============================================
 // Ethernet Setup (W5500)
 // ============================================
+#ifndef ETHERNET_DISABLED
 void onEthEvent(arduino_event_id_t event, arduino_event_info_t info) {
     switch (event) {
         case ARDUINO_EVENT_ETH_START:
@@ -448,8 +456,13 @@ void onEthEvent(arduino_event_id_t event, arduino_event_info_t info) {
             break;
     }
 }
+#endif
 
 void setupEthernet() {
+#ifdef ETHERNET_DISABLED
+    Serial.println("Ethernet support not available (compile-time disabled)");
+    ethConnected = false;
+#else
     if (!config.ethEnabled) {
         Serial.println("Ethernet disabled");
         return;
@@ -483,6 +496,7 @@ void setupEthernet() {
 
     // Wait a bit for link
     delay(1000);
+#endif
 }
 
 // ============================================
@@ -609,8 +623,13 @@ String getStatusJSON() {
     // Ethernet status
     doc["ethEnabled"] = config.ethEnabled;
     doc["ethConnected"] = ethConnected;
+#ifndef ETHERNET_DISABLED
     doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
     doc["ethMAC"] = ETH.linkUp() ? ETH.macAddress() : "";
+#else
+    doc["ethIP"] = "";
+    doc["ethMAC"] = "";
+#endif
 
     // WiFi status
     doc["wifiEnabled"] = config.wifiEnabled;
@@ -621,9 +640,12 @@ String getStatusJSON() {
     doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";
 
     // IP for header (priority: Ethernet > WiFi STA > WiFi AP)
+#ifndef ETHERNET_DISABLED
     if (ethConnected) {
         doc["ip"] = ETH.localIP().toString();
-    } else if (wifiSTAConnected) {
+    } else
+#endif
+    if (wifiSTAConnected) {
         doc["ip"] = WiFi.localIP().toString();
     } else if (wifiAPActive) {
         doc["ip"] = WiFi.softAPIP().toString();
