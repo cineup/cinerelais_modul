@@ -1,5 +1,5 @@
 /*
- * TEST 8 - Add Digital Inputs
+ * TEST 9 - Config Load/Save
  */
 
 #include <Arduino.h>
@@ -19,10 +19,27 @@
 #define TCA9554_ADDR 0x20
 #define TCA9554_OUTPUT_REG 0x01
 #define TCA9554_CONFIG_REG 0x03
-#define TCP_PORT 5000
+#define CONFIG_FILE "/config.json"
 
 // Digital Input Pins (active LOW, directly on ESP32)
 const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
+
+// Configuration
+struct Config {
+    char hostname[32];
+    uint16_t tcpPort;
+    uint16_t pulseDuration;
+    char wifiSSID[33];
+    char wifiPassword[65];
+};
+
+Config config = {
+    "cinerelais1",  // hostname
+    5000,           // tcpPort
+    500,            // pulseDuration (ms)
+    "",             // wifiSSID
+    ""              // wifiPassword
+};
 
 // Create as pointers (not global objects!)
 AsyncWebServer* webServer = nullptr;
@@ -41,6 +58,8 @@ uint8_t relayRegister = 0x00;
 bool inputStates[8] = {false};
 
 // Forward declarations
+void loadConfig();
+void saveConfig();
 void tca9554Init();
 void setRelay(int relay, bool state);
 void setAllRelays(bool state);
@@ -54,15 +73,19 @@ void setup() {
     delay(3000);
 
     Serial.println("\n\n========================================");
-    Serial.println("TEST 8 - Digital Inputs");
+    Serial.println("TEST 9 - Config Load/Save");
     Serial.println("========================================\n");
 
-    // Test LittleFS
-    Serial.println("Testing LittleFS...");
+    // LittleFS + Config
+    Serial.println("Mounting LittleFS...");
     if (!LittleFS.begin(true)) {
         Serial.println("ERROR: LittleFS mount failed!");
     } else {
         Serial.println("LittleFS OK");
+        loadConfig();
+        Serial.printf("  Hostname: %s\n", config.hostname);
+        Serial.printf("  TCP Port: %d\n", config.tcpPort);
+        Serial.printf("  Pulse Duration: %d ms\n", config.pulseDuration);
     }
 
     // Test I2C + TCA9554
@@ -84,11 +107,11 @@ void setup() {
     rgbLed->show();
     Serial.println("NeoPixel OK");
 
-    // Test WiFi AP
-    Serial.println("Testing WiFi AP...");
+    // WiFi AP (use hostname from config)
+    Serial.println("Starting WiFi AP...");
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("TestAP", "12345678");
-    Serial.printf("WiFi AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+    WiFi.softAP(config.hostname, "12345678");
+    Serial.printf("WiFi AP: %s @ %s\n", config.hostname, WiFi.softAPIP().toString().c_str());
 
     // Test AsyncWebServer + ArduinoJson
     Serial.println("Creating AsyncWebServer...");
@@ -136,6 +159,31 @@ void setup() {
         }
     });
 
+    // Config API
+    webServer->on("/config", HTTP_GET, [](AsyncWebServerRequest *request){
+        JsonDocument doc;
+        doc["hostname"] = config.hostname;
+        doc["tcpPort"] = config.tcpPort;
+        doc["pulseDuration"] = config.pulseDuration;
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    webServer->on("/config", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (request->hasParam("hostname", true)) {
+            strlcpy(config.hostname, request->getParam("hostname", true)->value().c_str(), sizeof(config.hostname));
+        }
+        if (request->hasParam("tcpPort", true)) {
+            config.tcpPort = request->getParam("tcpPort", true)->value().toInt();
+        }
+        if (request->hasParam("pulseDuration", true)) {
+            config.pulseDuration = request->getParam("pulseDuration", true)->value().toInt();
+        }
+        saveConfig();
+        request->send(200, "text/plain", "OK: Config saved. Restart to apply.");
+    });
+
     // Test ElegantOTA
     ElegantOTA.begin(webServer);
     Serial.println("ElegantOTA OK - available at /update");
@@ -146,13 +194,13 @@ void setup() {
     // TCP Command Server
     Serial.println("Starting TCP server...");
     setupTcpServer();
-    Serial.printf("TCP server started on port %d\n", TCP_PORT);
+    Serial.printf("TCP server started on port %d\n", config.tcpPort);
 
     Serial.println("\n========================================");
     Serial.println("Setup complete!");
     Serial.println("HTTP: http://192.168.4.1/");
-    Serial.printf("TCP:  nc 192.168.4.1 %d\n", TCP_PORT);
-    Serial.println("Commands: r1_on, r1_off, all_on, all_off, status, help");
+    Serial.println("      http://192.168.4.1/config (GET/POST)");
+    Serial.printf("TCP:  nc 192.168.4.1 %d\n", config.tcpPort);
     Serial.println("========================================\n");
 }
 
@@ -229,7 +277,7 @@ void setAllRelays(bool state) {
 // ============================================
 
 void setupTcpServer() {
-    tcpServer = new AsyncServer(TCP_PORT);
+    tcpServer = new AsyncServer(config.tcpPort);
 
     tcpServer->onClient([](void* arg, AsyncClient* client) {
         Serial.printf("TCP client connected: %s\n", client->remoteIP().toString().c_str());
@@ -325,4 +373,52 @@ void readDigitalInputs() {
         // Active LOW: LOW = triggered (true), HIGH = not triggered (false)
         inputStates[i] = (digitalRead(DI_PINS[i]) == LOW);
     }
+}
+
+// ============================================
+// Config Load/Save
+// ============================================
+
+void loadConfig() {
+    File file = LittleFS.open(CONFIG_FILE, "r");
+    if (!file) {
+        Serial.println("No config file, using defaults");
+        return;
+    }
+
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        Serial.printf("Config parse error: %s\n", error.c_str());
+        return;
+    }
+
+    strlcpy(config.hostname, doc["hostname"] | "cinerelais1", sizeof(config.hostname));
+    config.tcpPort = doc["tcpPort"] | 5000;
+    config.pulseDuration = doc["pulseDuration"] | 500;
+    strlcpy(config.wifiSSID, doc["wifiSSID"] | "", sizeof(config.wifiSSID));
+    strlcpy(config.wifiPassword, doc["wifiPassword"] | "", sizeof(config.wifiPassword));
+
+    Serial.println("Config loaded");
+}
+
+void saveConfig() {
+    JsonDocument doc;
+    doc["hostname"] = config.hostname;
+    doc["tcpPort"] = config.tcpPort;
+    doc["pulseDuration"] = config.pulseDuration;
+    doc["wifiSSID"] = config.wifiSSID;
+    doc["wifiPassword"] = config.wifiPassword;
+
+    File file = LittleFS.open(CONFIG_FILE, "w");
+    if (!file) {
+        Serial.println("ERROR: Cannot open config file for writing");
+        return;
+    }
+
+    serializeJson(doc, file);
+    file.close();
+    Serial.println("Config saved");
 }
