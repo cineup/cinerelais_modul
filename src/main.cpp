@@ -86,6 +86,12 @@ bool wifiAPActive = false;
 unsigned long lastWiFiCheck = 0;
 const unsigned long WIFI_CHECK_INTERVAL = 30000;
 
+// LED brightness
+const uint8_t LED_BRIGHTNESS_STATUS = 51;   // 20% for normal status
+const uint8_t LED_BRIGHTNESS_EVENT = 127;   // 50% for events
+unsigned long ledEventEndTime = 0;
+bool ledEventActive = false;
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -105,6 +111,8 @@ void checkWiFiConnection();
 String processCommand(const String& cmd);
 String getStatusJSON();
 String getConfigJSON();
+void setStatusLED();
+void flashEventLED();
 
 // ============================================
 // Setup
@@ -260,6 +268,7 @@ void setup() {
             pulseRelay(relay, duration);
         }
 
+        flashEventLED();
         request->send(200, "text/plain", "OK");
     });
 
@@ -284,6 +293,7 @@ void setup() {
             pulseAllRelays(duration);
         }
 
+        flashEventLED();
         request->send(200, "text/plain", "OK");
     });
 
@@ -310,15 +320,8 @@ void setup() {
     Serial.println("Starting TCP Server...");
     setupTcpServer();
 
-    // Set LED based on connection status
-    if (wifiSTAConnected) {
-        rgbLed->setPixelColor(0, rgbLed->Color(0, 255, 255));  // Cyan = STA connected
-    } else if (wifiAPActive) {
-        rgbLed->setPixelColor(0, rgbLed->Color(0, 0, 255));    // Blue = AP only
-    } else {
-        rgbLed->setPixelColor(0, rgbLed->Color(255, 0, 0));    // Red = no connection
-    }
-    rgbLed->show();
+    // Set LED based on connection status (20% brightness)
+    setStatusLED();
 
     Serial.println("\n========================================");
     Serial.println("Setup complete!");
@@ -340,6 +343,13 @@ void loop() {
     ElegantOTA.loop();
     updatePulses();
     checkWiFiConnection();
+
+    // Handle LED event timeout
+    if (ledEventActive && millis() >= ledEventEndTime) {
+        ledEventActive = false;
+        setStatusLED();
+    }
+
     delay(10);
 }
 
@@ -428,8 +438,7 @@ void checkWiFiConnection() {
     if (WiFi.status() != WL_CONNECTED && wifiSTAConnected) {
         wifiSTAConnected = false;
         Serial.println("WiFi STA disconnected, attempting reconnect...");
-        rgbLed->setPixelColor(0, rgbLed->Color(0, 0, 255));  // Blue during reconnect
-        rgbLed->show();
+        setStatusLED();
     }
 
     if (WiFi.status() != WL_CONNECTED) {
@@ -437,8 +446,7 @@ void checkWiFiConnection() {
     } else if (!wifiSTAConnected) {
         wifiSTAConnected = true;
         Serial.printf("WiFi STA reconnected: %s\n", WiFi.localIP().toString().c_str());
-        rgbLed->setPixelColor(0, rgbLed->Color(0, 255, 255));  // Cyan
-        rgbLed->show();
+        setStatusLED();
     }
 }
 
@@ -693,6 +701,9 @@ void setupTcpServer() {
             if (cmd.length() > 0) {
                 Serial.printf("TCP cmd: %s\n", cmd.c_str());
                 String response = processCommand(cmd);
+                if (cmd != "status" && cmd != "help") {
+                    flashEventLED();
+                }
                 if (c->connected()) {
                     c->write((response + "\n").c_str());
                 }
@@ -767,4 +778,34 @@ String processCommand(const String& cmd) {
     }
 
     return "ERROR: Unknown command. Type 'help'";
+}
+
+// ============================================
+// LED Control
+// ============================================
+void setStatusLED() {
+    uint8_t r = 0, g = 0, b = 0;
+
+    if (wifiSTAConnected) {
+        // Cyan = STA connected
+        g = LED_BRIGHTNESS_STATUS;
+        b = LED_BRIGHTNESS_STATUS;
+    } else if (wifiAPActive) {
+        // Blue = AP only
+        b = LED_BRIGHTNESS_STATUS;
+    } else {
+        // Red = no connection
+        r = LED_BRIGHTNESS_STATUS;
+    }
+
+    rgbLed->setPixelColor(0, rgbLed->Color(r, g, b));
+    rgbLed->show();
+}
+
+void flashEventLED() {
+    // Orange flash at 50% brightness
+    rgbLed->setPixelColor(0, rgbLed->Color(LED_BRIGHTNESS_EVENT, LED_BRIGHTNESS_EVENT / 2, 0));
+    rgbLed->show();
+    ledEventActive = true;
+    ledEventEndTime = millis() + 150;  // 150ms flash
 }
