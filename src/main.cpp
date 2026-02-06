@@ -49,7 +49,7 @@
 // ============================================
 
 NetworkConfig config;
-AsyncWebServer webServer(80);
+AsyncWebServer* webServer = nullptr;  // Initialize in setup()
 AsyncServer* tcpServer = nullptr;
 std::vector<AsyncClient*> tcpClients;
 
@@ -1111,16 +1111,19 @@ void setupTCPServer() {
 void setupWebServer() {
     Serial.println("Setting up Web Server...");
 
+    // Create web server instance
+    webServer = new AsyncWebServer(80);
+
     // Serve static files from LittleFS
-    webServer.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    webServer->serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
     // API: Get status
-    webServer.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", getStatusJSON());
     });
 
     // API: Set relay
-    webServer.on("/api/relay", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/relay", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("relay", true) && request->hasParam("state", true)) {
             int relay = request->getParam("relay", true)->value().toInt();
             String state = request->getParam("state", true)->value();
@@ -1160,7 +1163,7 @@ void setupWebServer() {
     });
 
     // API: Set all relays
-    webServer.on("/api/relays", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/relays", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (request->hasParam("state", true)) {
             String state = request->getParam("state", true)->value();
             String clientIP = request->client()->remoteIP().toString();
@@ -1195,7 +1198,7 @@ void setupWebServer() {
     });
 
     // API: Get config
-    webServer.on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/config", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;
         // Ethernet
         doc["useDHCP"] = config.useDHCP;
@@ -1232,7 +1235,7 @@ void setupWebServer() {
     });
 
     // API: Save config
-    webServer.on("/api/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         bool changed = false;
 
         // Ethernet
@@ -1342,19 +1345,19 @@ void setupWebServer() {
     });
 
     // API: Restart
-    webServer.on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", "{\"success\":true,\"message\":\"Restarting...\"}");
         delay(500);
         ESP.restart();
     });
 
     // API: Get command log
-    webServer.on("/api/log", HTTP_GET, [](AsyncWebServerRequest *request) {
+    webServer->on("/api/log", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", getLogJSON());
     });
 
     // Setup ElegantOTA with LED callbacks
-    ElegantOTA.begin(&webServer);
+    ElegantOTA.begin(webServer);
     ElegantOTA.onStart([]() {
         Serial.println("OTA Update started");
         ledOtaActive = true;
@@ -1367,10 +1370,10 @@ void setupWebServer() {
     });
 
     // Handle 404
-    webServer.onNotFound([](AsyncWebServerRequest *request) {
+    webServer->onNotFound([](AsyncWebServerRequest *request) {
         request->send(404, "text/plain", "Not Found");
     });
 
-    webServer.begin();
+    webServer->begin();
     Serial.println("Web server started on port 80");
 }
