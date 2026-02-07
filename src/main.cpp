@@ -242,9 +242,16 @@ void setup() {
             changed = true;
         }
 
-        // Ethernet config (useDHCP/staticIP for HTML compatibility)
+        // Ethernet config - handle checkbox booleans properly
+        // HTML checkboxes send "true"/"on" when checked, nothing when unchecked
+        // So we check for explicit "true"/"false" or presence of related fields
         if (request->hasParam("useDHCP", true)) {
-            config.ethDHCP = request->getParam("useDHCP", true)->value() == "true";
+            String val = request->getParam("useDHCP", true)->value();
+            config.ethDHCP = (val == "true" || val == "on" || val == "1");
+            changed = true;
+        } else if (request->hasParam("staticIP", true)) {
+            // If staticIP is being set but useDHCP not sent, assume DHCP disabled
+            config.ethDHCP = false;
             changed = true;
         }
         if (request->hasParam("staticIP", true)) {
@@ -264,12 +271,15 @@ void setup() {
             changed = true;
         }
 
+        // WiFi config - same checkbox handling
         if (request->hasParam("wifiEnabled", true)) {
-            config.wifiEnabled = request->getParam("wifiEnabled", true)->value() == "true";
+            String val = request->getParam("wifiEnabled", true)->value();
+            config.wifiEnabled = (val == "true" || val == "on" || val == "1");
             changed = true;
         }
         if (request->hasParam("wifiAPEnabled", true)) {
-            config.wifiAPEnabled = request->getParam("wifiAPEnabled", true)->value() == "true";
+            String val = request->getParam("wifiAPEnabled", true)->value();
+            config.wifiAPEnabled = (val == "true" || val == "on" || val == "1");
             changed = true;
         }
         if (request->hasParam("wifiSSID", true)) {
@@ -285,7 +295,12 @@ void setup() {
             changed = true;
         }
         if (request->hasParam("wifiDHCP", true)) {
-            config.wifiDHCP = request->getParam("wifiDHCP", true)->value() == "true";
+            String val = request->getParam("wifiDHCP", true)->value();
+            config.wifiDHCP = (val == "true" || val == "on" || val == "1");
+            changed = true;
+        } else if (request->hasParam("wifiIP", true)) {
+            // If wifiIP is being set but wifiDHCP not sent, assume DHCP disabled
+            config.wifiDHCP = false;
             changed = true;
         }
         if (request->hasParam("wifiIP", true)) {
@@ -307,7 +322,8 @@ void setup() {
 
         // LED settings
         if (request->hasParam("ledEnabled", true)) {
-            config.ledEnabled = request->getParam("ledEnabled", true)->value() == "true";
+            String val = request->getParam("ledEnabled", true)->value();
+            config.ledEnabled = (val == "true" || val == "on" || val == "1");
             changed = true;
         }
         if (request->hasParam("ledBrightness", true)) {
@@ -317,7 +333,8 @@ void setup() {
 
         // NTP settings
         if (request->hasParam("ntpEnabled", true)) {
-            config.ntpEnabled = request->getParam("ntpEnabled", true)->value() == "true";
+            String val = request->getParam("ntpEnabled", true)->value();
+            config.ntpEnabled = (val == "true" || val == "on" || val == "1");
             changed = true;
         }
         if (request->hasParam("ntpServer", true)) {
