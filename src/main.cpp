@@ -795,11 +795,11 @@ void loadConfig() {
     config.tcpPort = doc["tcpPort"] | 5000;
     config.pulseDuration = doc["pulseDuration"] | 500;
 
-    // Ethernet - use explicit key check for boolean
+    // Ethernet - use explicit key check for boolean (ArduinoJson v7 API)
     config.ethEnabled = doc["ethEnabled"] | true;
-    if (doc.containsKey("ethDHCP")) {
+    if (doc["ethDHCP"].is<bool>()) {
         config.ethDHCP = doc["ethDHCP"].as<bool>();
-    } else if (doc.containsKey("useDHCP")) {
+    } else if (doc["useDHCP"].is<bool>()) {
         config.ethDHCP = doc["useDHCP"].as<bool>();
     } else {
         config.ethDHCP = true;
