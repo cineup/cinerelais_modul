@@ -518,23 +518,26 @@ void setupEthernet() {
     // Register event handler
     Network.onEvent(onEthEvent);
 
-    // Configure static IP if not DHCP
+    // Initialize W5500 first
+    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
+
+    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, SPI)) {
+        Serial.println("ETH: Failed to initialize W5500");
+        return;
+    }
+
+    // Configure static IP AFTER ETH.begin() if not DHCP
     if (!config.ethDHCP) {
         IPAddress ip, gateway, subnet, dns;
         ip.fromString(config.ethIP);
         gateway.fromString(config.ethGateway);
         subnet.fromString(config.ethSubnet);
         dns.fromString(config.ethDNS);
+
+        Serial.printf("ETH: Using static IP %s\n", config.ethIP);
         ETH.config(ip, gateway, subnet, dns);
-    }
-
-    // Initialize W5500
-    // ETH.begin(type, phy_addr, cs, int, rst, spi, clk, miso, mosi)
-    SPI.begin(ETH_SCLK_PIN, ETH_MISO_PIN, ETH_MOSI_PIN, ETH_CS_PIN);
-
-    if (!ETH.begin(ETH_PHY_W5500, 1, ETH_CS_PIN, ETH_INT_PIN, ETH_RST_PIN, SPI)) {
-        Serial.println("ETH: Failed to initialize W5500");
-        return;
+    } else {
+        Serial.println("ETH: Using DHCP");
     }
 
     Serial.println("ETH: W5500 initialized, waiting for link...");
@@ -802,7 +805,8 @@ void loadConfig() {
     strlcpy(config.ntpServer, doc["ntpServer"] | "pool.ntp.org", sizeof(config.ntpServer));
     strlcpy(config.ntpTimezone, doc["ntpTimezone"] | "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(config.ntpTimezone));
 
-    Serial.printf("Config loaded: hostname=%s, tcpPort=%d\n", config.hostname, config.tcpPort);
+    Serial.printf("Config loaded: hostname=%s, tcpPort=%d, ethDHCP=%d, ledBrightness=%d\n",
+                  config.hostname, config.tcpPort, config.ethDHCP, config.ledBrightness);
 }
 
 void saveConfig() {
