@@ -67,6 +67,15 @@ struct Config {
     char wifiGateway[16];
     char wifiSubnet[16];
     char wifiDNS[16];
+
+    // LED
+    bool ledEnabled;
+    uint8_t ledBrightness;
+
+    // NTP
+    bool ntpEnabled;
+    char ntpServer[64];
+    char ntpTimezone[48];
 };
 
 Config config = {
@@ -90,7 +99,14 @@ Config config = {
     "192.168.4.100",// wifiIP
     "192.168.4.1",  // wifiGateway
     "255.255.255.0",// wifiSubnet
-    "8.8.8.8"       // wifiDNS
+    "8.8.8.8",      // wifiDNS
+    // LED
+    true,           // ledEnabled
+    51,             // ledBrightness (20%)
+    // NTP
+    true,           // ntpEnabled
+    "pool.ntp.org", // ntpServer
+    "CET-1CEST,M3.5.0,M10.5.0/3"  // ntpTimezone (Europe/Berlin)
 };
 
 // ============================================
@@ -117,11 +133,10 @@ bool wifiAPActive = false;
 unsigned long lastWiFiCheck = 0;
 const unsigned long WIFI_CHECK_INTERVAL = 30000;
 
-// LED brightness
-const uint8_t LED_BRIGHTNESS_STATUS = 51;   // 20% for normal status
-const uint8_t LED_BRIGHTNESS_EVENT = 127;   // 50% for events
+// LED state
 unsigned long ledEventEndTime = 0;
 bool ledEventActive = false;
+volatile bool ledUpdateNeeded = false;  // Flag for thread-safe LED updates
 
 // ============================================
 // Forward Declarations
@@ -290,6 +305,30 @@ void setup() {
             changed = true;
         }
 
+        // LED settings
+        if (request->hasParam("ledEnabled", true)) {
+            config.ledEnabled = request->getParam("ledEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("ledBrightness", true)) {
+            config.ledBrightness = request->getParam("ledBrightness", true)->value().toInt();
+            changed = true;
+        }
+
+        // NTP settings
+        if (request->hasParam("ntpEnabled", true)) {
+            config.ntpEnabled = request->getParam("ntpEnabled", true)->value() == "true";
+            changed = true;
+        }
+        if (request->hasParam("ntpServer", true)) {
+            strlcpy(config.ntpServer, request->getParam("ntpServer", true)->value().c_str(), sizeof(config.ntpServer));
+            changed = true;
+        }
+        if (request->hasParam("ntpTimezone", true)) {
+            strlcpy(config.ntpTimezone, request->getParam("ntpTimezone", true)->value().c_str(), sizeof(config.ntpTimezone));
+            changed = true;
+        }
+
         if (changed) {
             saveConfig();
         }
@@ -410,6 +449,12 @@ void loop() {
     updatePulses();
     checkWiFiConnection();
 
+    // Handle LED updates (thread-safe: flag set by event handlers)
+    if (ledUpdateNeeded) {
+        ledUpdateNeeded = false;
+        setStatusLED();
+    }
+
     // Handle LED event timeout
     if (ledEventActive && millis() >= ledEventEndTime) {
         ledEventActive = false;
@@ -435,22 +480,22 @@ void onEthEvent(arduino_event_id_t event, arduino_event_info_t info) {
         case ARDUINO_EVENT_ETH_GOT_IP:
             ethConnected = true;
             Serial.printf("ETH: Got IP %s\n", ETH.localIP().toString().c_str());
-            setStatusLED();
+            ledUpdateNeeded = true;  // Thread-safe: set flag, update in loop()
             break;
         case ARDUINO_EVENT_ETH_LOST_IP:
             ethConnected = false;
             Serial.println("ETH: Lost IP");
-            setStatusLED();
+            ledUpdateNeeded = true;
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             ethConnected = false;
             Serial.println("ETH: Link Down");
-            setStatusLED();
+            ledUpdateNeeded = true;
             break;
         case ARDUINO_EVENT_ETH_STOP:
             ethConnected = false;
             Serial.println("ETH: Stopped");
-            setStatusLED();
+            ledUpdateNeeded = true;
             break;
         default:
             break;
@@ -584,7 +629,7 @@ void checkWiFiConnection() {
     if (WiFi.status() != WL_CONNECTED && wifiSTAConnected) {
         wifiSTAConnected = false;
         Serial.println("WiFi STA disconnected, attempting reconnect...");
-        setStatusLED();
+        ledUpdateNeeded = true;
     }
 
     if (WiFi.status() != WL_CONNECTED) {
@@ -592,7 +637,7 @@ void checkWiFiConnection() {
     } else if (!wifiSTAConnected) {
         wifiSTAConnected = true;
         Serial.printf("WiFi STA reconnected: %s\n", WiFi.localIP().toString().c_str());
-        setStatusLED();
+        ledUpdateNeeded = true;
     }
 }
 
@@ -691,6 +736,15 @@ String getConfigJSON() {
     // Don't send password
     doc["wifiPassword"] = "";
 
+    // LED
+    doc["ledEnabled"] = config.ledEnabled;
+    doc["ledBrightness"] = config.ledBrightness;
+
+    // NTP
+    doc["ntpEnabled"] = config.ntpEnabled;
+    doc["ntpServer"] = config.ntpServer;
+    doc["ntpTimezone"] = config.ntpTimezone;
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -739,6 +793,15 @@ void loadConfig() {
     strlcpy(config.wifiSubnet, doc["wifiSubnet"] | "255.255.255.0", sizeof(config.wifiSubnet));
     strlcpy(config.wifiDNS, doc["wifiDNS"] | "8.8.8.8", sizeof(config.wifiDNS));
 
+    // LED
+    config.ledEnabled = doc["ledEnabled"] | true;
+    config.ledBrightness = doc["ledBrightness"] | 51;
+
+    // NTP
+    config.ntpEnabled = doc["ntpEnabled"] | true;
+    strlcpy(config.ntpServer, doc["ntpServer"] | "pool.ntp.org", sizeof(config.ntpServer));
+    strlcpy(config.ntpTimezone, doc["ntpTimezone"] | "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(config.ntpTimezone));
+
     Serial.printf("Config loaded: hostname=%s, tcpPort=%d\n", config.hostname, config.tcpPort);
 }
 
@@ -767,6 +830,15 @@ void saveConfig() {
     doc["wifiGateway"] = config.wifiGateway;
     doc["wifiSubnet"] = config.wifiSubnet;
     doc["wifiDNS"] = config.wifiDNS;
+
+    // LED
+    doc["ledEnabled"] = config.ledEnabled;
+    doc["ledBrightness"] = config.ledBrightness;
+
+    // NTP
+    doc["ntpEnabled"] = config.ntpEnabled;
+    doc["ntpServer"] = config.ntpServer;
+    doc["ntpTimezone"] = config.ntpTimezone;
 
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {
@@ -981,21 +1053,30 @@ String processCommand(const String& cmd) {
 // LED Control
 // ============================================
 void setStatusLED() {
+    if (!config.ledEnabled || rgbLed == nullptr) {
+        if (rgbLed != nullptr) {
+            rgbLed->setPixelColor(0, 0);
+            rgbLed->show();
+        }
+        return;
+    }
+
+    uint8_t brightness = config.ledBrightness;
     uint8_t r = 0, g = 0, b = 0;
 
     if (ethConnected) {
         // Green = Ethernet connected (highest priority)
-        g = LED_BRIGHTNESS_STATUS;
+        g = brightness;
     } else if (wifiSTAConnected) {
         // Cyan = WiFi STA connected
-        g = LED_BRIGHTNESS_STATUS;
-        b = LED_BRIGHTNESS_STATUS;
+        g = brightness;
+        b = brightness;
     } else if (wifiAPActive) {
         // Blue = WiFi AP only
-        b = LED_BRIGHTNESS_STATUS;
+        b = brightness;
     } else {
         // Red = no connection
-        r = LED_BRIGHTNESS_STATUS;
+        r = brightness;
     }
 
     rgbLed->setPixelColor(0, rgbLed->Color(r, g, b));
@@ -1003,8 +1084,11 @@ void setStatusLED() {
 }
 
 void flashEventLED() {
-    // Orange flash at 50% brightness
-    rgbLed->setPixelColor(0, rgbLed->Color(LED_BRIGHTNESS_EVENT, LED_BRIGHTNESS_EVENT / 2, 0));
+    if (!config.ledEnabled || rgbLed == nullptr) return;
+
+    // Orange flash at ~2.5x status brightness (capped at 255)
+    uint8_t eventBrightness = min(255, (int)config.ledBrightness * 5 / 2);
+    rgbLed->setPixelColor(0, rgbLed->Color(eventBrightness, eventBrightness / 2, 0));
     rgbLed->show();
     ledEventActive = true;
     ledEventEndTime = millis() + 150;  // 150ms flash
