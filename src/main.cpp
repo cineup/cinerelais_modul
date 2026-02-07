@@ -248,10 +248,12 @@ void setup() {
         if (request->hasParam("useDHCP", true)) {
             String val = request->getParam("useDHCP", true)->value();
             config.ethDHCP = (val == "true" || val == "on" || val == "1");
+            Serial.printf("Config POST: useDHCP='%s' -> ethDHCP=%d\n", val.c_str(), config.ethDHCP);
             changed = true;
         } else if (request->hasParam("staticIP", true)) {
             // If staticIP is being set but useDHCP not sent, assume DHCP disabled
             config.ethDHCP = false;
+            Serial.println("Config POST: no useDHCP param, staticIP present -> ethDHCP=0");
             changed = true;
         }
         if (request->hasParam("staticIP", true)) {
@@ -793,9 +795,15 @@ void loadConfig() {
     config.tcpPort = doc["tcpPort"] | 5000;
     config.pulseDuration = doc["pulseDuration"] | 500;
 
-    // Ethernet
+    // Ethernet - use explicit key check for boolean
     config.ethEnabled = doc["ethEnabled"] | true;
-    config.ethDHCP = doc["ethDHCP"] | doc["useDHCP"] | true;
+    if (doc.containsKey("ethDHCP")) {
+        config.ethDHCP = doc["ethDHCP"].as<bool>();
+    } else if (doc.containsKey("useDHCP")) {
+        config.ethDHCP = doc["useDHCP"].as<bool>();
+    } else {
+        config.ethDHCP = true;
+    }
     strlcpy(config.ethIP, doc["ethIP"] | doc["staticIP"] | "192.168.1.100", sizeof(config.ethIP));
     strlcpy(config.ethGateway, doc["ethGateway"] | doc["gateway"] | "192.168.1.1", sizeof(config.ethGateway));
     strlcpy(config.ethSubnet, doc["ethSubnet"] | doc["subnet"] | "255.255.255.0", sizeof(config.ethSubnet));
