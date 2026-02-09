@@ -17,6 +17,7 @@
             --danger: #ef4444;
             --warning: #f59e0b;
             --info: #3b82f6;
+            --cyan: #22d3ee;
         }
 
         * {
@@ -33,79 +34,187 @@
             line-height: 1.6;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
+        /* Header */
+        header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        header {
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.5rem 2rem;
-            background: var(--bg-card);
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 2rem;
+            gap: 1rem;
+            flex-wrap: wrap;
         }
 
-        .logo {
+        .header-left {
             display: flex;
             align-items: center;
             gap: 1rem;
         }
 
         .logo-icon {
-            width: 48px;
-            height: 48px;
+            width: 42px;
+            height: 42px;
             background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
+            flex-shrink: 0;
         }
 
-        .logo h1 {
+        .hostname {
             font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: -0.02em;
-        }
-
-        .logo span {
-            font-size: 0.875rem;
-            color: var(--text-dim);
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
         }
 
-        .status-indicator {
+        .connection-status {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .conn-badge {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.4rem;
+            padding: 0.4rem 0.75rem;
             background: var(--bg-dark);
-            border-radius: 9999px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.8rem;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.875rem;
         }
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
+        .conn-badge.online {
+            border-color: var(--accent);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .conn-badge.online .conn-dot {
             background: var(--accent);
-            animation: pulse 2s infinite;
+            box-shadow: 0 0 6px var(--accent);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .conn-badge.wifi-sta {
+            border-color: var(--cyan);
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        .conn-badge.wifi-sta .conn-dot {
+            background: var(--cyan);
+            box-shadow: 0 0 6px var(--cyan);
+        }
+
+        .conn-badge.wifi-ap {
+            border-color: var(--info);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .conn-badge.wifi-ap .conn-dot {
+            background: var(--info);
+            box-shadow: 0 0 6px var(--info);
+        }
+
+        .conn-badge.offline {
+            opacity: 0.5;
+        }
+
+        .conn-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+        }
+
+        .conn-label {
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+
+        .conn-ip {
+            color: var(--text);
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 0 1.5rem;
+        }
+
+        .tab-nav-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 0.25rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .tab-nav-inner::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: var(--bg-card-hover);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
             gap: 1.5rem;
+        }
+
+        .grid-full {
+            grid-column: 1 / -1;
         }
 
         .card {
@@ -117,7 +226,6 @@
         }
 
         .card:hover {
-            background: var(--bg-card-hover);
             border-color: #3a3a4a;
         }
 
@@ -125,20 +233,21 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border);
         }
 
         .card-title {
-            font-size: 1.125rem;
+            font-size: 1.1rem;
             font-weight: 600;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .relay-grid {
+        /* Relay Grid */
+        .relay-grid, .input-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0.75rem;
@@ -151,7 +260,7 @@
             background: var(--bg-dark);
             color: var(--text);
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.15s ease;
@@ -160,11 +269,16 @@
             align-items: center;
             justify-content: center;
             gap: 0.25rem;
+            min-height: 70px;
         }
 
         .relay-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .relay-btn:active {
+            transform: translateY(0);
         }
 
         .relay-btn.active {
@@ -175,7 +289,7 @@
         }
 
         .relay-btn span {
-            font-size: 0.625rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             opacity: 0.7;
@@ -187,6 +301,40 @@
             margin-top: 1rem;
         }
 
+        /* Input Indicators */
+        .input-indicator {
+            aspect-ratio: 1;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            min-height: 70px;
+        }
+
+        .input-indicator.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: var(--info);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .input-indicator .num {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .input-indicator span {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+        }
+
+        /* Buttons */
         .btn {
             flex: 1;
             padding: 0.75rem 1rem;
@@ -194,7 +342,7 @@
             border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: inherit;
             font-size: 0.875rem;
             font-weight: 500;
             cursor: pointer;
@@ -216,43 +364,37 @@
             color: var(--warning);
         }
 
-        .input-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
+        .btn-full {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 0.875rem;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
         }
 
-        .input-indicator {
-            aspect-ratio: 1;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            background: var(--bg-dark);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.25rem;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        .btn-full:hover {
+            background: var(--accent);
+            color: #000;
         }
 
-        .input-indicator.active {
-            background: rgba(59, 130, 246, 0.2);
-            border-color: var(--info);
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        .btn-danger-full {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
         }
 
-        .input-indicator .num {
-            font-size: 1.25rem;
-            font-weight: 700;
+        .btn-danger-full:hover {
+            background: var(--danger);
+            color: #fff;
         }
 
-        .input-indicator span {
-            font-size: 0.625rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-dim);
+        .btn-sm {
+            flex: 0;
+            padding: 0.5rem 1rem;
         }
 
+        /* Forms */
         .form-group {
             margin-bottom: 1rem;
         }
@@ -280,6 +422,11 @@
             border-color: var(--accent);
         }
 
+        .form-group input[type="range"] {
+            padding: 0;
+            cursor: pointer;
+        }
+
         .form-row {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -297,6 +444,7 @@
             position: relative;
             width: 52px;
             height: 28px;
+            flex-shrink: 0;
         }
 
         .toggle input {
@@ -340,59 +488,124 @@
             background: var(--accent);
         }
 
+        /* Info Grid */
         .info-grid {
             display: grid;
-            gap: 0.75rem;
+            gap: 0.5rem;
         }
 
         .info-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem;
+            padding: 0.6rem 0.75rem;
             background: var(--bg-dark);
             border-radius: 8px;
         }
 
         .info-label {
             color: var(--text-dim);
-            font-size: 0.875rem;
+            font-size: 0.85rem;
         }
 
         .info-value {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
         }
 
-        .btn-full {
-            width: 100%;
-            margin-top: 1rem;
-            padding: 1rem;
-            background: var(--accent-dim);
-            border: 1px solid var(--accent);
+        .status-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-badge.online {
+            background: rgba(34, 197, 94, 0.2);
             color: var(--accent);
         }
 
-        .btn-full:hover {
-            background: var(--accent);
-            color: #000;
+        .status-badge.offline {
+            background: rgba(113, 113, 122, 0.2);
+            color: var(--text-dim);
         }
 
-        .btn-danger-full {
-            background: rgba(239, 68, 68, 0.1);
-            border-color: var(--danger);
-            color: var(--danger);
+        /* Sections */
+        .section-divider {
+            border-top: 1px solid var(--border);
+            margin: 1rem 0;
+            padding-top: 1rem;
         }
 
-        .btn-danger-full:hover {
-            background: var(--danger);
-            color: #fff;
+        .subsection-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
         }
 
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+        }
+
+        /* Log Table */
+        .log-container {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .log-table {
+            width: 100%;
+            font-size: 0.85rem;
+            border-collapse: collapse;
+        }
+
+        .log-table th {
+            text-align: left;
+            color: var(--text-dim);
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+        }
+
+        .log-table td {
+            padding: 0.4rem 0.5rem;
+            font-family: monospace;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* OTA Link */
+        .ota-link {
+            display: block;
+            text-align: center;
+            padding: 1rem;
+            background: var(--bg-dark);
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            color: var(--text-dim);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .ota-link:hover {
+            border-color: var(--info);
+            color: var(--info);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
+            bottom: 1.5rem;
+            right: 1.5rem;
             padding: 1rem 1.5rem;
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -419,469 +632,503 @@
             background: rgba(239, 68, 68, 0.1);
         }
 
-        .section-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-dim);
-            margin-bottom: 1rem;
-        }
-
-        .ota-section {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--border);
-        }
-
-        .ota-link {
-            display: block;
-            text-align: center;
-            padding: 1rem;
-            background: var(--bg-dark);
-            border: 1px dashed var(--border);
-            border-radius: 8px;
-            color: var(--text-dim);
-            text-decoration: none;
-            transition: all 0.2s ease;
-        }
-
-        .ota-link:hover {
-            border-color: var(--info);
-            color: var(--info);
-            background: rgba(59, 130, 246, 0.1);
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.15rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        }
-
-        .status-badge.online {
-            background: rgba(34, 197, 94, 0.2);
-            color: var(--accent);
-        }
-
-        .status-badge.offline {
-            background: rgba(113, 113, 122, 0.2);
-            color: var(--text-dim);
-        }
-
-        .wifi-config-section {
-            border-top: 1px solid var(--border);
+        /* LED Color Legend */
+        .led-legend {
+            display: grid;
+            gap: 0.4rem;
             margin-top: 1rem;
-            padding-top: 1rem;
         }
 
-        .subsection-title {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-dim);
-            margin-bottom: 0.5rem;
-            margin-top: 0.5rem;
+        .led-legend .info-item {
+            padding: 0.5rem 0.75rem;
         }
 
-        @media (max-width: 768px) {
+        /* Responsive */
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            header {
+                padding: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .hostname {
+                font-size: 1.25rem;
+            }
+
+            .connection-status {
+                width: 100%;
+            }
+
+            .conn-badge {
+                flex: 1;
+                justify-content: center;
+                font-size: 0.75rem;
+                padding: 0.35rem 0.5rem;
+            }
+
+            .tab-nav {
+                padding: 0 1rem;
+            }
+
+            .tab-btn {
+                padding: 0.875rem 1rem;
+                font-size: 0.85rem;
+            }
+
             .container {
                 padding: 1rem;
             }
 
-            header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-
             .relay-grid, .input-grid {
                 grid-template-columns: repeat(4, 1fr);
+                gap: 0.5rem;
+            }
+
+            .relay-btn, .input-indicator {
+                min-height: 60px;
+                font-size: 1.25rem;
+            }
+
+            .relay-btn span, .input-indicator span {
+                font-size: 0.55rem;
             }
 
             .form-row {
                 grid-template-columns: 1fr;
             }
+
+            .relay-actions {
+                flex-direction: column;
+            }
+
+            .card {
+                padding: 1.25rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Header -->
     <header>
-        <div class="logo">
-            <div class="logo-icon">&#9889;</div>
-            <div>
-                <h1>CineRelais Controller</h1>
-                <span id="hostname">cinerelais1</span>
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo-icon">&#9889;</div>
+                <div class="hostname" id="hostname">CineRelais</div>
             </div>
-        </div>
-        <div class="status-indicator">
-            <div class="status-dot"></div>
-            <span id="ip-address">Verbinde...</span>
+            <div class="connection-status">
+                <div class="conn-badge offline" id="conn-eth">
+                    <div class="conn-dot"></div>
+                    <span class="conn-label">ETH</span>
+                    <span class="conn-ip" id="conn-eth-ip">-</span>
+                </div>
+                <div class="conn-badge offline" id="conn-wifi">
+                    <div class="conn-dot"></div>
+                    <span class="conn-label">WLAN</span>
+                    <span class="conn-ip" id="conn-wifi-ip">-</span>
+                </div>
+                <div class="conn-badge offline" id="conn-ap">
+                    <div class="conn-dot"></div>
+                    <span class="conn-label">AP</span>
+                    <span class="conn-ip" id="conn-ap-ip">-</span>
+                </div>
+            </div>
         </div>
     </header>
 
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+        <div class="tab-nav-inner">
+            <button class="tab-btn active" onclick="switchTab('control')">Steuerung</button>
+            <button class="tab-btn" onclick="switchTab('network')">Netzwerk</button>
+            <button class="tab-btn" onclick="switchTab('settings')">Einstellungen</button>
+        </div>
+    </nav>
+
     <div class="container">
-        <div class="grid">
-            <!-- Relay Control -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Relais Ausgaenge</h2>
-                </div>
-                <div class="relay-grid" id="relay-grid">
-                </div>
-                <div class="relay-actions">
-                    <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
-                    <button class="btn btn-warning" onclick="pulseAllRelays()">Alle IMPULS</button>
-                    <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
-                </div>
-            </div>
-
-            <!-- Digital Inputs -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Digitale Eingaenge</h2>
-                </div>
-                <div class="input-grid" id="input-grid">
-                </div>
-            </div>
-
-            <!-- Ethernet Configuration -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Ethernet Konfiguration</h2>
-                </div>
-
-                <div class="toggle-container">
-                    <span>DHCP aktiviert</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="useDHCP" checked onchange="toggleDHCP()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div id="static-ip-config">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Statische IP</label>
-                            <input type="text" id="staticIP" placeholder="192.168.1.100">
-                        </div>
-                        <div class="form-group">
-                            <label>Subnetz</label>
-                            <input type="text" id="subnet" placeholder="255.255.255.0">
-                        </div>
+        <!-- Tab 1: Steuerung -->
+        <div id="tab-control" class="tab-content active">
+            <div class="grid">
+                <!-- Relay Control -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Relais Ausgaenge</h2>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Gateway</label>
-                            <input type="text" id="gateway" placeholder="192.168.1.1">
-                        </div>
-                        <div class="form-group">
-                            <label>DNS</label>
-                            <input type="text" id="dns" placeholder="8.8.8.8">
-                        </div>
+                    <div class="relay-grid" id="relay-grid"></div>
+                    <div class="relay-actions">
+                        <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
+                        <button class="btn btn-warning" onclick="pulseAllRelays()">Alle IMPULS</button>
+                        <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Hostname</label>
-                    <input type="text" id="hostnameInput" placeholder="cinerelais1">
+                <!-- Digital Inputs -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Digitale Eingaenge</h2>
+                    </div>
+                    <div class="input-grid" id="input-grid"></div>
                 </div>
 
-                <button class="btn btn-full" onclick="saveEthernetConfig()">Ethernet speichern</button>
+                <!-- Command Log -->
+                <div class="card grid-full">
+                    <div class="card-header">
+                        <h2 class="card-title">Befehlsprotokoll</h2>
+                        <button class="btn btn-sm" onclick="loadLog()">Aktualisieren</button>
+                    </div>
+                    <div class="log-container">
+                        <table class="log-table">
+                            <thead>
+                                <tr>
+                                    <th>Zeit</th>
+                                    <th>Quelle</th>
+                                    <th>Befehl</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-table">
+                                <tr><td colspan="3" style="text-align: center; color: var(--text-dim); padding: 1rem;">Keine Eintraege</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+        </div>
 
-            <!-- WiFi Configuration -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">WiFi Konfiguration</h2>
-                </div>
+        <!-- Tab 2: Netzwerk -->
+        <div id="tab-network" class="tab-content">
+            <div class="grid">
+                <!-- Ethernet Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Ethernet</h2>
+                    </div>
 
-                <div class="toggle-container">
-                    <span>WiFi aktiviert</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="wifiEnabled" checked onchange="toggleWiFiSections()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
+                    <div class="form-group">
+                        <label>Hostname</label>
+                        <input type="text" id="hostnameInput" placeholder="cinerelais1">
+                    </div>
 
-                <div id="wifi-config-details">
-                    <!-- AP Section -->
-                    <div class="subsection-title">Access Point (AP)</div>
                     <div class="toggle-container">
-                        <span>AP aktiviert</span>
+                        <span>DHCP aktiviert</span>
                         <label class="toggle">
-                            <input type="checkbox" id="wifiAPEnabled" checked onchange="toggleAPSection()">
+                            <input type="checkbox" id="useDHCP" checked onchange="toggleDHCP()">
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
-                    <div id="ap-config">
-                        <div class="form-group">
-                            <label>AP Passwort (leer = offen, min. 8 Zeichen fuer WPA2)</label>
-                            <input type="text" id="wifiAPPassword" placeholder="(offen)">
+
+                    <div id="static-ip-config">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Statische IP</label>
+                                <input type="text" id="staticIP" placeholder="192.168.1.100">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnetz</label>
+                                <input type="text" id="subnet" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Gateway</label>
+                                <input type="text" id="gateway" placeholder="192.168.1.1">
+                            </div>
+                            <div class="form-group">
+                                <label>DNS</label>
+                                <input type="text" id="dns" placeholder="8.8.8.8">
+                            </div>
                         </div>
                     </div>
 
-                    <!-- STA Section -->
-                    <div class="wifi-config-section">
-                        <div class="subsection-title">WLAN Verbindung (STA)</div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>WLAN SSID</label>
-                                <input type="text" id="wifiSSID" placeholder="(leer = deaktiviert)">
-                            </div>
-                            <div class="form-group">
-                                <label>WLAN Passwort</label>
-                                <input type="password" id="wifiPassword" placeholder="">
-                            </div>
-                        </div>
+                    <button class="btn btn-full" onclick="saveEthernetConfig()">Ethernet speichern</button>
+                </div>
 
+                <!-- WiFi Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">WiFi</h2>
+                    </div>
+
+                    <div class="toggle-container">
+                        <span>WiFi aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="wifiEnabled" checked onchange="toggleWiFiSections()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="wifi-config-details">
+                        <!-- AP Section -->
+                        <div class="subsection-title">Access Point (AP)</div>
                         <div class="toggle-container">
-                            <span>DHCP (STA)</span>
+                            <span>AP aktiviert</span>
                             <label class="toggle">
-                                <input type="checkbox" id="wifiDHCP" checked onchange="toggleWiFiDHCP()">
+                                <input type="checkbox" id="wifiAPEnabled" checked onchange="toggleAPSection()">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+                        <div id="ap-config">
+                            <div class="form-group">
+                                <label>AP Passwort (leer = offen, min. 8 Zeichen)</label>
+                                <input type="text" id="wifiAPPassword" placeholder="(offen)">
+                            </div>
+                        </div>
 
-                        <div id="wifi-static-config">
+                        <!-- STA Section -->
+                        <div class="section-divider">
+                            <div class="subsection-title">WLAN Verbindung (STA)</div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>WiFi IP</label>
-                                    <input type="text" id="wifiIP" placeholder="192.168.4.100">
+                                    <label>WLAN SSID</label>
+                                    <input type="text" id="wifiSSID" placeholder="(leer = deaktiviert)">
                                 </div>
                                 <div class="form-group">
-                                    <label>WiFi Subnetz</label>
-                                    <input type="text" id="wifiSubnet" placeholder="255.255.255.0">
+                                    <label>WLAN Passwort</label>
+                                    <input type="password" id="wifiPassword" placeholder="">
                                 </div>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>WiFi Gateway</label>
-                                    <input type="text" id="wifiGateway" placeholder="192.168.4.1">
+
+                            <div class="toggle-container">
+                                <span>DHCP (STA)</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="wifiDHCP" checked onchange="toggleWiFiDHCP()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+
+                            <div id="wifi-static-config">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>WiFi IP</label>
+                                        <input type="text" id="wifiIP" placeholder="192.168.4.100">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>WiFi Subnetz</label>
+                                        <input type="text" id="wifiSubnet" placeholder="255.255.255.0">
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label>WiFi DNS</label>
-                                    <input type="text" id="wifiDNS" placeholder="8.8.8.8">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>WiFi Gateway</label>
+                                        <input type="text" id="wifiGateway" placeholder="192.168.4.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>WiFi DNS</label>
+                                        <input type="text" id="wifiDNS" placeholder="8.8.8.8">
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <button class="btn btn-full" onclick="saveWiFiConfig()">WiFi speichern</button>
                 </div>
 
-                <button class="btn btn-full" onclick="saveWiFiConfig()">WiFi speichern</button>
+                <!-- System Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">System Info</h2>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Ethernet</span>
+                            <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ETH MAC</span>
+                            <span class="info-value" id="info-eth-mac">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi STA</span>
+                            <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi AP</span>
+                            <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">TCA9554</span>
+                            <span class="info-value" id="info-tca9554">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Betriebszeit</span>
+                            <span class="info-value" id="info-uptime">-</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
+                        Geraet neustarten
+                    </button>
+                </div>
             </div>
+        </div>
 
-            <!-- TCP/Control Settings -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Steuerung</h2>
+        <!-- Tab 3: Einstellungen -->
+        <div id="tab-settings" class="tab-content">
+            <div class="grid">
+                <!-- TCP/Control Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Steuerung</h2>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>TCP Port</label>
+                            <input type="number" id="tcpPort" placeholder="5000" min="1" max="65535">
+                        </div>
+                        <div class="form-group">
+                            <label>Impuls Dauer (ms)</label>
+                            <input type="number" id="pulseDuration" placeholder="500" min="50" max="30000">
+                        </div>
+                    </div>
+
+                    <div class="info-item" style="margin-top: 0.5rem;">
+                        <span class="info-label">Aktueller TCP Port</span>
+                        <span class="info-value" id="info-tcpport">-</span>
+                    </div>
+
+                    <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>TCP Port</label>
-                        <input type="number" id="tcpPort" placeholder="5000" min="1" max="65535">
+                <!-- NTP Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Zeit / NTP</h2>
                     </div>
-                    <div class="form-group">
-                        <label>Impuls Dauer (ms)</label>
-                        <input type="number" id="pulseDuration" placeholder="500" min="50" max="30000">
+
+                    <div class="toggle-container">
+                        <span>NTP aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="ntp-config">
+                        <div class="form-group">
+                            <label>NTP Server</label>
+                            <input type="text" id="ntpServer" placeholder="pool.ntp.org">
+                        </div>
+                        <div class="form-group">
+                            <label>Zeitzone (POSIX)</label>
+                            <input type="text" id="ntpTimezone" placeholder="CET-1CEST,M3.5.0,M10.5.0/3">
+                        </div>
+                        <div class="info-item" style="margin-top: 0.5rem;">
+                            <span class="info-label">Aktuelle Zeit</span>
+                            <span class="info-value" id="info-current-time">-</span>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
+                </div>
+
+                <!-- LED Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Status LED</h2>
+                    </div>
+
+                    <div class="toggle-container">
+                        <span>LED aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="ledEnabled" checked onchange="toggleLEDSection()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="led-config">
+                        <div class="form-group">
+                            <label>Helligkeit (<span id="brightnessPercent">20</span>%)</label>
+                            <input type="range" id="ledBrightness" min="0" max="255" value="51"
+                                   oninput="updateBrightnessPercent(this.value)">
+                        </div>
+
+                        <div class="led-legend">
+                            <div class="info-item">
+                                <span class="info-label" style="color: #22c55e;">Gruen</span>
+                                <span class="info-value">Ethernet verbunden</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #22d3ee;">Cyan</span>
+                                <span class="info-value">WiFi STA verbunden</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #3b82f6;">Blau pulsierend</span>
+                                <span class="info-value">Nur WiFi AP</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #ef4444;">Rot blinkend</span>
+                                <span class="info-value">Keine Verbindung</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #f97316;">Orange Blitz</span>
+                                <span class="info-value">Befehl empfangen</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #eab308;">Gelb Blitz</span>
+                                <span class="info-value">Relais Aktivitaet</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #a855f7;">Lila pulsierend</span>
+                                <span class="info-value">OTA Update laeuft</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-full" onclick="saveLEDConfig()">LED speichern</button>
+                </div>
+
+                <!-- TCP Commands Help -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">TCP Befehle</h2>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Relais EIN</span>
+                            <span class="info-value">r1_on ... r8_on</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Relais AUS</span>
+                            <span class="info-value">r1_off ... r8_off</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Impuls</span>
+                            <span class="info-value">r1_pulse / r1_pulse_500</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Alle EIN/AUS</span>
+                            <span class="info-value">all_on / all_off</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Alle Impuls</span>
+                            <span class="info-value">all_pulse / all_pulse_500</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Status / Hilfe</span>
+                            <span class="info-value">status / help</span>
+                        </div>
                     </div>
                 </div>
 
-                <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
-
-                <div class="ota-section">
-                    <p class="section-title">Firmware Update</p>
+                <!-- OTA Update -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Firmware Update</h2>
+                    </div>
                     <a href="/update" class="ota-link">
                         OTA Firmware Update oeffnen
                     </a>
-                </div>
-            </div>
-
-            <!-- NTP Configuration -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Zeit / NTP</h2>
-                </div>
-
-                <div class="toggle-container">
-                    <span>NTP aktiviert</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div id="ntp-config">
-                    <div class="form-group">
-                        <label>NTP Server</label>
-                        <input type="text" id="ntpServer" placeholder="pool.ntp.org">
-                    </div>
-                    <div class="form-group">
-                        <label>Zeitzone (POSIX)</label>
-                        <input type="text" id="ntpTimezone" placeholder="CET-1CEST,M3.5.0,M10.5.0/3">
-                    </div>
-                    <div class="info-item" style="margin-top: 0.5rem;">
-                        <span class="info-label">Aktuelle Zeit</span>
-                        <span class="info-value" id="info-current-time">-</span>
-                    </div>
-                </div>
-
-                <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
-            </div>
-
-            <!-- LED Configuration -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Status LED</h2>
-                </div>
-
-                <div class="toggle-container">
-                    <span>LED aktiviert</span>
-                    <label class="toggle">
-                        <input type="checkbox" id="ledEnabled" checked onchange="toggleLEDSection()">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div id="led-config">
-                    <div class="form-group">
-                        <label>Helligkeit (<span id="brightnessPercent">20</span>%)</label>
-                        <input type="range" id="ledBrightness" min="0" max="255" value="51"
-                               oninput="updateBrightnessPercent(this.value)"
-                               style="width: 100%; cursor: pointer;">
-                    </div>
-
-                    <div class="info-grid" style="margin-top: 1rem;">
-                        <div class="info-item">
-                            <span class="info-label">Gruen</span>
-                            <span class="info-value" style="color: #22c55e;">Ethernet verbunden</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Cyan</span>
-                            <span class="info-value" style="color: #22d3ee;">WiFi STA verbunden</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Blau pulsierend</span>
-                            <span class="info-value" style="color: #3b82f6;">Nur WiFi AP</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Rot blinkend</span>
-                            <span class="info-value" style="color: #ef4444;">Keine Verbindung</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Orange Blitz</span>
-                            <span class="info-value" style="color: #f97316;">Befehl empfangen</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Gelb Blitz</span>
-                            <span class="info-value" style="color: #eab308;">Relais Aktivitaet</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Lila pulsierend</span>
-                            <span class="info-value" style="color: #a855f7;">OTA Update laeuft</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button class="btn btn-full" onclick="saveLEDConfig()">LED speichern</button>
-            </div>
-
-            <!-- System Info -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">System Info</h2>
-                </div>
-
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Ethernet</span>
-                        <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">ETH MAC</span>
-                        <span class="info-value" id="info-eth-mac">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">WiFi STA</span>
-                        <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">WiFi AP</span>
-                        <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">TCA9554</span>
-                        <span class="info-value" id="info-tca9554">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Betriebszeit</span>
-                        <span class="info-value" id="info-uptime">-</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">TCP Port</span>
-                        <span class="info-value" id="info-tcpport">-</span>
-                    </div>
-                </div>
-
-                <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
-                    Geraet neustarten
-                </button>
-            </div>
-
-            <!-- TCP Commands Help -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">TCP Befehle</h2>
-                </div>
-
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="info-label">Relais EIN</span>
-                        <span class="info-value">r1_on ... r8_on</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Relais AUS</span>
-                        <span class="info-value">r1_off ... r8_off</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Impuls</span>
-                        <span class="info-value">r1_pulse / r1_pulse_500</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Alle EIN/AUS</span>
-                        <span class="info-value">all_on / all_off</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Alle Impuls</span>
-                        <span class="info-value">all_pulse / all_pulse_500</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">Status / Hilfe</span>
-                        <span class="info-value">status / help</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Command Log -->
-            <div class="card" style="grid-column: span 2;">
-                <div class="card-header">
-                    <h2 class="card-title">Befehlsprotokoll</h2>
-                    <button class="btn" onclick="loadLog()" style="flex: 0; padding: 0.5rem 1rem;">Aktualisieren</button>
-                </div>
-                <div id="log-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%; font-size: 0.85rem;">
-                        <thead>
-                            <tr style="text-align: left; color: var(--text-dim); border-bottom: 1px solid var(--border);">
-                                <th style="padding: 0.5rem;">Zeit</th>
-                                <th style="padding: 0.5rem;">Quelle</th>
-                                <th style="padding: 0.5rem;">Befehl</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-table">
-                            <tr><td colspan="3" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>
-                        </tbody>
-                    </table>
                 </div>
             </div>
         </div>
@@ -890,6 +1137,17 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // Tab switching
+        function switchTab(tabName) {
+            // Update buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
         // Initialize relay and input grids
         function initGrids() {
             const relayGrid = document.getElementById('relay-grid');
@@ -921,11 +1179,42 @@
                 const response = await fetch('/api/status');
                 const data = await response.json();
 
-                // Update header
+                // Update hostname
                 document.getElementById('hostname').textContent = data.hostname;
-                document.getElementById('ip-address').textContent = data.ip || 'Keine Verbindung';
+                document.title = `${data.hostname} - CineRelais`;
 
-                // Ethernet status
+                // Update header connection badges
+                const ethBadge = document.getElementById('conn-eth');
+                const ethIp = document.getElementById('conn-eth-ip');
+                if (data.ethConnected) {
+                    ethBadge.className = 'conn-badge online';
+                    ethIp.textContent = data.ethIP;
+                } else {
+                    ethBadge.className = 'conn-badge offline';
+                    ethIp.textContent = '-';
+                }
+
+                const wifiBadge = document.getElementById('conn-wifi');
+                const wifiIp = document.getElementById('conn-wifi-ip');
+                if (data.wifiSTAConnected) {
+                    wifiBadge.className = 'conn-badge wifi-sta';
+                    wifiIp.textContent = data.wifiSTAIP;
+                } else {
+                    wifiBadge.className = 'conn-badge offline';
+                    wifiIp.textContent = '-';
+                }
+
+                const apBadge = document.getElementById('conn-ap');
+                const apIp = document.getElementById('conn-ap-ip');
+                if (data.wifiAPActive) {
+                    apBadge.className = 'conn-badge wifi-ap';
+                    apIp.textContent = data.wifiAPIP;
+                } else {
+                    apBadge.className = 'conn-badge offline';
+                    apIp.textContent = '-';
+                }
+
+                // System Info (Network tab)
                 const ethStatusEl = document.getElementById('info-eth-status');
                 const ethIpEl = document.getElementById('info-eth-ip');
                 if (data.ethConnected) {
@@ -939,7 +1228,6 @@
                 }
                 document.getElementById('info-eth-mac').textContent = data.ethMAC || '-';
 
-                // WiFi STA status
                 const wifiStaStatusEl = document.getElementById('info-wifi-sta-status');
                 const wifiStaIpEl = document.getElementById('info-wifi-sta-ip');
                 if (data.wifiSTAConnected) {
@@ -956,7 +1244,6 @@
                     wifiStaIpEl.textContent = '';
                 }
 
-                // WiFi AP status
                 const wifiApStatusEl = document.getElementById('info-wifi-ap-status');
                 const wifiApIpEl = document.getElementById('info-wifi-ap-ip');
                 if (data.wifiAPActive) {
@@ -969,7 +1256,6 @@
                     wifiApIpEl.textContent = '';
                 }
 
-                // TCA9554 status
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
 
                 // NTP / Current time
@@ -992,8 +1278,7 @@
                 const hours = Math.floor(uptime / 3600);
                 const minutes = Math.floor((uptime % 3600) / 60);
                 const seconds = uptime % 60;
-                document.getElementById('info-uptime').textContent =
-                    `${hours}h ${minutes}m ${seconds}s`;
+                document.getElementById('info-uptime').textContent = `${hours}h ${minutes}m ${seconds}s`;
 
                 // Relay states
                 data.relays.forEach((state, index) => {
@@ -1296,10 +1581,10 @@
                 }
 
                 tbody.innerHTML = data.map(entry => `
-                    <tr style="border-bottom: 1px solid var(--border);">
-                        <td style="padding: 0.4rem 0.5rem; font-family: monospace; color: var(--text-dim);">${entry.time}</td>
-                        <td style="padding: 0.4rem 0.5rem; font-family: monospace;">${entry.source}</td>
-                        <td style="padding: 0.4rem 0.5rem; font-family: monospace; color: var(--accent);">${entry.command}</td>
+                    <tr>
+                        <td style="color: var(--text-dim);">${entry.time}</td>
+                        <td>${entry.source}</td>
+                        <td style="color: var(--accent);">${entry.command}</td>
                     </tr>
                 `).join('');
             } catch (error) {
@@ -1337,7 +1622,7 @@
             updateStatus();
             loadLog();
             setInterval(updateStatus, 2000);
-            setInterval(loadLog, 10000); // Refresh log every 10 seconds
+            setInterval(loadLog, 10000);
         });
     </script>
 </body>
