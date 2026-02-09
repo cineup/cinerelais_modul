@@ -488,6 +488,42 @@
             background: var(--accent);
         }
 
+        .toggle-sm {
+            width: 40px;
+            height: 22px;
+        }
+
+        .toggle-sm .toggle-slider:before {
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+        }
+
+        .toggle-sm input:checked + .toggle-slider:before {
+            transform: translateX(18px);
+        }
+
+        .pulse-mode-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pulse-mode-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .pulse-mode-toggle .toggle input:checked + .toggle-slider {
+            background: rgba(245, 158, 11, 0.3);
+            border-color: var(--warning);
+        }
+
+        .pulse-mode-toggle .toggle input:checked + .toggle-slider:before {
+            background: var(--warning);
+        }
+
         /* Info Grid */
         .info-grid {
             display: grid;
@@ -761,12 +797,22 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">Relais Ausgaenge</h2>
+                        <div class="pulse-mode-toggle">
+                            <span class="pulse-mode-label">Impuls</span>
+                            <label class="toggle toggle-sm">
+                                <input type="checkbox" id="pulseMode" onchange="togglePulseMode()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
                     <div class="relay-grid" id="relay-grid"></div>
-                    <div class="relay-actions">
+                    <div class="relay-actions" id="relay-actions-toggle">
                         <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
                         <button class="btn btn-warning" onclick="pulseAllRelays()">Alle IMPULS</button>
                         <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
+                    </div>
+                    <div class="relay-actions" id="relay-actions-pulse" style="display: none;">
+                        <button class="btn btn-warning" onclick="pulseAllRelays()" style="flex: 1;">Alle IMPULS</button>
                     </div>
                 </div>
 
@@ -1137,6 +1183,9 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // Pulse mode state
+        let pulseMode = false;
+
         // Tab switching
         function switchTab(tabName) {
             // Update buttons
@@ -1146,6 +1195,18 @@
             // Update content
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Toggle pulse mode
+        function togglePulseMode() {
+            pulseMode = document.getElementById('pulseMode').checked;
+            document.getElementById('relay-actions-toggle').style.display = pulseMode ? 'none' : 'flex';
+            document.getElementById('relay-actions-pulse').style.display = pulseMode ? 'flex' : 'none';
+
+            // Update button labels
+            document.querySelectorAll('.relay-btn span').forEach(span => {
+                span.textContent = pulseMode ? 'Impuls' : 'Relais';
+            });
         }
 
         // Initialize relay and input grids
@@ -1389,6 +1450,12 @@
 
         // Relay control functions
         async function toggleRelay(relay) {
+            // In pulse mode, always trigger pulse instead of toggle
+            if (pulseMode) {
+                pulseRelay(relay);
+                return;
+            }
+
             const btn = document.getElementById(`relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
 
