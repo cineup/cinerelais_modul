@@ -195,7 +195,7 @@ void setup() {
 
     // NeoPixel
     Serial.println("Initializing NeoPixel...");
-    rgbLed = new Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+    rgbLed = new Adafruit_NeoPixel(1, RGB_LED_PIN, NEO_RGB + NEO_KHZ800);
     rgbLed->begin();
     rgbLed->setPixelColor(0, rgbLed->Color(0, 0, 50));  // Dim blue during startup
     rgbLed->show();
@@ -1096,20 +1096,16 @@ void setStatusLED() {
     if (ethConnected) {
         // Green = Ethernet connected (highest priority)
         g = brightness;
-        Serial.printf("LED: Green (ethConnected=%d)\n", ethConnected);
     } else if (wifiSTAConnected) {
         // Cyan = WiFi STA connected
         g = brightness;
         b = brightness;
-        Serial.println("LED: Cyan (wifiSTAConnected)");
     } else if (wifiAPActive) {
         // Blue = WiFi AP only
         b = brightness;
-        Serial.println("LED: Blue (wifiAPActive)");
     } else {
         // Red = no connection
         r = brightness;
-        Serial.printf("LED: Red (eth=%d, sta=%d, ap=%d)\n", ethConnected, wifiSTAConnected, wifiAPActive);
     }
 
     rgbLed->setPixelColor(0, rgbLed->Color(r, g, b));
