@@ -524,6 +524,39 @@
             background: var(--warning);
         }
 
+        /* Modbus Status */
+        .modbus-status {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .modbus-status .conn-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+        }
+
+        .modbus-status.online .conn-dot {
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent);
+        }
+
+        .modbus-status.online {
+            color: var(--accent);
+        }
+
+        .modbus-status.offline .conn-dot {
+            background: var(--danger);
+        }
+
+        .modbus-status.offline {
+            color: var(--danger);
+        }
+
         /* Info Grid */
         .info-grid {
             display: grid;
@@ -871,6 +904,23 @@
                     <div class="input-grid" id="input-grid"></div>
                 </div>
 
+                <!-- Modbus Relays -->
+                <div class="card" id="modbus-card" style="display: none;">
+                    <div class="card-header">
+                        <h2 class="card-title">Modbus Relais</h2>
+                        <div class="modbus-status">
+                            <span class="conn-dot" id="modbus-status-dot"></span>
+                            <span id="modbus-status-text">-</span>
+                        </div>
+                    </div>
+                    <div class="relay-grid" id="modbus-relay-grid"></div>
+                    <div class="relay-actions">
+                        <button class="btn" onclick="modbusSetAllRelays('on')">Alle EIN</button>
+                        <button class="btn btn-warning" onclick="modbusPulseAllRelays()">Alle IMPULS</button>
+                        <button class="btn btn-danger" onclick="modbusSetAllRelays('off')">Alle AUS</button>
+                    </div>
+                </div>
+
                 <!-- Command Log -->
                 <div class="card grid-full">
                     <div class="card-header">
@@ -1090,6 +1140,46 @@
                     </div>
 
                     <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
+                </div>
+
+                <!-- Modbus Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Modbus RS485</h2>
+                    </div>
+
+                    <div class="toggle-container">
+                        <span>Modbus aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="modbusEnabled" onchange="toggleModbusSection()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="modbus-config">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Geraete-Adresse (1-247)</label>
+                                <input type="number" id="modbusAddress" placeholder="1" min="1" max="247">
+                            </div>
+                            <div class="form-group">
+                                <label>Anzahl Relais</label>
+                                <select id="modbusRelayCount">
+                                    <option value="6">6 Relais</option>
+                                    <option value="8" selected>8 Relais</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="info-item" style="margin-top: 0.5rem;">
+                            <span class="info-label">Verbindung</span>
+                            <span class="info-value" id="info-modbus-status">-</span>
+                        </div>
+
+                        <button class="btn" style="width: 100%; margin-top: 0.75rem;" onclick="scanModbusAddress()">Adresse scannen</button>
+                    </div>
+
+                    <button class="btn btn-full" onclick="saveModbusConfig()">Modbus speichern</button>
                 </div>
 
                 <!-- NTP Configuration -->
@@ -1318,6 +1408,11 @@
         let relayLabels = ['', '', '', '', '', '', '', ''];
         let inputLabels = ['', '', '', '', '', '', '', ''];
 
+        // Modbus state
+        let modbusEnabled = false;
+        let modbusRelayCount = 8;
+        let modbusLabels = ['', '', '', '', '', '', '', ''];
+
         // Tab switching
         function switchTab(tabName) {
             // Update buttons
@@ -1335,6 +1430,7 @@
             document.getElementById('relay-actions-toggle').style.display = pulseMode ? 'none' : 'flex';
             document.getElementById('relay-actions-pulse').style.display = pulseMode ? 'flex' : 'none';
             updateRelayLabels();
+            updateModbusLabels();
         }
 
         // Update relay button labels based on mode and custom labels
@@ -1506,6 +1602,38 @@
                         ind.classList.toggle('active', state);
                     }
                 });
+
+                // Modbus status
+                if (data.modbusEnabled) {
+                    document.getElementById('modbus-card').style.display = 'block';
+
+                    // Update connection status
+                    const statusEl = document.querySelector('.modbus-status');
+                    const statusText = document.getElementById('modbus-status-text');
+                    const infoStatus = document.getElementById('info-modbus-status');
+
+                    if (data.modbusConnected) {
+                        statusEl.className = 'modbus-status online';
+                        statusText.textContent = `Adr. ${data.modbusAddress}`;
+                        if (infoStatus) infoStatus.textContent = 'Verbunden';
+                    } else {
+                        statusEl.className = 'modbus-status offline';
+                        statusText.textContent = 'Offline';
+                        if (infoStatus) infoStatus.textContent = 'Nicht verbunden';
+                    }
+
+                    // Update Modbus relay states
+                    if (data.modbusRelays) {
+                        data.modbusRelays.forEach((state, index) => {
+                            const btn = document.getElementById(`modbus-relay-${index + 1}`);
+                            if (btn) {
+                                btn.classList.toggle('active', state);
+                            }
+                        });
+                    }
+                } else {
+                    document.getElementById('modbus-card').style.display = 'none';
+                }
             } catch (error) {
                 console.error('Status update failed:', error);
             }
@@ -1565,12 +1693,29 @@
                     }
                 }
 
+                // Modbus
+                modbusEnabled = data.modbusEnabled || false;
+                modbusRelayCount = data.modbusRelayCount || 8;
+                document.getElementById('modbusEnabled').checked = modbusEnabled;
+                document.getElementById('modbusAddress').value = data.modbusAddress || 1;
+                document.getElementById('modbusRelayCount').value = modbusRelayCount;
+                if (data.modbusLabels) {
+                    modbusLabels = data.modbusLabels;
+                }
+
+                // Show/hide Modbus card based on enabled state
+                document.getElementById('modbus-card').style.display = modbusEnabled ? 'block' : 'none';
+                if (modbusEnabled) {
+                    initModbusGrid();
+                }
+
                 toggleDHCP();
                 toggleWiFiSections();
                 toggleAPSection();
                 toggleWiFiDHCP();
                 toggleNTPSection();
                 toggleLEDSection();
+                toggleModbusSection();
                 updateRelayLabels();
                 updateInputLabels();
             } catch (error) {
@@ -1695,6 +1840,153 @@
             }
         }
 
+        // Modbus relay control
+        async function modbusToggleRelay(relay) {
+            if (pulseMode) {
+                modbusPulseRelay(relay);
+                return;
+            }
+
+            const btn = document.getElementById(`modbus-relay-${relay}`);
+            const newState = btn.classList.contains('active') ? 'off' : 'on';
+
+            try {
+                const formData = new FormData();
+                formData.append('relay', relay);
+                formData.append('state', newState);
+
+                const response = await fetch('/api/modbus/relay', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    btn.classList.toggle('active');
+                } else {
+                    showToast('Modbus Fehler', 'error');
+                }
+            } catch (error) {
+                showToast('Modbus Fehler', 'error');
+            }
+        }
+
+        async function modbusPulseRelay(relay) {
+            try {
+                const duration = document.getElementById('pulseDuration').value || 500;
+                const formData = new FormData();
+                formData.append('relay', relay);
+                formData.append('state', 'pulse');
+                formData.append('duration', duration);
+
+                const response = await fetch('/api/modbus/relay', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showToast(`Modbus Relais ${relay} Impuls`, 'success');
+                } else {
+                    showToast('Modbus Fehler', 'error');
+                }
+            } catch (error) {
+                showToast('Modbus Fehler', 'error');
+            }
+        }
+
+        async function modbusSetAllRelays(state) {
+            try {
+                const formData = new FormData();
+                formData.append('state', state);
+
+                const response = await fetch('/api/modbus/relays', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    updateStatus();
+                    showToast(`Modbus alle ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
+                } else {
+                    showToast('Modbus Fehler', 'error');
+                }
+            } catch (error) {
+                showToast('Modbus Fehler', 'error');
+            }
+        }
+
+        async function modbusPulseAllRelays() {
+            try {
+                const duration = document.getElementById('pulseDuration').value || 500;
+                const formData = new FormData();
+                formData.append('state', 'pulse');
+                formData.append('duration', duration);
+
+                const response = await fetch('/api/modbus/relays', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showToast('Modbus alle Impuls', 'success');
+                } else {
+                    showToast('Modbus Fehler', 'error');
+                }
+            } catch (error) {
+                showToast('Modbus Fehler', 'error');
+            }
+        }
+
+        async function scanModbusAddress() {
+            showToast('Suche Modbus Geraet...', 'success');
+            try {
+                const response = await fetch('/api/modbus/scan', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('modbusAddress').value = data.address;
+                    showToast(`Geraet gefunden: Adresse ${data.address}`, 'success');
+                } else {
+                    showToast('Kein Geraet gefunden', 'error');
+                }
+            } catch (error) {
+                showToast('Scan fehlgeschlagen', 'error');
+            }
+        }
+
+        function toggleModbusSection() {
+            const enabled = document.getElementById('modbusEnabled').checked;
+            document.getElementById('modbus-config').style.display = enabled ? 'block' : 'none';
+        }
+
+        function initModbusGrid() {
+            const grid = document.getElementById('modbus-relay-grid');
+            grid.innerHTML = '';
+
+            for (let i = 1; i <= modbusRelayCount; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'relay-btn';
+                btn.id = `modbus-relay-${i}`;
+                const label = modbusLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                btn.innerHTML = `${i}<span>${label}</span>`;
+                btn.onclick = () => modbusToggleRelay(i);
+                btn.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    modbusPulseRelay(i);
+                };
+                grid.appendChild(btn);
+            }
+        }
+
+        function updateModbusLabels() {
+            for (let i = 1; i <= modbusRelayCount; i++) {
+                const btn = document.getElementById(`modbus-relay-${i}`);
+                if (btn) {
+                    const label = modbusLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                    btn.querySelector('span').textContent = label;
+                }
+            }
+        }
+
         // Save configurations
         async function saveEthernetConfig() {
             try {
@@ -1797,6 +2089,25 @@
 
                 const result = await response.json();
                 showToast(result.message || 'LED Konfiguration gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
+        async function saveModbusConfig() {
+            try {
+                const formData = new FormData();
+                formData.append('modbusEnabled', document.getElementById('modbusEnabled').checked);
+                formData.append('modbusAddress', document.getElementById('modbusAddress').value);
+                formData.append('modbusRelayCount', document.getElementById('modbusRelayCount').value);
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                showToast(result.message || 'Modbus gespeichert. Neustart erforderlich.', 'success');
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }

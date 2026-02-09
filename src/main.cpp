@@ -17,6 +17,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <Adafruit_NeoPixel.h>
+#include <ModbusMaster.h>
 #include <vector>
 
 // ============================================
@@ -37,6 +38,11 @@
 #define ETH_CS_PIN   16
 #define ETH_INT_PIN  12
 #define ETH_RST_PIN  -1
+
+// RS485 Modbus
+#define RS485_TX_PIN 17
+#define RS485_RX_PIN 18
+#define RS485_BAUD   9600
 
 const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
 
@@ -80,6 +86,12 @@ struct Config {
     // Labels (max 12 chars each)
     char relayLabels[8][16];
     char inputLabels[8][16];
+
+    // Modbus RS485
+    bool modbusEnabled;
+    uint8_t modbusAddress;      // 1-247
+    uint8_t modbusRelayCount;   // 6 or 8
+    char modbusLabels[8][16];   // Labels for Modbus relays
 };
 
 Config config = {
@@ -113,7 +125,12 @@ Config config = {
     "CET-1CEST,M3.5.0,M10.5.0/3",  // ntpTimezone (Europe/Berlin)
     // Labels
     {"", "", "", "", "", "", "", ""},  // relayLabels
-    {"", "", "", "", "", "", "", ""}   // inputLabels
+    {"", "", "", "", "", "", "", ""},  // inputLabels
+    // Modbus
+    false,          // modbusEnabled
+    1,              // modbusAddress (default 0x01)
+    8,              // modbusRelayCount
+    {"", "", "", "", "", "", "", ""}   // modbusLabels
 };
 
 // ============================================
@@ -145,6 +162,15 @@ unsigned long ledEventEndTime = 0;
 bool ledEventActive = false;
 volatile bool ledUpdateNeeded = false;  // Flag for thread-safe LED updates
 
+// Modbus RS485
+ModbusMaster modbusNode;
+bool modbusConnected = false;
+bool modbusRelayStates[8] = {false};
+unsigned long modbusLastPoll = 0;
+const unsigned long MODBUS_POLL_INTERVAL = 500;  // Poll every 500ms
+unsigned long modbusPulseEndTime[8] = {0};
+bool modbusPulseActive[8] = {false};
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -170,6 +196,14 @@ String getStatusJSON();
 String getConfigJSON();
 void setStatusLED();
 void flashEventLED();
+void setupModbus();
+bool modbusSetRelay(int relay, bool state);
+bool modbusSetAllRelays(bool state);
+void modbusPulseRelay(int relay, uint16_t duration);
+void modbusPulseAllRelays(uint16_t duration);
+void updateModbusPulses();
+void modbusReadRelays();
+int modbusScanAddress();
 
 // ============================================
 // Setup
@@ -212,6 +246,9 @@ void setup() {
 
     // WiFi
     setupWiFi();
+
+    // Modbus RS485
+    setupModbus();
 
     // Web Server
     Serial.println("Starting Web Server...");
@@ -379,6 +416,36 @@ void setup() {
             }
         }
 
+        // Modbus settings
+        if (request->hasParam("modbusEnabled", true)) {
+            String val = request->getParam("modbusEnabled", true)->value();
+            config.modbusEnabled = (val == "true" || val == "on" || val == "1");
+            changed = true;
+        }
+        if (request->hasParam("modbusAddress", true)) {
+            config.modbusAddress = request->getParam("modbusAddress", true)->value().toInt();
+            if (config.modbusAddress < 1) config.modbusAddress = 1;
+            if (config.modbusAddress > 247) config.modbusAddress = 247;
+            changed = true;
+        }
+        if (request->hasParam("modbusRelayCount", true)) {
+            config.modbusRelayCount = request->getParam("modbusRelayCount", true)->value().toInt();
+            if (config.modbusRelayCount < 1) config.modbusRelayCount = 1;
+            if (config.modbusRelayCount > 8) config.modbusRelayCount = 8;
+            changed = true;
+        }
+        if (request->hasParam("modbusLabels", true)) {
+            String labelsJson = request->getParam("modbusLabels", true)->value();
+            JsonDocument labelsDoc;
+            if (deserializeJson(labelsDoc, labelsJson) == DeserializationError::Ok) {
+                JsonArray arr = labelsDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    strlcpy(config.modbusLabels[i], arr[i] | "", sizeof(config.modbusLabels[i]));
+                }
+                changed = true;
+            }
+        }
+
         if (changed) {
             saveConfig();
         }
@@ -447,6 +514,100 @@ void setup() {
         request->send(200, "text/plain", "OK");
     });
 
+    // API: Single Modbus Relay
+    webServer->on("/api/modbus/relay", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!config.modbusEnabled) {
+            request->send(400, "application/json", "{\"error\":\"Modbus disabled\"}");
+            return;
+        }
+
+        if (!request->hasParam("relay", true) || !request->hasParam("state", true)) {
+            request->send(400, "application/json", "{\"error\":\"Missing relay or state\"}");
+            return;
+        }
+
+        int relay = request->getParam("relay", true)->value().toInt();
+        String state = request->getParam("state", true)->value();
+
+        if (relay < 1 || relay > config.modbusRelayCount) {
+            request->send(400, "application/json", "{\"error\":\"Invalid relay number\"}");
+            return;
+        }
+
+        bool success = false;
+        if (state == "on") {
+            success = modbusSetRelay(relay, true);
+        } else if (state == "off") {
+            success = modbusSetRelay(relay, false);
+        } else if (state == "pulse") {
+            uint16_t duration = config.pulseDuration;
+            if (request->hasParam("duration", true)) {
+                duration = request->getParam("duration", true)->value().toInt();
+            }
+            modbusPulseRelay(relay, duration);
+            success = true;
+        }
+
+        if (success) {
+            flashEventLED();
+            request->send(200, "application/json", "{\"success\":true}");
+        } else {
+            request->send(500, "application/json", "{\"error\":\"Modbus communication failed\"}");
+        }
+    });
+
+    // API: All Modbus Relays
+    webServer->on("/api/modbus/relays", HTTP_POST, [](AsyncWebServerRequest *request){
+        if (!config.modbusEnabled) {
+            request->send(400, "application/json", "{\"error\":\"Modbus disabled\"}");
+            return;
+        }
+
+        if (!request->hasParam("state", true)) {
+            request->send(400, "application/json", "{\"error\":\"Missing state\"}");
+            return;
+        }
+
+        String state = request->getParam("state", true)->value();
+        bool success = false;
+
+        if (state == "on") {
+            success = modbusSetAllRelays(true);
+        } else if (state == "off") {
+            success = modbusSetAllRelays(false);
+        } else if (state == "pulse") {
+            uint16_t duration = config.pulseDuration;
+            if (request->hasParam("duration", true)) {
+                duration = request->getParam("duration", true)->value().toInt();
+            }
+            modbusPulseAllRelays(duration);
+            success = true;
+        }
+
+        if (success) {
+            flashEventLED();
+            request->send(200, "application/json", "{\"success\":true}");
+        } else {
+            request->send(500, "application/json", "{\"error\":\"Modbus communication failed\"}");
+        }
+    });
+
+    // API: Modbus Scan
+    webServer->on("/api/modbus/scan", HTTP_POST, [](AsyncWebServerRequest *request){
+        int addr = modbusScanAddress();
+        JsonDocument doc;
+        if (addr > 0) {
+            doc["success"] = true;
+            doc["address"] = addr;
+        } else {
+            doc["success"] = false;
+            doc["error"] = "No device found";
+        }
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
     // API: Restart
     webServer->on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request){
         request->send(200, "text/plain", "Restarting...");
@@ -497,6 +658,8 @@ void setup() {
 void loop() {
     ElegantOTA.loop();
     updatePulses();
+    updateModbusPulses();
+    modbusReadRelays();
     checkWiFiConnection();
 
     // Handle LED updates (thread-safe: flag set by event handlers)
@@ -751,6 +914,16 @@ String getStatusJSON() {
         doc["ip"] = "";
     }
 
+    // Modbus status
+    doc["modbusEnabled"] = config.modbusEnabled;
+    doc["modbusConnected"] = modbusConnected;
+    doc["modbusAddress"] = config.modbusAddress;
+    doc["modbusRelayCount"] = config.modbusRelayCount;
+    JsonArray modbusRelays = doc["modbusRelays"].to<JsonArray>();
+    for (int i = 0; i < config.modbusRelayCount && i < 8; i++) {
+        modbusRelays.add(modbusRelayStates[i]);
+    }
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -806,6 +979,15 @@ String getConfigJSON() {
     JsonArray inputLabelsArr = doc["inputLabels"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
         inputLabelsArr.add(config.inputLabels[i]);
+    }
+
+    // Modbus
+    doc["modbusEnabled"] = config.modbusEnabled;
+    doc["modbusAddress"] = config.modbusAddress;
+    doc["modbusRelayCount"] = config.modbusRelayCount;
+    JsonArray modbusLabelsArr = doc["modbusLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        modbusLabelsArr.add(config.modbusLabels[i]);
     }
 
     String output;
@@ -885,8 +1067,19 @@ void loadConfig() {
         }
     }
 
-    Serial.printf("Config loaded: hostname=%s, tcpPort=%d, ethDHCP=%d, ledBrightness=%d\n",
-                  config.hostname, config.tcpPort, config.ethDHCP, config.ledBrightness);
+    // Modbus
+    config.modbusEnabled = doc["modbusEnabled"] | false;
+    config.modbusAddress = doc["modbusAddress"] | 1;
+    config.modbusRelayCount = doc["modbusRelayCount"] | 8;
+    if (doc["modbusLabels"].is<JsonArray>()) {
+        JsonArray arr = doc["modbusLabels"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            strlcpy(config.modbusLabels[i], arr[i] | "", sizeof(config.modbusLabels[i]));
+        }
+    }
+
+    Serial.printf("Config loaded: hostname=%s, tcpPort=%d, ethDHCP=%d, modbus=%d\n",
+                  config.hostname, config.tcpPort, config.ethDHCP, config.modbusEnabled);
 }
 
 void saveConfig() {
@@ -932,6 +1125,15 @@ void saveConfig() {
     JsonArray inputLabelsArr = doc["inputLabels"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
         inputLabelsArr.add(config.inputLabels[i]);
+    }
+
+    // Modbus
+    doc["modbusEnabled"] = config.modbusEnabled;
+    doc["modbusAddress"] = config.modbusAddress;
+    doc["modbusRelayCount"] = config.modbusRelayCount;
+    JsonArray modbusLabelsArr = doc["modbusLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        modbusLabelsArr.add(config.modbusLabels[i]);
     }
 
     File file = LittleFS.open(CONFIG_FILE, "w");
@@ -1030,6 +1232,140 @@ void updatePulses() {
             pulseActive[i] = false;
         }
     }
+}
+
+// ============================================
+// Modbus RS485 Relay Control
+// ============================================
+void setupModbus() {
+    if (!config.modbusEnabled) {
+        Serial.println("Modbus: Disabled");
+        return;
+    }
+
+    Serial.println("Initializing Modbus RS485...");
+
+    // Initialize Serial1 for RS485 (TX=17, RX=18)
+    Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
+
+    // Initialize ModbusMaster with device address
+    modbusNode.begin(config.modbusAddress, Serial1);
+
+    Serial.printf("Modbus: Enabled, Address=%d, Relays=%d\n",
+                  config.modbusAddress, config.modbusRelayCount);
+
+    // Try to read relay states to verify connection
+    delay(100);
+    uint8_t result = modbusNode.readCoils(0x0000, config.modbusRelayCount);
+    if (result == modbusNode.ku8MBSuccess) {
+        modbusConnected = true;
+        // Read initial states
+        for (int i = 0; i < config.modbusRelayCount && i < 8; i++) {
+            modbusRelayStates[i] = modbusNode.getResponseBuffer(i / 16) & (1 << (i % 16));
+        }
+        Serial.println("Modbus: Connected");
+    } else {
+        modbusConnected = false;
+        Serial.printf("Modbus: Connection failed (error %d)\n", result);
+    }
+}
+
+bool modbusSetRelay(int relay, bool state) {
+    if (!config.modbusEnabled || relay < 1 || relay > config.modbusRelayCount) {
+        return false;
+    }
+
+    uint8_t result = modbusNode.writeSingleCoil(relay - 1, state ? 0xFF00 : 0x0000);
+    if (result == modbusNode.ku8MBSuccess) {
+        modbusRelayStates[relay - 1] = state;
+        modbusConnected = true;
+        Serial.printf("Modbus Relay %d: %s\n", relay, state ? "ON" : "OFF");
+        return true;
+    } else {
+        modbusConnected = false;
+        Serial.printf("Modbus Relay %d: FAILED (error %d)\n", relay, result);
+        return false;
+    }
+}
+
+bool modbusSetAllRelays(bool state) {
+    if (!config.modbusEnabled) return false;
+
+    bool success = true;
+    for (int i = 1; i <= config.modbusRelayCount; i++) {
+        if (!modbusSetRelay(i, state)) {
+            success = false;
+        }
+    }
+    Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
+    return success;
+}
+
+void modbusPulseRelay(int relay, uint16_t duration) {
+    if (!config.modbusEnabled || relay < 1 || relay > config.modbusRelayCount) return;
+    int idx = relay - 1;
+    modbusSetRelay(relay, true);
+    modbusPulseActive[idx] = true;
+    modbusPulseEndTime[idx] = millis() + duration;
+}
+
+void modbusPulseAllRelays(uint16_t duration) {
+    if (!config.modbusEnabled) return;
+    modbusSetAllRelays(true);
+    unsigned long endTime = millis() + duration;
+    for (int i = 0; i < config.modbusRelayCount; i++) {
+        modbusPulseActive[i] = true;
+        modbusPulseEndTime[i] = endTime;
+    }
+}
+
+void updateModbusPulses() {
+    if (!config.modbusEnabled) return;
+
+    unsigned long now = millis();
+    for (int i = 0; i < config.modbusRelayCount; i++) {
+        if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
+            modbusSetRelay(i + 1, false);
+            modbusPulseActive[i] = false;
+        }
+    }
+}
+
+void modbusReadRelays() {
+    if (!config.modbusEnabled) return;
+
+    unsigned long now = millis();
+    if (now - modbusLastPoll < MODBUS_POLL_INTERVAL) return;
+    modbusLastPoll = now;
+
+    uint8_t result = modbusNode.readCoils(0x0000, config.modbusRelayCount);
+    if (result == modbusNode.ku8MBSuccess) {
+        modbusConnected = true;
+        uint16_t data = modbusNode.getResponseBuffer(0);
+        for (int i = 0; i < config.modbusRelayCount && i < 8; i++) {
+            modbusRelayStates[i] = (data >> i) & 0x01;
+        }
+    } else {
+        modbusConnected = false;
+    }
+}
+
+// Scan for Modbus device address (1-247)
+int modbusScanAddress() {
+    Serial.println("Modbus: Scanning for device...");
+
+    for (uint8_t addr = 1; addr <= 32; addr++) {  // Scan first 32 addresses
+        modbusNode.begin(addr, Serial1);
+        delay(50);
+        uint8_t result = modbusNode.readCoils(0x0000, 1);
+        if (result == modbusNode.ku8MBSuccess) {
+            Serial.printf("Modbus: Found device at address %d\n", addr);
+            return addr;
+        }
+    }
+
+    Serial.println("Modbus: No device found");
+    return -1;
 }
 
 // ============================================
@@ -1132,12 +1468,87 @@ String processCommand(const String& cmd) {
         return "OK: All relays PULSE " + String(duration) + "ms";
     }
 
+    // Modbus commands: m1_r<1-8>_on / m1_r<1-8>_off / m1_r<1-8>_pulse / m1_all_on / m1_all_off
+    if (cmd.startsWith("m1_")) {
+        if (!config.modbusEnabled) {
+            return "ERROR: Modbus disabled";
+        }
+
+        String subCmd = cmd.substring(3);  // Remove "m1_"
+
+        // m1_r<1-8>_on / m1_r<1-8>_off / m1_r<1-8>_pulse
+        if (subCmd.startsWith("r") && subCmd.length() >= 4) {
+            int relay = subCmd.substring(1, 2).toInt();
+            if (relay >= 1 && relay <= config.modbusRelayCount) {
+                if (subCmd.indexOf("_on") > 0) {
+                    if (modbusSetRelay(relay, true)) {
+                        return "OK: Modbus Relay " + String(relay) + " ON";
+                    } else {
+                        return "ERROR: Modbus communication failed";
+                    }
+                } else if (subCmd.indexOf("_off") > 0) {
+                    if (modbusSetRelay(relay, false)) {
+                        return "OK: Modbus Relay " + String(relay) + " OFF";
+                    } else {
+                        return "ERROR: Modbus communication failed";
+                    }
+                } else if (subCmd.indexOf("_pulse") > 0) {
+                    uint16_t duration = config.pulseDuration;
+                    int underscorePos = subCmd.lastIndexOf('_');
+                    if (underscorePos > 7) {
+                        duration = subCmd.substring(underscorePos + 1).toInt();
+                        if (duration < 10) duration = config.pulseDuration;
+                    }
+                    modbusPulseRelay(relay, duration);
+                    return "OK: Modbus Relay " + String(relay) + " PULSE " + String(duration) + "ms";
+                }
+            }
+        }
+
+        if (subCmd == "all_on") {
+            if (modbusSetAllRelays(true)) {
+                return "OK: Modbus all relays ON";
+            } else {
+                return "ERROR: Modbus communication failed";
+            }
+        }
+        if (subCmd == "all_off") {
+            if (modbusSetAllRelays(false)) {
+                return "OK: Modbus all relays OFF";
+            } else {
+                return "ERROR: Modbus communication failed";
+            }
+        }
+        if (subCmd.startsWith("all_pulse")) {
+            uint16_t duration = config.pulseDuration;
+            int underscorePos = subCmd.lastIndexOf('_');
+            if (underscorePos > 4) {
+                duration = subCmd.substring(underscorePos + 1).toInt();
+                if (duration < 10) duration = config.pulseDuration;
+            }
+            modbusPulseAllRelays(duration);
+            return "OK: Modbus all relays PULSE " + String(duration) + "ms";
+        }
+
+        return "ERROR: Invalid Modbus command";
+    }
+
+    // Modbus scan command
+    if (cmd == "modbus_scan") {
+        int addr = modbusScanAddress();
+        if (addr > 0) {
+            return "OK: Modbus device found at address " + String(addr);
+        } else {
+            return "ERROR: No Modbus device found";
+        }
+    }
+
     if (cmd == "status") {
         return getStatusJSON();
     }
 
     if (cmd == "help") {
-        return "Commands: r<1-8>_on, r<1-8>_off, r<1-8>_pulse[_ms], all_on, all_off, all_pulse[_ms], status, help";
+        return "Commands: r<1-8>_on/off/pulse, all_on/off/pulse, m1_r<1-8>_on/off/pulse, m1_all_on/off/pulse, modbus_scan, status, help";
     }
 
     return "ERROR: Unknown command. Type 'help'";
