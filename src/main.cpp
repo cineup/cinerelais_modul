@@ -76,6 +76,10 @@ struct Config {
     bool ntpEnabled;
     char ntpServer[64];
     char ntpTimezone[48];
+
+    // Labels (max 12 chars each)
+    char relayLabels[8][16];
+    char inputLabels[8][16];
 };
 
 Config config = {
@@ -106,7 +110,10 @@ Config config = {
     // NTP
     true,           // ntpEnabled
     "pool.ntp.org", // ntpServer
-    "CET-1CEST,M3.5.0,M10.5.0/3"  // ntpTimezone (Europe/Berlin)
+    "CET-1CEST,M3.5.0,M10.5.0/3",  // ntpTimezone (Europe/Berlin)
+    // Labels
+    {"", "", "", "", "", "", "", ""},  // relayLabels
+    {"", "", "", "", "", "", "", ""}   // inputLabels
 };
 
 // ============================================
@@ -346,6 +353,30 @@ void setup() {
         if (request->hasParam("ntpTimezone", true)) {
             strlcpy(config.ntpTimezone, request->getParam("ntpTimezone", true)->value().c_str(), sizeof(config.ntpTimezone));
             changed = true;
+        }
+
+        // Labels (sent as JSON arrays)
+        if (request->hasParam("relayLabels", true)) {
+            String labelsJson = request->getParam("relayLabels", true)->value();
+            JsonDocument labelsDoc;
+            if (deserializeJson(labelsDoc, labelsJson) == DeserializationError::Ok) {
+                JsonArray arr = labelsDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    strlcpy(config.relayLabels[i], arr[i] | "", sizeof(config.relayLabels[i]));
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputLabels", true)) {
+            String labelsJson = request->getParam("inputLabels", true)->value();
+            JsonDocument labelsDoc;
+            if (deserializeJson(labelsDoc, labelsJson) == DeserializationError::Ok) {
+                JsonArray arr = labelsDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    strlcpy(config.inputLabels[i], arr[i] | "", sizeof(config.inputLabels[i]));
+                }
+                changed = true;
+            }
         }
 
         if (changed) {
@@ -767,6 +798,16 @@ String getConfigJSON() {
     doc["ntpServer"] = config.ntpServer;
     doc["ntpTimezone"] = config.ntpTimezone;
 
+    // Labels
+    JsonArray relayLabelsArr = doc["relayLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        relayLabelsArr.add(config.relayLabels[i]);
+    }
+    JsonArray inputLabelsArr = doc["inputLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputLabelsArr.add(config.inputLabels[i]);
+    }
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -830,6 +871,20 @@ void loadConfig() {
     strlcpy(config.ntpServer, doc["ntpServer"] | "pool.ntp.org", sizeof(config.ntpServer));
     strlcpy(config.ntpTimezone, doc["ntpTimezone"] | "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(config.ntpTimezone));
 
+    // Labels
+    if (doc["relayLabels"].is<JsonArray>()) {
+        JsonArray arr = doc["relayLabels"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            strlcpy(config.relayLabels[i], arr[i] | "", sizeof(config.relayLabels[i]));
+        }
+    }
+    if (doc["inputLabels"].is<JsonArray>()) {
+        JsonArray arr = doc["inputLabels"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            strlcpy(config.inputLabels[i], arr[i] | "", sizeof(config.inputLabels[i]));
+        }
+    }
+
     Serial.printf("Config loaded: hostname=%s, tcpPort=%d, ethDHCP=%d, ledBrightness=%d\n",
                   config.hostname, config.tcpPort, config.ethDHCP, config.ledBrightness);
 }
@@ -868,6 +923,16 @@ void saveConfig() {
     doc["ntpEnabled"] = config.ntpEnabled;
     doc["ntpServer"] = config.ntpServer;
     doc["ntpTimezone"] = config.ntpTimezone;
+
+    // Labels
+    JsonArray relayLabelsArr = doc["relayLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        relayLabelsArr.add(config.relayLabels[i]);
+    }
+    JsonArray inputLabelsArr = doc["inputLabels"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputLabelsArr.add(config.inputLabels[i]);
+    }
 
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {

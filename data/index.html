@@ -637,6 +637,53 @@
             background: rgba(59, 130, 246, 0.1);
         }
 
+        /* Label Grid */
+        .label-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .label-input {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: var(--bg-dark);
+            border-radius: 8px;
+            padding: 0.4rem;
+        }
+
+        .label-num {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            min-width: 1.2rem;
+            text-align: center;
+        }
+
+        .label-input input {
+            flex: 1;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-card);
+            color: var(--text);
+            font-size: 0.8rem;
+            min-width: 0;
+        }
+
+        .label-input input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        @media (max-width: 600px) {
+            .label-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         /* Toast */
         .toast {
             position: fixed;
@@ -800,7 +847,7 @@
                         <div class="pulse-mode-toggle">
                             <span class="pulse-mode-label">Impuls</span>
                             <label class="toggle toggle-sm">
-                                <input type="checkbox" id="pulseMode" onchange="togglePulseMode()">
+                                <input type="checkbox" id="pulseMode" checked onchange="togglePulseMode()">
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -1167,6 +1214,87 @@
                     </div>
                 </div>
 
+                <!-- Labels Configuration -->
+                <div class="card grid-full">
+                    <div class="card-header">
+                        <h2 class="card-title">Beschriftungen</h2>
+                    </div>
+
+                    <div class="subsection-title">Relais Beschriftungen</div>
+                    <div class="label-grid">
+                        <div class="label-input">
+                            <span class="label-num">1</span>
+                            <input type="text" id="relayLabel1" placeholder="z.B. Licht An" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">2</span>
+                            <input type="text" id="relayLabel2" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">3</span>
+                            <input type="text" id="relayLabel3" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">4</span>
+                            <input type="text" id="relayLabel4" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">5</span>
+                            <input type="text" id="relayLabel5" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">6</span>
+                            <input type="text" id="relayLabel6" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">7</span>
+                            <input type="text" id="relayLabel7" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">8</span>
+                            <input type="text" id="relayLabel8" placeholder="" maxlength="12">
+                        </div>
+                    </div>
+
+                    <div class="subsection-title" style="margin-top: 1rem;">Input Beschriftungen</div>
+                    <div class="label-grid">
+                        <div class="label-input">
+                            <span class="label-num">1</span>
+                            <input type="text" id="inputLabel1" placeholder="z.B. Tuer" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">2</span>
+                            <input type="text" id="inputLabel2" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">3</span>
+                            <input type="text" id="inputLabel3" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">4</span>
+                            <input type="text" id="inputLabel4" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">5</span>
+                            <input type="text" id="inputLabel5" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">6</span>
+                            <input type="text" id="inputLabel6" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">7</span>
+                            <input type="text" id="inputLabel7" placeholder="" maxlength="12">
+                        </div>
+                        <div class="label-input">
+                            <span class="label-num">8</span>
+                            <input type="text" id="inputLabel8" placeholder="" maxlength="12">
+                        </div>
+                    </div>
+
+                    <button class="btn btn-full" onclick="saveLabelsConfig()">Beschriftungen speichern</button>
+                </div>
+
                 <!-- OTA Update -->
                 <div class="card">
                     <div class="card-header">
@@ -1183,8 +1311,12 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // Pulse mode state
-        let pulseMode = false;
+        // Pulse mode state (default ON for cinema use)
+        let pulseMode = true;
+
+        // Labels for relays and inputs
+        let relayLabels = ['', '', '', '', '', '', '', ''];
+        let inputLabels = ['', '', '', '', '', '', '', ''];
 
         // Tab switching
         function switchTab(tabName) {
@@ -1202,11 +1334,29 @@
             pulseMode = document.getElementById('pulseMode').checked;
             document.getElementById('relay-actions-toggle').style.display = pulseMode ? 'none' : 'flex';
             document.getElementById('relay-actions-pulse').style.display = pulseMode ? 'flex' : 'none';
+            updateRelayLabels();
+        }
 
-            // Update button labels
-            document.querySelectorAll('.relay-btn span').forEach(span => {
-                span.textContent = pulseMode ? 'Impuls' : 'Relais';
-            });
+        // Update relay button labels based on mode and custom labels
+        function updateRelayLabels() {
+            for (let i = 1; i <= 8; i++) {
+                const btn = document.getElementById(`relay-${i}`);
+                if (btn) {
+                    const label = relayLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                    btn.querySelector('span').textContent = label;
+                }
+            }
+        }
+
+        // Update input labels
+        function updateInputLabels() {
+            for (let i = 1; i <= 8; i++) {
+                const ind = document.getElementById(`input-${i}`);
+                if (ind) {
+                    const label = inputLabels[i - 1] || 'Input';
+                    ind.querySelector('span:last-child').textContent = label;
+                }
+            }
         }
 
         // Initialize relay and input grids
@@ -1401,12 +1551,28 @@
                 document.getElementById('ledBrightness').value = data.ledBrightness || 51;
                 updateBrightnessPercent(data.ledBrightness || 51);
 
+                // Labels
+                if (data.relayLabels) {
+                    relayLabels = data.relayLabels;
+                    for (let i = 1; i <= 8; i++) {
+                        document.getElementById(`relayLabel${i}`).value = relayLabels[i - 1] || '';
+                    }
+                }
+                if (data.inputLabels) {
+                    inputLabels = data.inputLabels;
+                    for (let i = 1; i <= 8; i++) {
+                        document.getElementById(`inputLabel${i}`).value = inputLabels[i - 1] || '';
+                    }
+                }
+
                 toggleDHCP();
                 toggleWiFiSections();
                 toggleAPSection();
                 toggleWiFiDHCP();
                 toggleNTPSection();
                 toggleLEDSection();
+                updateRelayLabels();
+                updateInputLabels();
             } catch (error) {
                 console.error('Config load failed:', error);
             }
@@ -1636,6 +1802,34 @@
             }
         }
 
+        async function saveLabelsConfig() {
+            try {
+                // Collect labels from inputs
+                for (let i = 1; i <= 8; i++) {
+                    relayLabels[i - 1] = document.getElementById(`relayLabel${i}`).value.trim();
+                    inputLabels[i - 1] = document.getElementById(`inputLabel${i}`).value.trim();
+                }
+
+                const formData = new FormData();
+                formData.append('relayLabels', JSON.stringify(relayLabels));
+                formData.append('inputLabels', JSON.stringify(inputLabels));
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                showToast(result.message || 'Beschriftungen gespeichert', 'success');
+
+                // Update display immediately
+                updateRelayLabels();
+                updateInputLabels();
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
         async function loadLog() {
             try {
                 const response = await fetch('/api/log');
@@ -1688,6 +1882,7 @@
             loadConfig();
             updateStatus();
             loadLog();
+            togglePulseMode(); // Apply default pulse mode
             setInterval(updateStatus, 2000);
             setInterval(loadLog, 10000);
         });

@@ -121,6 +121,10 @@ struct NetworkConfig {
     // LED
     bool ledEnabled;
     uint8_t ledBrightness;      // 0-255
+
+    // Labels (max 12 chars each)
+    char relayLabels[8][16];
+    char inputLabels[8][16];
 };
 
 // Default configuration
@@ -152,7 +156,10 @@ const NetworkConfig DEFAULT_CONFIG = {
     DEFAULT_NTP_TIMEZONE,   // ntpTimezone
     // LED
     DEFAULT_LED_ENABLED,    // ledEnabled
-    DEFAULT_LED_BRIGHTNESS  // ledBrightness
+    DEFAULT_LED_BRIGHTNESS, // ledBrightness
+    // Labels
+    {"", "", "", "", "", "", "", ""},  // relayLabels
+    {"", "", "", "", "", "", "", ""}   // inputLabels
 };
 
 #endif // CONFIG_H
