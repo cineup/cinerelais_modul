@@ -1223,6 +1223,10 @@
                             <span class="info-value" id="info-version">-</span>
                         </div>
                         <div class="info-item">
+                            <span class="info-label">Hardware</span>
+                            <span class="info-value" id="info-hardware">-</span>
+                        </div>
+                        <div class="info-item">
                             <span class="info-label">TCA9554</span>
                             <span class="info-value" id="info-tca9554">-</span>
                         </div>
@@ -1233,6 +1237,22 @@
                         <div class="info-item">
                             <span class="info-label">Betriebszeit</span>
                             <span class="info-value" id="info-uptime">-</span>
+                        </div>
+                    </div>
+
+                    <div class="subsection-title" style="margin-top: 1rem;">Netzwerk</div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Ethernet</span>
+                            <span class="info-value" id="info-sys-eth">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi</span>
+                            <span class="info-value" id="info-sys-wifi">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">AP</span>
+                            <span class="info-value" id="info-sys-ap">-</span>
                         </div>
                     </div>
 
@@ -1613,6 +1633,26 @@
                 }
 
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
+
+                // Hardware info
+                const hardwareEl = document.getElementById('info-hardware');
+                if (hardwareEl && data.chipModel) {
+                    hardwareEl.textContent = `${data.chipModel} (${data.chipCores} Cores, ${data.flashSize}MB)`;
+                }
+
+                // Network summary in System Info
+                const sysEthEl = document.getElementById('info-sys-eth');
+                if (sysEthEl) {
+                    sysEthEl.textContent = data.ethConnected ? data.ethIP : 'Offline';
+                }
+                const sysWifiEl = document.getElementById('info-sys-wifi');
+                if (sysWifiEl) {
+                    sysWifiEl.textContent = data.wifiSTAConnected ? data.wifiSTAIP : 'Offline';
+                }
+                const sysApEl = document.getElementById('info-sys-ap');
+                if (sysApEl) {
+                    sysApEl.textContent = data.wifiAPActive ? data.wifiAPIP : 'Aus';
+                }
 
                 // NTP / Current time
                 const timeEl = document.getElementById('info-current-time');
@@ -2123,8 +2163,8 @@
             formData.append('ledEnabled', document.getElementById('ledEnabled').checked);
             formData.append('ledBrightness', document.getElementById('ledBrightness').value);
 
-            // LED changes don't need restart
-            await saveConfigAndAskRestart(formData, 'LED Konfiguration gespeichert', false);
+            // LED changes need restart to apply
+            await saveConfigAndAskRestart(formData, 'LED Konfiguration gespeichert', true);
         }
 
         async function saveModbusConfig() {
@@ -2192,11 +2232,45 @@
                 try {
                     await fetch('/api/restart', { method: 'POST' });
                     showToast('Geraet wird neugestartet...', 'success');
-                    setTimeout(() => location.reload(), 5000);
+                    // Wait and poll for device to come back online
+                    waitForReboot();
                 } catch (error) {
                     showToast('Fehler beim Neustart', 'error');
                 }
             }
+        }
+
+        async function waitForReboot() {
+            const maxAttempts = 30;
+            const interval = 2000;
+            let attempts = 0;
+
+            const checkOnline = async () => {
+                attempts++;
+                try {
+                    const response = await fetch('/api/status', {
+                        method: 'GET',
+                        cache: 'no-cache'
+                    });
+                    if (response.ok) {
+                        showToast('Geraet ist wieder online!', 'success');
+                        setTimeout(() => location.reload(), 500);
+                        return;
+                    }
+                } catch (e) {
+                    // Device still offline
+                }
+
+                if (attempts < maxAttempts) {
+                    showToast(`Warte auf Neustart... (${attempts}/${maxAttempts})`, 'success');
+                    setTimeout(checkOnline, interval);
+                } else {
+                    showToast('Zeitlimit erreicht - bitte manuell neu laden', 'error');
+                }
+            };
+
+            // Wait 3 seconds before starting to poll
+            setTimeout(checkOnline, 3000);
         }
 
         // Toast notification

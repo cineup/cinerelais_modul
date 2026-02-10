@@ -173,6 +173,9 @@ const unsigned long MODBUS_POLL_INTERVAL = 500;  // Poll every 500ms
 unsigned long modbusPulseEndTime[8] = {0};
 bool modbusPulseActive[8] = {false};
 
+// NTP
+bool ntpSynced = false;
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -206,6 +209,7 @@ void modbusPulseAllRelays(uint16_t duration);
 void updateModbusPulses();
 void modbusReadRelays();
 int modbusScanAddress();
+void setupNTP();
 
 // ============================================
 // Setup
@@ -248,6 +252,9 @@ void setup() {
 
     // WiFi
     setupWiFi();
+
+    // NTP Time Sync
+    setupNTP();
 
     // Modbus RS485
     setupModbus();
@@ -664,6 +671,14 @@ void loop() {
     modbusReadRelays();
     checkWiFiConnection();
 
+    // Check NTP sync status periodically
+    static unsigned long lastNtpCheck = 0;
+    if (config.ntpEnabled && millis() - lastNtpCheck > 60000) {  // Every minute
+        lastNtpCheck = millis();
+        struct tm timeinfo;
+        ntpSynced = getLocalTime(&timeinfo, 0);
+    }
+
     // Handle LED updates (thread-safe: flag set by event handlers)
     if (ledUpdateNeeded) {
         ledUpdateNeeded = false;
@@ -919,6 +934,28 @@ String getStatusJSON() {
     } else {
         doc["ip"] = "";
     }
+
+    // NTP status
+    doc["ntpEnabled"] = config.ntpEnabled;
+    doc["ntpSynced"] = ntpSynced;
+    if (ntpSynced) {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo, 0)) {
+            char timeStr[32];
+            strftime(timeStr, sizeof(timeStr), "%d.%m.%Y %H:%M:%S", &timeinfo);
+            doc["currentTime"] = timeStr;
+        } else {
+            doc["currentTime"] = "";
+        }
+    } else {
+        doc["currentTime"] = "";
+    }
+
+    // Hardware info
+    doc["chipModel"] = ESP.getChipModel();
+    doc["chipCores"] = ESP.getChipCores();
+    doc["flashSize"] = ESP.getFlashChipSize() / 1024 / 1024;  // MB
+    doc["freeHeap"] = ESP.getFreeHeap() / 1024;  // KB
 
     // Modbus status
     doc["modbusEnabled"] = config.modbusEnabled;
@@ -1237,6 +1274,34 @@ void updatePulses() {
             setRelay(i + 1, false);
             pulseActive[i] = false;
         }
+    }
+}
+
+// ============================================
+// NTP Time Synchronization
+// ============================================
+void setupNTP() {
+    if (!config.ntpEnabled) {
+        Serial.println("NTP: Disabled");
+        return;
+    }
+
+    Serial.printf("NTP: Configuring with server=%s, timezone=%s\n",
+                  config.ntpServer, config.ntpTimezone);
+
+    // Configure NTP
+    configTzTime(config.ntpTimezone, config.ntpServer);
+
+    // Wait briefly for initial sync attempt
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 5000)) {  // 5 second timeout
+        ntpSynced = true;
+        char timeStr[32];
+        strftime(timeStr, sizeof(timeStr), "%d.%m.%Y %H:%M:%S", &timeinfo);
+        Serial.printf("NTP: Synced - %s\n", timeStr);
+    } else {
+        ntpSynced = false;
+        Serial.println("NTP: Initial sync failed, will retry in background");
     }
 }
 
