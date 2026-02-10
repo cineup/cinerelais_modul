@@ -1124,18 +1124,8 @@
                             <input type="text" id="ntpServer" placeholder="pool.ntp.org">
                         </div>
                         <div class="form-group">
-                            <label>Zeitzone</label>
-                            <select id="ntpTimezone">
-                                <option value="UTC0">UTC (Koordinierte Weltzeit)</option>
-                                <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin (MEZ/MESZ)</option>
-                                <option value="GMT0BST,M3.5.0/1,M10.5.0">Europe/London (GMT/BST)</option>
-                                <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Helsinki (EET/EEST)</option>
-                                <option value="WET0WEST,M3.5.0/1,M10.5.0">Europe/Lisbon (WET/WEST)</option>
-                                <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York (EST/EDT)</option>
-                                <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago (CST/CDT)</option>
-                                <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver (MST/MDT)</option>
-                                <option value="PST8PDT,M3.2.0,M11.1.0">America/Los_Angeles (PST/PDT)</option>
-                            </select>
+                            <label>Zeitzone (z.B. UTC, MEZ, CET-1CEST,M3.5.0,M10.5.0/3)</label>
+                            <input type="text" id="ntpTimezone" placeholder="UTC">
                         </div>
                         <div class="info-item" style="margin-top: 0.5rem;">
                             <span class="info-label">Aktuelle Zeit</span>
@@ -1245,6 +1235,10 @@
                         <div class="info-item">
                             <span class="info-label">Ethernet</span>
                             <span class="info-value" id="info-sys-eth">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ETH MAC</span>
+                            <span class="info-value" id="info-sys-mac">-</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">WiFi</span>
@@ -1645,6 +1639,10 @@
                 if (sysEthEl) {
                     sysEthEl.textContent = data.ethConnected ? data.ethIP : 'Offline';
                 }
+                const sysMacEl = document.getElementById('info-sys-mac');
+                if (sysMacEl) {
+                    sysMacEl.textContent = data.ethMAC || '-';
+                }
                 const sysWifiEl = document.getElementById('info-sys-wifi');
                 if (sysWifiEl) {
                     sysWifiEl.textContent = data.wifiSTAConnected ? data.wifiSTAIP : 'Offline';
@@ -1761,15 +1759,7 @@
                 // NTP
                 document.getElementById('ntpEnabled').checked = data.ntpEnabled;
                 document.getElementById('ntpServer').value = data.ntpServer || 'pool.ntp.org';
-                // Set timezone dropdown - if value not in list, default to UTC
-                const tzSelect = document.getElementById('ntpTimezone');
-                const tzValue = data.ntpTimezone || 'UTC0';
-                const tzOption = Array.from(tzSelect.options).find(opt => opt.value === tzValue);
-                if (tzOption) {
-                    tzSelect.value = tzValue;
-                } else {
-                    tzSelect.value = 'UTC0'; // Default to UTC if not found
-                }
+                document.getElementById('ntpTimezone').value = data.ntpTimezone || 'UTC';
 
                 // LED
                 document.getElementById('ledEnabled').checked = data.ledEnabled !== false;
@@ -2240,37 +2230,47 @@
             }
         }
 
-        async function waitForReboot() {
+        function waitForReboot() {
             const maxAttempts = 30;
             const interval = 2000;
             let attempts = 0;
+            let reloading = false;
 
-            const checkOnline = async () => {
+            function checkOnline() {
+                if (reloading) return;
                 attempts++;
-                try {
-                    const response = await fetch('/api/status', {
-                        method: 'GET',
-                        cache: 'no-cache'
-                    });
-                    if (response.ok) {
-                        showToast('Geraet ist wieder online!', 'success');
-                        setTimeout(() => location.reload(), 500);
-                        return;
+
+                // Create abort controller for timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                fetch('/api/status', {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    signal: controller.signal
+                })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    if (response.ok && !reloading) {
+                        reloading = true;
+                        showToast('Geraet ist wieder online! Seite wird neu geladen...', 'success');
+                        setTimeout(() => window.location.reload(true), 1000);
                     }
-                } catch (e) {
-                    // Device still offline
-                }
+                })
+                .catch(() => {
+                    clearTimeout(timeoutId);
+                    if (attempts < maxAttempts && !reloading) {
+                        showToast(`Warte auf Neustart... (${attempts}/${maxAttempts})`, 'success');
+                        setTimeout(checkOnline, interval);
+                    } else if (!reloading) {
+                        showToast('Zeitlimit erreicht - bitte Seite manuell neu laden', 'error');
+                    }
+                });
+            }
 
-                if (attempts < maxAttempts) {
-                    showToast(`Warte auf Neustart... (${attempts}/${maxAttempts})`, 'success');
-                    setTimeout(checkOnline, interval);
-                } else {
-                    showToast('Zeitlimit erreicht - bitte manuell neu laden', 'error');
-                }
-            };
-
-            // Wait 3 seconds before starting to poll
-            setTimeout(checkOnline, 3000);
+            // Wait 5 seconds before starting to poll (ESP32 needs time to reboot)
+            showToast('Geraet wird neugestartet...', 'success');
+            setTimeout(checkOnline, 5000);
         }
 
         // Toast notification
