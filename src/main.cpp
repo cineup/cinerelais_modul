@@ -3,6 +3,8 @@
  * Ethernet, WiFi AP/STA, Web Interface, TCP Server, Relay Control
  */
 
+#define FIRMWARE_VERSION "1.0.0"
+
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -122,7 +124,7 @@ Config config = {
     // NTP
     true,           // ntpEnabled
     "pool.ntp.org", // ntpServer
-    "CET-1CEST,M3.5.0,M10.5.0/3",  // ntpTimezone (Europe/Berlin)
+    "UTC0",         // ntpTimezone (UTC default)
     // Labels
     {"", "", "", "", "", "", "", ""},  // relayLabels
     {"", "", "", "", "", "", "", ""},  // inputLabels
@@ -897,8 +899,12 @@ String getStatusJSON() {
     doc["wifiSSID"] = config.wifiSSID;
     doc["wifiSTAConnected"] = wifiSTAConnected;
     doc["wifiSTAIP"] = wifiSTAConnected ? WiFi.localIP().toString() : "";
+    doc["wifiRSSI"] = wifiSTAConnected ? WiFi.RSSI() : 0;
     doc["wifiAPActive"] = wifiAPActive;
     doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";
+
+    // Firmware version
+    doc["version"] = FIRMWARE_VERSION;
 
     // IP for header (priority: Ethernet > WiFi STA > WiFi AP)
 #ifndef ETHERNET_DISABLED
@@ -1051,7 +1057,7 @@ void loadConfig() {
     // NTP
     config.ntpEnabled = doc["ntpEnabled"] | true;
     strlcpy(config.ntpServer, doc["ntpServer"] | "pool.ntp.org", sizeof(config.ntpServer));
-    strlcpy(config.ntpTimezone, doc["ntpTimezone"] | "CET-1CEST,M3.5.0,M10.5.0/3", sizeof(config.ntpTimezone));
+    strlcpy(config.ntpTimezone, doc["ntpTimezone"] | "UTC0", sizeof(config.ntpTimezone));
 
     // Labels
     if (doc["relayLabels"].is<JsonArray>()) {

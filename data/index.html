@@ -948,6 +948,36 @@
         <!-- Tab 2: Netzwerk -->
         <div id="tab-network" class="tab-content">
             <div class="grid">
+                <!-- Network Status -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Netzwerk Status</h2>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Ethernet</span>
+                            <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ETH MAC</span>
+                            <span class="info-value" id="info-eth-mac">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi STA</span>
+                            <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi Signal</span>
+                            <span class="info-value" id="info-wifi-rssi">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi AP</span>
+                            <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Ethernet Configuration -->
                 <div class="card">
                     <div class="card-header">
@@ -1074,42 +1104,46 @@
                     <button class="btn btn-full" onclick="saveWiFiConfig()">WiFi speichern</button>
                 </div>
 
-                <!-- System Info -->
+                <!-- NTP Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">System Info</h2>
+                        <h2 class="card-title">Zeit / NTP</h2>
                     </div>
 
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span class="info-label">Ethernet</span>
-                            <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
+                    <div class="toggle-container">
+                        <span>NTP aktiviert</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="ntp-config">
+                        <div class="form-group">
+                            <label>NTP Server</label>
+                            <input type="text" id="ntpServer" placeholder="pool.ntp.org">
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">ETH MAC</span>
-                            <span class="info-value" id="info-eth-mac">-</span>
+                        <div class="form-group">
+                            <label>Zeitzone</label>
+                            <select id="ntpTimezone">
+                                <option value="UTC0">UTC (Koordinierte Weltzeit)</option>
+                                <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin (MEZ/MESZ)</option>
+                                <option value="GMT0BST,M3.5.0/1,M10.5.0">Europe/London (GMT/BST)</option>
+                                <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Helsinki (EET/EEST)</option>
+                                <option value="WET0WEST,M3.5.0/1,M10.5.0">Europe/Lisbon (WET/WEST)</option>
+                                <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York (EST/EDT)</option>
+                                <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago (CST/CDT)</option>
+                                <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver (MST/MDT)</option>
+                                <option value="PST8PDT,M3.2.0,M11.1.0">America/Los_Angeles (PST/PDT)</option>
+                            </select>
                         </div>
-                        <div class="info-item">
-                            <span class="info-label">WiFi STA</span>
-                            <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">WiFi AP</span>
-                            <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">TCA9554</span>
-                            <span class="info-value" id="info-tca9554">-</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Betriebszeit</span>
-                            <span class="info-value" id="info-uptime">-</span>
+                        <div class="info-item" style="margin-top: 0.5rem;">
+                            <span class="info-label">Aktuelle Zeit</span>
+                            <span class="info-value" id="info-current-time">-</span>
                         </div>
                     </div>
 
-                    <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
-                        Geraet neustarten
-                    </button>
+                    <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
                 </div>
             </div>
         </div>
@@ -1132,11 +1166,6 @@
                             <label>Impuls Dauer (ms)</label>
                             <input type="number" id="pulseDuration" placeholder="500" min="50" max="30000">
                         </div>
-                    </div>
-
-                    <div class="info-item" style="margin-top: 0.5rem;">
-                        <span class="info-label">Aktueller TCP Port</span>
-                        <span class="info-value" id="info-tcpport">-</span>
                     </div>
 
                     <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
@@ -1182,36 +1211,34 @@
                     <button class="btn btn-full" onclick="saveModbusConfig()">Modbus speichern</button>
                 </div>
 
-                <!-- NTP Configuration -->
+                <!-- System Info -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Zeit / NTP</h2>
+                        <h2 class="card-title">System Info</h2>
                     </div>
 
-                    <div class="toggle-container">
-                        <span>NTP aktiviert</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-
-                    <div id="ntp-config">
-                        <div class="form-group">
-                            <label>NTP Server</label>
-                            <input type="text" id="ntpServer" placeholder="pool.ntp.org">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Firmware</span>
+                            <span class="info-value" id="info-version">-</span>
                         </div>
-                        <div class="form-group">
-                            <label>Zeitzone (POSIX)</label>
-                            <input type="text" id="ntpTimezone" placeholder="CET-1CEST,M3.5.0,M10.5.0/3">
+                        <div class="info-item">
+                            <span class="info-label">TCA9554</span>
+                            <span class="info-value" id="info-tca9554">-</span>
                         </div>
-                        <div class="info-item" style="margin-top: 0.5rem;">
-                            <span class="info-label">Aktuelle Zeit</span>
-                            <span class="info-value" id="info-current-time">-</span>
+                        <div class="info-item">
+                            <span class="info-label">TCP Port</span>
+                            <span class="info-value" id="info-tcpport">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Betriebszeit</span>
+                            <span class="info-value" id="info-uptime">-</span>
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
+                    <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
+                        Geraet neustarten
+                    </button>
                 </div>
 
                 <!-- LED Configuration -->
@@ -1563,6 +1590,28 @@
                     wifiApIpEl.textContent = '';
                 }
 
+                // WiFi RSSI (signal strength)
+                const rssiEl = document.getElementById('info-wifi-rssi');
+                if (rssiEl) {
+                    if (data.wifiSTAConnected && data.wifiRSSI) {
+                        const rssi = data.wifiRSSI;
+                        let strength = 'Schwach';
+                        if (rssi >= -50) strength = 'Exzellent';
+                        else if (rssi >= -60) strength = 'Sehr gut';
+                        else if (rssi >= -70) strength = 'Gut';
+                        else if (rssi >= -80) strength = 'Mittel';
+                        rssiEl.textContent = `${rssi} dBm (${strength})`;
+                    } else {
+                        rssiEl.textContent = '-';
+                    }
+                }
+
+                // Firmware version
+                if (data.version) {
+                    const versionEl = document.getElementById('info-version');
+                    if (versionEl) versionEl.textContent = 'v' + data.version;
+                }
+
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
 
                 // NTP / Current time
@@ -1672,7 +1721,15 @@
                 // NTP
                 document.getElementById('ntpEnabled').checked = data.ntpEnabled;
                 document.getElementById('ntpServer').value = data.ntpServer || 'pool.ntp.org';
-                document.getElementById('ntpTimezone').value = data.ntpTimezone || 'CET-1CEST,M3.5.0,M10.5.0/3';
+                // Set timezone dropdown - if value not in list, default to UTC
+                const tzSelect = document.getElementById('ntpTimezone');
+                const tzValue = data.ntpTimezone || 'UTC0';
+                const tzOption = Array.from(tzSelect.options).find(opt => opt.value === tzValue);
+                if (tzOption) {
+                    tzSelect.value = tzValue;
+                } else {
+                    tzSelect.value = 'UTC0'; // Default to UTC if not found
+                }
 
                 // LED
                 document.getElementById('ledEnabled').checked = data.ledEnabled !== false;
