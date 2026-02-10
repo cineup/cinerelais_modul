@@ -1124,8 +1124,66 @@
                             <input type="text" id="ntpServer" placeholder="pool.ntp.org">
                         </div>
                         <div class="form-group">
-                            <label>Zeitzone (z.B. UTC, MEZ, CET-1CEST,M3.5.0,M10.5.0/3)</label>
-                            <input type="text" id="ntpTimezone" placeholder="UTC">
+                            <label>Zeitzone</label>
+                            <select id="ntpTimezone">
+                                <optgroup label="Europa">
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Amsterdam</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Athens</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Belgrade</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Brussels</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Bucharest</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Budapest</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Chisinau</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Copenhagen</option>
+                                    <option value="IST-1GMT0,M10.5.0,M3.5.0/1">Europe/Dublin</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Helsinki</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Kiev</option>
+                                    <option value="WET0WEST,M3.5.0/1,M10.5.0">Europe/Lisbon</option>
+                                    <option value="GMT0BST,M3.5.0/1,M10.5.0">Europe/London</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Luxembourg</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Madrid</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Malta</option>
+                                    <option value="MSK-3">Europe/Minsk</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Monaco</option>
+                                    <option value="MSK-3">Europe/Moscow</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Oslo</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Paris</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Prague</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Riga</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Rome</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Stockholm</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Tallinn</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Tirane</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Vienna</option>
+                                    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Vilnius</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Warsaw</option>
+                                    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Zurich</option>
+                                </optgroup>
+                                <optgroup label="Amerika">
+                                    <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York</option>
+                                    <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago</option>
+                                    <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver</option>
+                                    <option value="PST8PDT,M3.2.0,M11.1.0">America/Los_Angeles</option>
+                                    <option value="AST4ADT,M3.2.0,M11.1.0">America/Halifax</option>
+                                    <option value="EST5">America/Panama</option>
+                                    <option value="<-03>3">America/Sao_Paulo</option>
+                                </optgroup>
+                                <optgroup label="Asien/Pazifik">
+                                    <option value="<+03>-3">Asia/Dubai</option>
+                                    <option value="IST-5:30">Asia/Kolkata</option>
+                                    <option value="<+07>-7">Asia/Bangkok</option>
+                                    <option value="CST-8">Asia/Shanghai</option>
+                                    <option value="HKT-8">Asia/Hong_Kong</option>
+                                    <option value="<+09>-9">Asia/Seoul</option>
+                                    <option value="JST-9">Asia/Tokyo</option>
+                                    <option value="AEST-10AEDT,M10.1.0,M4.1.0/3">Australia/Sydney</option>
+                                    <option value="NZST-12NZDT,M9.5.0,M4.1.0/3">Pacific/Auckland</option>
+                                </optgroup>
+                                <optgroup label="UTC">
+                                    <option value="UTC0">UTC</option>
+                                </optgroup>
+                            </select>
                         </div>
                         <div class="info-item" style="margin-top: 0.5rem;">
                             <span class="info-label">Aktuelle Zeit</span>
@@ -1759,7 +1817,14 @@
                 // NTP
                 document.getElementById('ntpEnabled').checked = data.ntpEnabled;
                 document.getElementById('ntpServer').value = data.ntpServer || 'pool.ntp.org';
-                document.getElementById('ntpTimezone').value = data.ntpTimezone || 'UTC';
+                // Set timezone dropdown
+                const tzSelect = document.getElementById('ntpTimezone');
+                const tzValue = data.ntpTimezone || 'CET-1CEST,M3.5.0,M10.5.0/3';
+                tzSelect.value = tzValue;
+                // If value not in dropdown, select first option (Berlin)
+                if (tzSelect.selectedIndex === -1) {
+                    tzSelect.selectedIndex = 0;
+                }
 
                 // LED
                 document.getElementById('ledEnabled').checked = data.ledEnabled !== false;
