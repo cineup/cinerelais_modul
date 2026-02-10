@@ -288,6 +288,25 @@
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
         }
 
+        .relay-btn.pulse-flash {
+            animation: pulseFlash 0.4s ease-out;
+        }
+
+        @keyframes pulseFlash {
+            0% {
+                background: var(--accent);
+                border-color: var(--accent);
+                color: #000;
+                box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+            }
+            100% {
+                background: var(--bg-dark);
+                border-color: var(--border);
+                color: var(--text);
+                box-shadow: none;
+            }
+        }
+
         .relay-btn span {
             font-size: 0.65rem;
             text-transform: uppercase;
@@ -320,6 +339,20 @@
             background: rgba(59, 130, 246, 0.2);
             border-color: var(--info);
             box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .input-indicator.changed {
+            animation: inputChanged 0.5s ease-out;
+        }
+
+        @keyframes inputChanged {
+            0% {
+                transform: scale(1.1);
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+            }
+            100% {
+                transform: scale(1);
+            }
         }
 
         .input-indicator .num {
@@ -1512,6 +1545,9 @@
         let modbusRelayCount = 8;
         let modbusLabels = ['', '', '', '', '', '', '', ''];
 
+        // Previous states for change detection
+        let prevInputStates = [null, null, null, null, null, null, null, null];
+
         // Tab switching
         function switchTab(tabName) {
             // Update buttons
@@ -1740,10 +1776,17 @@
                     }
                 });
 
-                // Input states
+                // Input states with change detection
                 data.inputs.forEach((state, index) => {
                     const ind = document.getElementById(`input-${index + 1}`);
                     if (ind) {
+                        // Detect state change and trigger animation
+                        if (prevInputStates[index] !== null && prevInputStates[index] !== state) {
+                            ind.classList.remove('changed');
+                            void ind.offsetWidth; // Force reflow
+                            ind.classList.add('changed');
+                        }
+                        prevInputStates[index] = state;
                         ind.classList.toggle('active', state);
                     }
                 });
@@ -1939,12 +1982,20 @@
         }
 
         async function pulseRelay(relay) {
+            const btn = document.getElementById(`relay-${relay}`);
             try {
                 const duration = document.getElementById('pulseDuration').value || 500;
                 const formData = new FormData();
                 formData.append('relay', relay);
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
+
+                // Visual feedback immediately
+                if (btn) {
+                    btn.classList.remove('pulse-flash');
+                    void btn.offsetWidth; // Force reflow to restart animation
+                    btn.classList.add('pulse-flash');
+                }
 
                 await fetch('/api/relay', {
                     method: 'POST',
@@ -1980,6 +2031,16 @@
                 const formData = new FormData();
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
+
+                // Visual feedback for all buttons
+                for (let i = 1; i <= 8; i++) {
+                    const btn = document.getElementById(`relay-${i}`);
+                    if (btn) {
+                        btn.classList.remove('pulse-flash');
+                        void btn.offsetWidth;
+                        btn.classList.add('pulse-flash');
+                    }
+                }
 
                 await fetch('/api/relays', {
                     method: 'POST',
@@ -2023,12 +2084,20 @@
         }
 
         async function modbusPulseRelay(relay) {
+            const btn = document.getElementById(`modbus-relay-${relay}`);
             try {
                 const duration = document.getElementById('pulseDuration').value || 500;
                 const formData = new FormData();
                 formData.append('relay', relay);
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
+
+                // Visual feedback immediately
+                if (btn) {
+                    btn.classList.remove('pulse-flash');
+                    void btn.offsetWidth; // Force reflow to restart animation
+                    btn.classList.add('pulse-flash');
+                }
 
                 const response = await fetch('/api/modbus/relay', {
                     method: 'POST',
@@ -2072,6 +2141,16 @@
                 const formData = new FormData();
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
+
+                // Visual feedback for all modbus buttons
+                for (let i = 1; i <= modbusRelayCount; i++) {
+                    const btn = document.getElementById(`modbus-relay-${i}`);
+                    if (btn) {
+                        btn.classList.remove('pulse-flash');
+                        void btn.offsetWidth;
+                        btn.classList.add('pulse-flash');
+                    }
+                }
 
                 const response = await fetch('/api/modbus/relays', {
                     method: 'POST',
