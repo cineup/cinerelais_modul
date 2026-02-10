@@ -1987,130 +1987,96 @@
             }
         }
 
-        // Save configurations
-        async function saveEthernetConfig() {
+        // Helper: Save config and ask for restart if needed
+        async function saveConfigAndAskRestart(formData, successMsg, needsRestart = true) {
             try {
-                const formData = new FormData();
-                formData.append('useDHCP', document.getElementById('useDHCP').checked);
-                formData.append('staticIP', document.getElementById('staticIP').value);
-                formData.append('gateway', document.getElementById('gateway').value);
-                formData.append('subnet', document.getElementById('subnet').value);
-                formData.append('dns', document.getElementById('dns').value);
-                formData.append('hostname', document.getElementById('hostnameInput').value);
-
                 const response = await fetch('/api/config', {
                     method: 'POST',
                     body: formData
                 });
 
                 const result = await response.json();
-                showToast(result.message || 'Ethernet Konfiguration gespeichert', 'success');
+                showToast(result.message || successMsg, 'success');
+
+                if (needsRestart) {
+                    setTimeout(() => {
+                        if (confirm('Einstellungen wurden gespeichert.\n\nJetzt neustarten um Aenderungen zu uebernehmen?')) {
+                            restartDevice(true); // Skip second confirmation
+                        }
+                    }, 500);
+                }
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
+        }
+
+        // Save configurations
+        async function saveEthernetConfig() {
+            const formData = new FormData();
+            formData.append('useDHCP', document.getElementById('useDHCP').checked);
+            formData.append('staticIP', document.getElementById('staticIP').value);
+            formData.append('gateway', document.getElementById('gateway').value);
+            formData.append('subnet', document.getElementById('subnet').value);
+            formData.append('dns', document.getElementById('dns').value);
+            formData.append('hostname', document.getElementById('hostnameInput').value);
+
+            await saveConfigAndAskRestart(formData, 'Ethernet Konfiguration gespeichert', true);
         }
 
         async function saveWiFiConfig() {
-            try {
-                const formData = new FormData();
-                formData.append('wifiEnabled', document.getElementById('wifiEnabled').checked);
-                formData.append('wifiAPEnabled', document.getElementById('wifiAPEnabled').checked);
-                formData.append('wifiAPPassword', document.getElementById('wifiAPPassword').value);
-                formData.append('wifiSSID', document.getElementById('wifiSSID').value);
-                const wifiPwField = document.getElementById('wifiPassword');
-                if (wifiPwField.value.length > 0) {
-                    formData.append('wifiPassword', wifiPwField.value);
-                }
-                formData.append('wifiDHCP', document.getElementById('wifiDHCP').checked);
-                formData.append('wifiIP', document.getElementById('wifiIP').value);
-                formData.append('wifiGateway', document.getElementById('wifiGateway').value);
-                formData.append('wifiSubnet', document.getElementById('wifiSubnet').value);
-                formData.append('wifiDNS', document.getElementById('wifiDNS').value);
-
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                showToast(result.message || 'WiFi Konfiguration gespeichert', 'success');
-            } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
+            const formData = new FormData();
+            formData.append('wifiEnabled', document.getElementById('wifiEnabled').checked);
+            formData.append('wifiAPEnabled', document.getElementById('wifiAPEnabled').checked);
+            formData.append('wifiAPPassword', document.getElementById('wifiAPPassword').value);
+            formData.append('wifiSSID', document.getElementById('wifiSSID').value);
+            const wifiPwField = document.getElementById('wifiPassword');
+            if (wifiPwField.value.length > 0) {
+                formData.append('wifiPassword', wifiPwField.value);
             }
+            formData.append('wifiDHCP', document.getElementById('wifiDHCP').checked);
+            formData.append('wifiIP', document.getElementById('wifiIP').value);
+            formData.append('wifiGateway', document.getElementById('wifiGateway').value);
+            formData.append('wifiSubnet', document.getElementById('wifiSubnet').value);
+            formData.append('wifiDNS', document.getElementById('wifiDNS').value);
+
+            await saveConfigAndAskRestart(formData, 'WiFi Konfiguration gespeichert', true);
         }
 
         async function saveControlConfig() {
-            try {
-                const formData = new FormData();
-                formData.append('tcpPort', document.getElementById('tcpPort').value);
-                formData.append('pulseDuration', document.getElementById('pulseDuration').value);
+            const formData = new FormData();
+            formData.append('tcpPort', document.getElementById('tcpPort').value);
+            formData.append('pulseDuration', document.getElementById('pulseDuration').value);
 
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                showToast(result.message || 'Konfiguration gespeichert', 'success');
-            } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
-            }
+            // TCP Port change needs restart, pulse duration doesn't
+            const tcpPortChanged = document.getElementById('tcpPort').value != document.getElementById('info-tcpport').textContent;
+            await saveConfigAndAskRestart(formData, 'Steuerung Konfiguration gespeichert', tcpPortChanged);
         }
 
         async function saveNTPConfig() {
-            try {
-                const formData = new FormData();
-                formData.append('ntpEnabled', document.getElementById('ntpEnabled').checked);
-                formData.append('ntpServer', document.getElementById('ntpServer').value);
-                formData.append('ntpTimezone', document.getElementById('ntpTimezone').value);
+            const formData = new FormData();
+            formData.append('ntpEnabled', document.getElementById('ntpEnabled').checked);
+            formData.append('ntpServer', document.getElementById('ntpServer').value);
+            formData.append('ntpTimezone', document.getElementById('ntpTimezone').value);
 
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                showToast(result.message || 'NTP Konfiguration gespeichert', 'success');
-            } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
-            }
+            await saveConfigAndAskRestart(formData, 'NTP Konfiguration gespeichert', true);
         }
 
         async function saveLEDConfig() {
-            try {
-                const formData = new FormData();
-                formData.append('ledEnabled', document.getElementById('ledEnabled').checked);
-                formData.append('ledBrightness', document.getElementById('ledBrightness').value);
+            const formData = new FormData();
+            formData.append('ledEnabled', document.getElementById('ledEnabled').checked);
+            formData.append('ledBrightness', document.getElementById('ledBrightness').value);
 
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                showToast(result.message || 'LED Konfiguration gespeichert', 'success');
-            } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
-            }
+            // LED changes don't need restart
+            await saveConfigAndAskRestart(formData, 'LED Konfiguration gespeichert', false);
         }
 
         async function saveModbusConfig() {
-            try {
-                const formData = new FormData();
-                formData.append('modbusEnabled', document.getElementById('modbusEnabled').checked);
-                formData.append('modbusAddress', document.getElementById('modbusAddress').value);
-                formData.append('modbusRelayCount', document.getElementById('modbusRelayCount').value);
+            const formData = new FormData();
+            formData.append('modbusEnabled', document.getElementById('modbusEnabled').checked);
+            formData.append('modbusAddress', document.getElementById('modbusAddress').value);
+            formData.append('modbusRelayCount', document.getElementById('modbusRelayCount').value);
 
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                showToast(result.message || 'Modbus gespeichert. Neustart erforderlich.', 'success');
-            } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
-            }
+            await saveConfigAndAskRestart(formData, 'Modbus Konfiguration gespeichert', true);
         }
 
         async function saveLabelsConfig() {
@@ -2164,8 +2130,8 @@
             }
         }
 
-        async function restartDevice() {
-            if (confirm('Geraet wirklich neustarten?')) {
+        async function restartDevice(skipConfirm = false) {
+            if (skipConfirm || confirm('Geraet wirklich neustarten?')) {
                 try {
                     await fetch('/api/restart', { method: 'POST' });
                     showToast('Geraet wird neugestartet...', 'success');
