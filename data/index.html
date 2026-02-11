@@ -863,6 +863,207 @@
                 padding: 1.25rem;
             }
         }
+
+        /* Input Action Mapping */
+        .input-action-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-action-row {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--bg-dark);
+        }
+
+        .input-action-header {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            gap: 0.75rem;
+        }
+
+        .input-action-header:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .input-action-num {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--info);
+            min-width: 1.5rem;
+        }
+
+        .input-action-name {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .input-action-summary {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .input-action-summary.has-mapping {
+            color: var(--accent);
+        }
+
+        .expand-icon {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            transition: transform 0.2s ease;
+        }
+
+        .input-action-row.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .input-action-content {
+            display: none;
+            padding: 1rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .input-action-row.expanded .input-action-content {
+            display: block;
+        }
+
+        .action-section {
+            margin-bottom: 1rem;
+        }
+
+        .action-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .action-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .relay-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .relay-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.4rem 0.6rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .relay-checkbox:hover {
+            border-color: var(--accent);
+        }
+
+        .relay-checkbox input {
+            accent-color: var(--accent);
+        }
+
+        .relay-checkbox.checked {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tcp-config {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .tcp-config.enabled {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .tcp-config input[type="text"],
+        .tcp-config input[type="number"] {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .tcp-config input[type="text"]:focus,
+        .tcp-config input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .tcp-host-input {
+            width: 130px;
+        }
+
+        .tcp-port-input {
+            width: 70px;
+        }
+
+        .tcp-cmd-input {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .tcp-separator {
+            color: var(--text-dim);
+            font-weight: bold;
+        }
+
+        .card-hint {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .relay-checkboxes {
+                gap: 0.4rem;
+            }
+
+            .relay-checkbox {
+                padding: 0.35rem 0.5rem;
+                font-size: 0.8rem;
+            }
+
+            .tcp-config {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .tcp-host-input,
+            .tcp-port-input,
+            .tcp-cmd-input {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -935,6 +1136,20 @@
                         <h2 class="card-title">Digitale Eingaenge</h2>
                     </div>
                     <div class="input-grid" id="input-grid"></div>
+                </div>
+
+                <!-- Input to Relay Mapping -->
+                <div class="card grid-full">
+                    <div class="card-header">
+                        <h2 class="card-title">Input &rarr; Aktionen</h2>
+                    </div>
+                    <p class="card-hint">
+                        Wenn ein Input aktiv ist, werden die konfigurierten Relais geschlossen.
+                    </p>
+                    <div class="input-action-list" id="input-action-list"></div>
+                    <button class="btn btn-full" onclick="saveInputActionsConfig()">
+                        Aktionen speichern
+                    </button>
                 </div>
 
                 <!-- Modbus Relays -->
@@ -1548,6 +1763,13 @@
         // Previous states for change detection
         let prevInputStates = [null, null, null, null, null, null, null, null];
 
+        // Input-to-Relay mapping state
+        let inputRelayMap = [0, 0, 0, 0, 0, 0, 0, 0];
+        let inputTcpEnabled = [false, false, false, false, false, false, false, false];
+        let inputTcpHost = ['', '', '', '', '', '', '', ''];
+        let inputTcpPort = [0, 0, 0, 0, 0, 0, 0, 0];
+        let inputTcpCommand = ['', '', '', '', '', '', '', ''];
+
         // Tab switching
         function switchTab(tabName) {
             // Update buttons
@@ -1904,6 +2126,24 @@
                     initModbusGrid();
                 }
 
+                // Input-to-Relay Mapping
+                if (data.inputRelayMap) {
+                    inputRelayMap = data.inputRelayMap;
+                }
+                if (data.inputTcpEnabled) {
+                    inputTcpEnabled = data.inputTcpEnabled;
+                }
+                if (data.inputTcpHost) {
+                    inputTcpHost = data.inputTcpHost;
+                }
+                if (data.inputTcpPort) {
+                    inputTcpPort = data.inputTcpPort;
+                }
+                if (data.inputTcpCommand) {
+                    inputTcpCommand = data.inputTcpCommand;
+                }
+                buildInputActionList();
+
                 toggleDHCP();
                 toggleWiFiSections();
                 toggleAPSection();
@@ -2215,6 +2455,147 @@
                     const label = modbusLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
                     btn.querySelector('span').textContent = label;
                 }
+            }
+        }
+
+        // Input-to-Relay Mapping Functions
+        function buildInputActionList() {
+            const list = document.getElementById('input-action-list');
+            list.innerHTML = '';
+
+            for (let i = 1; i <= 8; i++) {
+                const row = document.createElement('div');
+                row.className = 'input-action-row';
+                row.id = `input-action-row-${i}`;
+
+                const inputName = inputLabels[i - 1] || `Input ${i}`;
+                const summary = getInputActionSummary(i);
+
+                row.innerHTML = `
+                    <div class="input-action-header" onclick="toggleInputAction(${i})">
+                        <span class="input-action-num">${i}</span>
+                        <span class="input-action-name">${inputName}</span>
+                        <span class="input-action-summary ${summary ? 'has-mapping' : ''}" id="input-summary-${i}">${summary || '-'}</span>
+                        <span class="expand-icon">&#9660;</span>
+                    </div>
+                    <div class="input-action-content" id="input-action-content-${i}">
+                        <div class="action-section">
+                            <label class="action-label">Relais aktivieren:</label>
+                            <div class="relay-checkboxes" id="relay-checkboxes-${i}">
+                                ${buildRelayCheckboxes(i)}
+                            </div>
+                        </div>
+                        <div class="action-section">
+                            <label class="action-label">
+                                <input type="checkbox" id="tcp-enabled-${i}" ${inputTcpEnabled[i-1] ? 'checked' : ''}
+                                       onchange="toggleTcpConfig(${i})" disabled>
+                                TCP Befehl senden (in Vorbereitung):
+                            </label>
+                            <div class="tcp-config ${inputTcpEnabled[i-1] ? 'enabled' : ''}" id="tcp-config-${i}">
+                                <input type="text" class="tcp-host-input" id="tcp-host-${i}"
+                                       placeholder="192.168.1.x" value="${inputTcpHost[i-1] || ''}" disabled>
+                                <span class="tcp-separator">:</span>
+                                <input type="number" class="tcp-port-input" id="tcp-port-${i}"
+                                       placeholder="5000" value="${inputTcpPort[i-1] || ''}" disabled>
+                                <input type="text" class="tcp-cmd-input" id="tcp-cmd-${i}"
+                                       placeholder="r1_on" value="${inputTcpCommand[i-1] || ''}" disabled>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                list.appendChild(row);
+            }
+        }
+
+        function buildRelayCheckboxes(inputNum) {
+            let html = '';
+            const map = inputRelayMap[inputNum - 1];
+
+            for (let r = 1; r <= 8; r++) {
+                const checked = (map & (1 << (r - 1))) !== 0;
+                const relayName = relayLabels[r - 1] || `R${r}`;
+                html += `
+                    <label class="relay-checkbox ${checked ? 'checked' : ''}">
+                        <input type="checkbox" id="map-${inputNum}-${r}"
+                               ${checked ? 'checked' : ''}
+                               onchange="updateRelayCheckbox(${inputNum}, ${r})">
+                        ${relayName}
+                    </label>
+                `;
+            }
+            return html;
+        }
+
+        function toggleInputAction(inputNum) {
+            const row = document.getElementById(`input-action-row-${inputNum}`);
+            row.classList.toggle('expanded');
+        }
+
+        function updateRelayCheckbox(inputNum, relayNum) {
+            const checkbox = document.getElementById(`map-${inputNum}-${relayNum}`);
+            const label = checkbox.parentElement;
+            const bit = 1 << (relayNum - 1);
+
+            if (checkbox.checked) {
+                inputRelayMap[inputNum - 1] |= bit;
+                label.classList.add('checked');
+            } else {
+                inputRelayMap[inputNum - 1] &= ~bit;
+                label.classList.remove('checked');
+            }
+
+            // Update summary
+            const summary = getInputActionSummary(inputNum);
+            const summaryEl = document.getElementById(`input-summary-${inputNum}`);
+            summaryEl.textContent = summary || '-';
+            summaryEl.className = `input-action-summary ${summary ? 'has-mapping' : ''}`;
+        }
+
+        function getInputActionSummary(inputNum) {
+            const map = inputRelayMap[inputNum - 1];
+            if (map === 0) return '';
+
+            const relays = [];
+            for (let r = 1; r <= 8; r++) {
+                if (map & (1 << (r - 1))) {
+                    relays.push(`R${r}`);
+                }
+            }
+            return '→ ' + relays.join(', ');
+        }
+
+        function toggleTcpConfig(inputNum) {
+            const enabled = document.getElementById(`tcp-enabled-${inputNum}`).checked;
+            inputTcpEnabled[inputNum - 1] = enabled;
+            document.getElementById(`tcp-config-${inputNum}`).className =
+                `tcp-config ${enabled ? 'enabled' : ''}`;
+        }
+
+        async function saveInputActionsConfig() {
+            // Read TCP values from form (for future use)
+            for (let i = 1; i <= 8; i++) {
+                inputTcpHost[i - 1] = document.getElementById(`tcp-host-${i}`).value;
+                inputTcpPort[i - 1] = parseInt(document.getElementById(`tcp-port-${i}`).value) || 0;
+                inputTcpCommand[i - 1] = document.getElementById(`tcp-cmd-${i}`).value;
+            }
+
+            const formData = new FormData();
+            formData.append('inputRelayMap', JSON.stringify(inputRelayMap));
+            formData.append('inputTcpEnabled', JSON.stringify(inputTcpEnabled));
+            formData.append('inputTcpHost', JSON.stringify(inputTcpHost));
+            formData.append('inputTcpPort', JSON.stringify(inputTcpPort));
+            formData.append('inputTcpCommand', JSON.stringify(inputTcpCommand));
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                showToast('Aktionen gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
             }
         }
 

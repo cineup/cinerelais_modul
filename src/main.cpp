@@ -94,6 +94,15 @@ struct Config {
     uint8_t modbusAddress;      // 1-247
     uint8_t modbusRelayCount;   // 6 or 8
     char modbusLabels[8][16];   // Labels for Modbus relays
+
+    // Input-to-Relay Mapping (Bitmask: Bit n = Relay n+1)
+    uint8_t inputRelayMap[8];   // Which relays to activate for each input
+
+    // TCP Command per Input (prepared for future use)
+    bool inputTcpEnabled[8];
+    char inputTcpHost[8][16];   // IP address
+    uint16_t inputTcpPort[8];   // Port
+    char inputTcpCommand[8][32]; // Command string
 };
 
 Config config = {
@@ -132,7 +141,14 @@ Config config = {
     false,          // modbusEnabled
     1,              // modbusAddress (default 0x01)
     8,              // modbusRelayCount
-    {"", "", "", "", "", "", "", ""}   // modbusLabels
+    {"", "", "", "", "", "", "", ""},  // modbusLabels
+    // Input-to-Relay Mapping
+    {0, 0, 0, 0, 0, 0, 0, 0},          // inputRelayMap (all disabled)
+    // TCP per Input (prepared)
+    {false, false, false, false, false, false, false, false},  // inputTcpEnabled
+    {"", "", "", "", "", "", "", ""},  // inputTcpHost
+    {0, 0, 0, 0, 0, 0, 0, 0},          // inputTcpPort
+    {"", "", "", "", "", "", "", ""}   // inputTcpCommand
 };
 
 // ============================================
@@ -176,6 +192,9 @@ bool modbusPulseActive[8] = {false};
 // NTP
 bool ntpSynced = false;
 
+// Input-to-Relay Mapping
+uint8_t inputControlledRelays = 0;  // Bitmask of relays controlled by inputs
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -210,6 +229,7 @@ void updateModbusPulses();
 void modbusReadRelays();
 int modbusScanAddress();
 void setupNTP();
+void processInputMappings();
 
 // ============================================
 // Setup
@@ -455,6 +475,65 @@ void setup() {
             }
         }
 
+        // Input-to-Relay Mapping
+        if (request->hasParam("inputRelayMap", true)) {
+            String mapJson = request->getParam("inputRelayMap", true)->value();
+            JsonDocument mapDoc;
+            if (deserializeJson(mapDoc, mapJson) == DeserializationError::Ok) {
+                JsonArray arr = mapDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    config.inputRelayMap[i] = arr[i] | 0;
+                }
+                changed = true;
+            }
+        }
+
+        // TCP per Input (prepared)
+        if (request->hasParam("inputTcpEnabled", true)) {
+            String tcpJson = request->getParam("inputTcpEnabled", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    config.inputTcpEnabled[i] = arr[i] | false;
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputTcpHost", true)) {
+            String tcpJson = request->getParam("inputTcpHost", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    strlcpy(config.inputTcpHost[i], arr[i] | "", sizeof(config.inputTcpHost[i]));
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputTcpPort", true)) {
+            String tcpJson = request->getParam("inputTcpPort", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    config.inputTcpPort[i] = arr[i] | 0;
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputTcpCommand", true)) {
+            String tcpJson = request->getParam("inputTcpCommand", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    strlcpy(config.inputTcpCommand[i], arr[i] | "", sizeof(config.inputTcpCommand[i]));
+                }
+                changed = true;
+            }
+        }
+
         if (changed) {
             saveConfig();
         }
@@ -669,6 +748,7 @@ void loop() {
     updatePulses();
     updateModbusPulses();
     modbusReadRelays();
+    processInputMappings();  // Handle input-to-relay mappings
     checkWiFiConnection();
 
     // Check NTP sync status periodically
@@ -1033,6 +1113,24 @@ String getConfigJSON() {
         modbusLabelsArr.add(config.modbusLabels[i]);
     }
 
+    // Input-to-Relay Mapping
+    JsonArray inputRelayMapArr = doc["inputRelayMap"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputRelayMapArr.add(config.inputRelayMap[i]);
+    }
+
+    // TCP per Input (prepared)
+    JsonArray inputTcpEnabledArr = doc["inputTcpEnabled"].to<JsonArray>();
+    JsonArray inputTcpHostArr = doc["inputTcpHost"].to<JsonArray>();
+    JsonArray inputTcpPortArr = doc["inputTcpPort"].to<JsonArray>();
+    JsonArray inputTcpCommandArr = doc["inputTcpCommand"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputTcpEnabledArr.add(config.inputTcpEnabled[i]);
+        inputTcpHostArr.add(config.inputTcpHost[i]);
+        inputTcpPortArr.add(config.inputTcpPort[i]);
+        inputTcpCommandArr.add(config.inputTcpCommand[i]);
+    }
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -1121,6 +1219,40 @@ void loadConfig() {
         }
     }
 
+    // Input-to-Relay Mapping
+    if (doc["inputRelayMap"].is<JsonArray>()) {
+        JsonArray arr = doc["inputRelayMap"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            config.inputRelayMap[i] = arr[i] | 0;
+        }
+    }
+
+    // TCP per Input (prepared)
+    if (doc["inputTcpEnabled"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpEnabled"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            config.inputTcpEnabled[i] = arr[i] | false;
+        }
+    }
+    if (doc["inputTcpHost"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpHost"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            strlcpy(config.inputTcpHost[i], arr[i] | "", sizeof(config.inputTcpHost[i]));
+        }
+    }
+    if (doc["inputTcpPort"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpPort"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            config.inputTcpPort[i] = arr[i] | 0;
+        }
+    }
+    if (doc["inputTcpCommand"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpCommand"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            strlcpy(config.inputTcpCommand[i], arr[i] | "", sizeof(config.inputTcpCommand[i]));
+        }
+    }
+
     Serial.printf("Config loaded: hostname=%s, tcpPort=%d, ethDHCP=%d, modbus=%d\n",
                   config.hostname, config.tcpPort, config.ethDHCP, config.modbusEnabled);
 }
@@ -1177,6 +1309,24 @@ void saveConfig() {
     JsonArray modbusLabelsArr = doc["modbusLabels"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
         modbusLabelsArr.add(config.modbusLabels[i]);
+    }
+
+    // Input-to-Relay Mapping
+    JsonArray inputRelayMapArr = doc["inputRelayMap"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputRelayMapArr.add(config.inputRelayMap[i]);
+    }
+
+    // TCP per Input (prepared)
+    JsonArray inputTcpEnabledArr = doc["inputTcpEnabled"].to<JsonArray>();
+    JsonArray inputTcpHostArr = doc["inputTcpHost"].to<JsonArray>();
+    JsonArray inputTcpPortArr = doc["inputTcpPort"].to<JsonArray>();
+    JsonArray inputTcpCommandArr = doc["inputTcpCommand"].to<JsonArray>();
+    for (int i = 0; i < 8; i++) {
+        inputTcpEnabledArr.add(config.inputTcpEnabled[i]);
+        inputTcpHostArr.add(config.inputTcpHost[i]);
+        inputTcpPortArr.add(config.inputTcpPort[i]);
+        inputTcpCommandArr.add(config.inputTcpCommand[i]);
     }
 
     File file = LittleFS.open(CONFIG_FILE, "w");
@@ -1302,6 +1452,35 @@ void setupNTP() {
     } else {
         ntpSynced = false;
         Serial.println("NTP: Initial sync failed, will retry in background");
+    }
+}
+
+// ============================================
+// Input-to-Relay Mapping
+// ============================================
+void processInputMappings() {
+    readDigitalInputs();
+
+    uint8_t newInputControlled = 0;
+
+    // Check each input and accumulate relay bits
+    for (int i = 0; i < 8; i++) {
+        if (inputStates[i] && config.inputRelayMap[i] != 0) {
+            newInputControlled |= config.inputRelayMap[i];
+        }
+    }
+
+    // Only update relays if the controlled set changed
+    if (newInputControlled != inputControlledRelays) {
+        for (int r = 0; r < 8; r++) {
+            bool shouldBeOn = (newInputControlled & (1 << r)) != 0;
+            bool wasOn = (inputControlledRelays & (1 << r)) != 0;
+
+            if (shouldBeOn != wasOn) {
+                setRelay(r + 1, shouldBeOn);
+            }
+        }
+        inputControlledRelays = newInputControlled;
     }
 }
 
