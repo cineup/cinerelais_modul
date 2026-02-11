@@ -194,6 +194,9 @@ bool ntpSynced = false;
 
 // Input-to-Relay Mapping
 uint8_t inputControlledRelays = 0;  // Bitmask of relays controlled by inputs
+bool inputDebouncedStates[8] = {false};  // Debounced input states
+unsigned long inputDebounceTime[8] = {0};  // Timestamp when input changed
+const unsigned long INPUT_DEBOUNCE_MS = 500;  // 500ms debounce delay
 
 // ============================================
 // Forward Declarations
@@ -1460,12 +1463,30 @@ void setupNTP() {
 // ============================================
 void processInputMappings() {
     readDigitalInputs();
+    unsigned long now = millis();
+
+    // Debounce each input
+    for (int i = 0; i < 8; i++) {
+        if (inputStates[i] != inputDebouncedStates[i]) {
+            // Input changed - reset debounce timer
+            if (inputDebounceTime[i] == 0) {
+                inputDebounceTime[i] = now;
+            } else if (now - inputDebounceTime[i] >= INPUT_DEBOUNCE_MS) {
+                // Stable for debounce period - accept new state
+                inputDebouncedStates[i] = inputStates[i];
+                inputDebounceTime[i] = 0;
+            }
+        } else {
+            // Input matches debounced state - reset timer
+            inputDebounceTime[i] = 0;
+        }
+    }
 
     uint8_t newInputControlled = 0;
 
-    // Check each input and accumulate relay bits
+    // Check each input (using debounced states) and accumulate relay bits
     for (int i = 0; i < 8; i++) {
-        if (inputStates[i] && config.inputRelayMap[i] != 0) {
+        if (inputDebouncedStates[i] && config.inputRelayMap[i] != 0) {
             newInputControlled |= config.inputRelayMap[i];
         }
     }

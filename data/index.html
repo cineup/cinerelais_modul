@@ -1138,20 +1138,6 @@
                     <div class="input-grid" id="input-grid"></div>
                 </div>
 
-                <!-- Input to Relay Mapping -->
-                <div class="card grid-full">
-                    <div class="card-header">
-                        <h2 class="card-title">Input &rarr; Aktionen</h2>
-                    </div>
-                    <p class="card-hint">
-                        Wenn ein Input aktiv ist, werden die konfigurierten Relais geschlossen.
-                    </p>
-                    <div class="input-action-list" id="input-action-list"></div>
-                    <button class="btn btn-full" onclick="saveInputActionsConfig()">
-                        Aktionen speichern
-                    </button>
-                </div>
-
                 <!-- Modbus Relays -->
                 <div class="card" id="modbus-card" style="display: none;">
                     <div class="card-header">
@@ -1505,6 +1491,20 @@
                     </div>
 
                     <button class="btn btn-full" onclick="saveModbusConfig()">Modbus speichern</button>
+                </div>
+
+                <!-- Input to Relay Mapping -->
+                <div class="card grid-full">
+                    <div class="card-header">
+                        <h2 class="card-title">Input &rarr; Aktionen</h2>
+                    </div>
+                    <p class="card-hint">
+                        Wenn ein Input aktiv ist, werden die konfigurierten Relais geschlossen (500ms Entprellung).
+                    </p>
+                    <div class="input-action-list" id="input-action-list"></div>
+                    <button class="btn btn-full" onclick="saveInputActionsConfig()">
+                        Aktionen speichern
+                    </button>
                 </div>
 
                 <!-- System Info -->
