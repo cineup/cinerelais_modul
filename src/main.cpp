@@ -49,6 +49,51 @@
 const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
 
 // ============================================
+// TCP Device Presets (for Input→TCP Actions)
+// ============================================
+
+// Command format: ASCII string or HEX bytes (prefixed with "HEX:")
+struct DeviceCommand {
+    const char* name;
+    const char* command;  // ASCII text or "HEX:060e2b34..." for binary
+};
+
+struct DevicePreset {
+    const char* name;
+    uint16_t port;
+    const DeviceCommand* commands;
+    uint8_t commandCount;
+};
+
+// Dolby IMS300 Commands (Port 11730, binary protocol)
+const DeviceCommand IMS300_COMMANDS[] = {
+    {"PlaySPL",      "HEX:060e2b3402050100e1001010101030b008300000401020304"},
+    {"PauseSPL",     "HEX:060e2b3402050100e1001010101030d008300000401020304"},
+    {"EjectSPL",     "HEX:060e2b3402050100e1001010101030f008300000401020304"},
+    {"SkipForward",  "HEX:060e2b34020501000e100101010311008300000401020304"},
+    {"SkipBackward", "HEX:060e2b34020501000e100101010313008300000401020304"},
+    {"JumpForward",  "HEX:060e2b34020501000e100101010315008300000401020304"},
+    {"JumpBackward", "HEX:060e2b34020501000e100101010317008300000401020304"}
+};
+
+// AP20 Audio Processor Commands (Port 14500, ASCII protocol)
+const DeviceCommand AP20_COMMANDS[] = {
+    {"Mute",       "@MUTED 1\r"},
+    {"Unmute",     "@MUTED 0\r"},
+    {"Volume +1",  "@VOLUME +1\r"},
+    {"Volume -1",  "@VOLUME -1\r"},
+    {"Volume +5",  "@VOLUME +5\r"},
+    {"Volume -5",  "@VOLUME -5\r"}
+};
+
+// Device Presets Array (add new devices here)
+const DevicePreset DEVICE_PRESETS[] = {
+    {"Dolby IMS300", 11730, IMS300_COMMANDS, sizeof(IMS300_COMMANDS) / sizeof(DeviceCommand)},
+    {"AP20",         14500, AP20_COMMANDS,   sizeof(AP20_COMMANDS) / sizeof(DeviceCommand)}
+};
+const uint8_t DEVICE_PRESET_COUNT = sizeof(DEVICE_PRESETS) / sizeof(DevicePreset);
+
+// ============================================
 // Configuration
 // ============================================
 struct Config {
@@ -98,11 +143,14 @@ struct Config {
     // Input-to-Relay Mapping (Bitmask: Bit n = Relay n+1)
     uint8_t inputRelayMap[8];   // Which relays to activate for each input
 
-    // TCP Command per Input (prepared for future use)
-    bool inputTcpEnabled[8];
-    char inputTcpHost[8][16];   // IP address
-    uint16_t inputTcpPort[8];   // Port
-    char inputTcpCommand[8][32]; // Command string
+    // TCP Command per Input
+    // Mode: 0=disabled, 1=manual (IP/Port/Command), 2=preset (Device/Function)
+    uint8_t inputTcpMode[8];
+    char inputTcpHost[8][16];      // IP address (used in both modes)
+    uint16_t inputTcpPort[8];      // Port (manual mode only)
+    char inputTcpCommand[8][64];   // Command string (manual mode, larger for HEX)
+    uint8_t inputTcpDevice[8];     // Device preset index (preset mode)
+    uint8_t inputTcpFunction[8];   // Function index within device (preset mode)
 };
 
 Config config = {
@@ -144,11 +192,13 @@ Config config = {
     {"", "", "", "", "", "", "", ""},  // modbusLabels
     // Input-to-Relay Mapping
     {0, 0, 0, 0, 0, 0, 0, 0},          // inputRelayMap (all disabled)
-    // TCP per Input (prepared)
-    {false, false, false, false, false, false, false, false},  // inputTcpEnabled
+    // TCP per Input
+    {0, 0, 0, 0, 0, 0, 0, 0},          // inputTcpMode (0=disabled)
     {"", "", "", "", "", "", "", ""},  // inputTcpHost
     {0, 0, 0, 0, 0, 0, 0, 0},          // inputTcpPort
-    {"", "", "", "", "", "", "", ""}   // inputTcpCommand
+    {"", "", "", "", "", "", "", ""},  // inputTcpCommand
+    {0, 0, 0, 0, 0, 0, 0, 0},          // inputTcpDevice
+    {0, 0, 0, 0, 0, 0, 0, 0}           // inputTcpFunction
 };
 
 // ============================================
@@ -198,6 +248,9 @@ bool inputDebouncedStates[8] = {false};  // Debounced input states
 unsigned long inputDebounceTime[8] = {0};  // Timestamp when input changed
 const unsigned long INPUT_DEBOUNCE_MS = 500;  // 500ms debounce delay
 
+// Input TCP command state (track if command was sent for current input state)
+bool inputTcpSent[8] = {false};  // True if TCP command was sent for active input
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -233,6 +286,7 @@ void modbusReadRelays();
 int modbusScanAddress();
 void setupNTP();
 void processInputMappings();
+void sendInputTcpCommand(int inputIndex);
 
 // ============================================
 // Setup
@@ -491,14 +545,14 @@ void setup() {
             }
         }
 
-        // TCP per Input (prepared)
-        if (request->hasParam("inputTcpEnabled", true)) {
-            String tcpJson = request->getParam("inputTcpEnabled", true)->value();
+        // TCP per Input
+        if (request->hasParam("inputTcpMode", true)) {
+            String tcpJson = request->getParam("inputTcpMode", true)->value();
             JsonDocument tcpDoc;
             if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
                 JsonArray arr = tcpDoc.as<JsonArray>();
                 for (int i = 0; i < 8 && i < arr.size(); i++) {
-                    config.inputTcpEnabled[i] = arr[i] | false;
+                    config.inputTcpMode[i] = arr[i] | 0;
                 }
                 changed = true;
             }
@@ -532,6 +586,28 @@ void setup() {
                 JsonArray arr = tcpDoc.as<JsonArray>();
                 for (int i = 0; i < 8 && i < arr.size(); i++) {
                     strlcpy(config.inputTcpCommand[i], arr[i] | "", sizeof(config.inputTcpCommand[i]));
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputTcpDevice", true)) {
+            String tcpJson = request->getParam("inputTcpDevice", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    config.inputTcpDevice[i] = arr[i] | 0;
+                }
+                changed = true;
+            }
+        }
+        if (request->hasParam("inputTcpFunction", true)) {
+            String tcpJson = request->getParam("inputTcpFunction", true)->value();
+            JsonDocument tcpDoc;
+            if (deserializeJson(tcpDoc, tcpJson) == DeserializationError::Ok) {
+                JsonArray arr = tcpDoc.as<JsonArray>();
+                for (int i = 0; i < 8 && i < arr.size(); i++) {
+                    config.inputTcpFunction[i] = arr[i] | 0;
                 }
                 changed = true;
             }
@@ -1122,16 +1198,32 @@ String getConfigJSON() {
         inputRelayMapArr.add(config.inputRelayMap[i]);
     }
 
-    // TCP per Input (prepared)
-    JsonArray inputTcpEnabledArr = doc["inputTcpEnabled"].to<JsonArray>();
+    // TCP per Input
+    JsonArray inputTcpModeArr = doc["inputTcpMode"].to<JsonArray>();
     JsonArray inputTcpHostArr = doc["inputTcpHost"].to<JsonArray>();
     JsonArray inputTcpPortArr = doc["inputTcpPort"].to<JsonArray>();
     JsonArray inputTcpCommandArr = doc["inputTcpCommand"].to<JsonArray>();
+    JsonArray inputTcpDeviceArr = doc["inputTcpDevice"].to<JsonArray>();
+    JsonArray inputTcpFunctionArr = doc["inputTcpFunction"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
-        inputTcpEnabledArr.add(config.inputTcpEnabled[i]);
+        inputTcpModeArr.add(config.inputTcpMode[i]);
         inputTcpHostArr.add(config.inputTcpHost[i]);
         inputTcpPortArr.add(config.inputTcpPort[i]);
         inputTcpCommandArr.add(config.inputTcpCommand[i]);
+        inputTcpDeviceArr.add(config.inputTcpDevice[i]);
+        inputTcpFunctionArr.add(config.inputTcpFunction[i]);
+    }
+
+    // Device presets info for UI
+    JsonArray devicesArr = doc["tcpDevices"].to<JsonArray>();
+    for (int d = 0; d < DEVICE_PRESET_COUNT; d++) {
+        JsonObject dev = devicesArr.add<JsonObject>();
+        dev["name"] = DEVICE_PRESETS[d].name;
+        dev["port"] = DEVICE_PRESETS[d].port;
+        JsonArray funcs = dev["functions"].to<JsonArray>();
+        for (int f = 0; f < DEVICE_PRESETS[d].commandCount; f++) {
+            funcs.add(DEVICE_PRESETS[d].commands[f].name);
+        }
     }
 
     String output;
@@ -1230,11 +1322,11 @@ void loadConfig() {
         }
     }
 
-    // TCP per Input (prepared)
-    if (doc["inputTcpEnabled"].is<JsonArray>()) {
-        JsonArray arr = doc["inputTcpEnabled"].as<JsonArray>();
+    // TCP per Input
+    if (doc["inputTcpMode"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpMode"].as<JsonArray>();
         for (int i = 0; i < 8 && i < arr.size(); i++) {
-            config.inputTcpEnabled[i] = arr[i] | false;
+            config.inputTcpMode[i] = arr[i] | 0;
         }
     }
     if (doc["inputTcpHost"].is<JsonArray>()) {
@@ -1253,6 +1345,18 @@ void loadConfig() {
         JsonArray arr = doc["inputTcpCommand"].as<JsonArray>();
         for (int i = 0; i < 8 && i < arr.size(); i++) {
             strlcpy(config.inputTcpCommand[i], arr[i] | "", sizeof(config.inputTcpCommand[i]));
+        }
+    }
+    if (doc["inputTcpDevice"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpDevice"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            config.inputTcpDevice[i] = arr[i] | 0;
+        }
+    }
+    if (doc["inputTcpFunction"].is<JsonArray>()) {
+        JsonArray arr = doc["inputTcpFunction"].as<JsonArray>();
+        for (int i = 0; i < 8 && i < arr.size(); i++) {
+            config.inputTcpFunction[i] = arr[i] | 0;
         }
     }
 
@@ -1320,16 +1424,20 @@ void saveConfig() {
         inputRelayMapArr.add(config.inputRelayMap[i]);
     }
 
-    // TCP per Input (prepared)
-    JsonArray inputTcpEnabledArr = doc["inputTcpEnabled"].to<JsonArray>();
+    // TCP per Input
+    JsonArray inputTcpModeArr = doc["inputTcpMode"].to<JsonArray>();
     JsonArray inputTcpHostArr = doc["inputTcpHost"].to<JsonArray>();
     JsonArray inputTcpPortArr = doc["inputTcpPort"].to<JsonArray>();
     JsonArray inputTcpCommandArr = doc["inputTcpCommand"].to<JsonArray>();
+    JsonArray inputTcpDeviceArr = doc["inputTcpDevice"].to<JsonArray>();
+    JsonArray inputTcpFunctionArr = doc["inputTcpFunction"].to<JsonArray>();
     for (int i = 0; i < 8; i++) {
-        inputTcpEnabledArr.add(config.inputTcpEnabled[i]);
+        inputTcpModeArr.add(config.inputTcpMode[i]);
         inputTcpHostArr.add(config.inputTcpHost[i]);
         inputTcpPortArr.add(config.inputTcpPort[i]);
         inputTcpCommandArr.add(config.inputTcpCommand[i]);
+        inputTcpDeviceArr.add(config.inputTcpDevice[i]);
+        inputTcpFunctionArr.add(config.inputTcpFunction[i]);
     }
 
     File file = LittleFS.open(CONFIG_FILE, "w");
@@ -1459,7 +1567,7 @@ void setupNTP() {
 }
 
 // ============================================
-// Input-to-Relay Mapping
+// Input-to-Relay Mapping and TCP Commands
 // ============================================
 void processInputMappings() {
     readDigitalInputs();
@@ -1475,6 +1583,11 @@ void processInputMappings() {
                 // Stable for debounce period - accept new state
                 inputDebouncedStates[i] = inputStates[i];
                 inputDebounceTime[i] = 0;
+
+                // Handle TCP command on rising edge (input became active)
+                if (inputDebouncedStates[i] && config.inputTcpMode[i] != 0) {
+                    sendInputTcpCommand(i);
+                }
             }
         } else {
             // Input matches debounced state - reset timer
@@ -1502,6 +1615,118 @@ void processInputMappings() {
             }
         }
         inputControlledRelays = newInputControlled;
+    }
+}
+
+// Helper: Convert HEX string to byte array
+int hexStringToBytes(const char* hexStr, uint8_t* outBytes, int maxLen) {
+    int len = strlen(hexStr);
+    int byteCount = 0;
+
+    for (int i = 0; i < len && byteCount < maxLen; i += 2) {
+        char hexByte[3] = {hexStr[i], hexStr[i + 1], 0};
+        outBytes[byteCount++] = (uint8_t)strtol(hexByte, nullptr, 16);
+    }
+    return byteCount;
+}
+
+// Send TCP command for input (async, fire-and-forget)
+void sendInputTcpCommand(int inputIndex) {
+    if (inputIndex < 0 || inputIndex >= 8) return;
+
+    const char* host = config.inputTcpHost[inputIndex];
+    if (strlen(host) == 0) {
+        Serial.printf("Input %d TCP: No host configured\n", inputIndex + 1);
+        return;
+    }
+
+    uint16_t port;
+    const char* command;
+    bool isHex = false;
+
+    if (config.inputTcpMode[inputIndex] == 1) {
+        // Manual mode
+        port = config.inputTcpPort[inputIndex];
+        command = config.inputTcpCommand[inputIndex];
+        isHex = (strncmp(command, "HEX:", 4) == 0);
+        if (isHex) command += 4;  // Skip "HEX:" prefix
+    } else if (config.inputTcpMode[inputIndex] == 2) {
+        // Preset mode
+        uint8_t deviceIdx = config.inputTcpDevice[inputIndex];
+        uint8_t funcIdx = config.inputTcpFunction[inputIndex];
+
+        if (deviceIdx >= DEVICE_PRESET_COUNT) {
+            Serial.printf("Input %d TCP: Invalid device index\n", inputIndex + 1);
+            return;
+        }
+
+        const DevicePreset& device = DEVICE_PRESETS[deviceIdx];
+        if (funcIdx >= device.commandCount) {
+            Serial.printf("Input %d TCP: Invalid function index\n", inputIndex + 1);
+            return;
+        }
+
+        port = device.port;
+        command = device.commands[funcIdx].command;
+        isHex = (strncmp(command, "HEX:", 4) == 0);
+        if (isHex) command += 4;
+    } else {
+        return;  // Mode 0 = disabled
+    }
+
+    if (port == 0 || strlen(command) == 0) {
+        Serial.printf("Input %d TCP: Invalid port or command\n", inputIndex + 1);
+        return;
+    }
+
+    Serial.printf("Input %d TCP: Sending to %s:%d\n", inputIndex + 1, host, port);
+
+    // Create async client for fire-and-forget
+    AsyncClient* client = new AsyncClient();
+
+    // Prepare command data
+    static uint8_t cmdBuffer[128];
+    int cmdLen;
+
+    if (isHex) {
+        cmdLen = hexStringToBytes(command, cmdBuffer, sizeof(cmdBuffer));
+    } else {
+        cmdLen = strlen(command);
+        memcpy(cmdBuffer, command, cmdLen);
+    }
+
+    // Store command info for callback (simple approach using static for last command)
+    static uint8_t lastCmdBuffer[128];
+    static int lastCmdLen;
+    memcpy(lastCmdBuffer, cmdBuffer, cmdLen);
+    lastCmdLen = cmdLen;
+
+    client->onConnect([](void* arg, AsyncClient* c) {
+        Serial.println("TCP Input: Connected, sending command");
+        c->write((char*)lastCmdBuffer, lastCmdLen);
+        // Close after short delay to ensure data is sent
+        c->close(true);
+    }, nullptr);
+
+    client->onDisconnect([](void* arg, AsyncClient* c) {
+        Serial.println("TCP Input: Disconnected");
+        delete c;
+    }, nullptr);
+
+    client->onError([](void* arg, AsyncClient* c, int8_t error) {
+        Serial.printf("TCP Input: Error %d\n", error);
+        delete c;
+    }, nullptr);
+
+    client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
+        Serial.println("TCP Input: Timeout");
+        c->close(true);
+    }, nullptr);
+
+    // Connect (async)
+    if (!client->connect(host, port)) {
+        Serial.printf("TCP Input: Connect to %s:%d failed\n", host, port);
+        delete client;
     }
 }
 

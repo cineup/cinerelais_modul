@@ -988,22 +988,35 @@
             color: var(--accent);
         }
 
-        .tcp-config {
+        .tcp-mode-select {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-dark);
+            color: var(--text);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            width: 100%;
+        }
+
+        .tcp-mode-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .tcp-config-manual,
+        .tcp-config-preset {
             display: flex;
             gap: 0.5rem;
             align-items: center;
             flex-wrap: wrap;
-            opacity: 0.5;
-            pointer-events: none;
+            margin-top: 0.5rem;
         }
 
-        .tcp-config.enabled {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .tcp-config input[type="text"],
-        .tcp-config input[type="number"] {
+        .tcp-config-manual input[type="text"],
+        .tcp-config-manual input[type="number"],
+        .tcp-config-preset input[type="text"],
+        .tcp-config-preset select {
             padding: 0.5rem 0.75rem;
             border: 1px solid var(--border);
             border-radius: 6px;
@@ -1013,8 +1026,9 @@
             font-size: 0.85rem;
         }
 
-        .tcp-config input[type="text"]:focus,
-        .tcp-config input[type="number"]:focus {
+        .tcp-config-manual input:focus,
+        .tcp-config-preset input:focus,
+        .tcp-config-preset select:focus {
             outline: none;
             border-color: var(--accent);
         }
@@ -1030,6 +1044,15 @@
         .tcp-cmd-input {
             flex: 1;
             min-width: 100px;
+        }
+
+        .tcp-device-select {
+            min-width: 120px;
+        }
+
+        .tcp-function-select {
+            min-width: 100px;
+            flex: 1;
         }
 
         .tcp-separator {
@@ -1053,14 +1076,22 @@
                 font-size: 0.8rem;
             }
 
-            .tcp-config {
+            .tcp-config-manual,
+            .tcp-config-preset {
                 flex-direction: column;
                 align-items: stretch;
             }
 
             .tcp-host-input,
             .tcp-port-input,
-            .tcp-cmd-input {
+            .tcp-cmd-input,
+            .tcp-device-select,
+            .tcp-function-select {
+                width: 100%;
+                min-width: unset;
+            }
+
+            .tcp-mode-select {
                 width: 100%;
             }
         }
@@ -1765,10 +1796,15 @@
 
         // Input-to-Relay mapping state
         let inputRelayMap = [0, 0, 0, 0, 0, 0, 0, 0];
-        let inputTcpEnabled = [false, false, false, false, false, false, false, false];
+        // TCP per Input: mode 0=disabled, 1=manual, 2=preset
+        let inputTcpMode = [0, 0, 0, 0, 0, 0, 0, 0];
         let inputTcpHost = ['', '', '', '', '', '', '', ''];
         let inputTcpPort = [0, 0, 0, 0, 0, 0, 0, 0];
         let inputTcpCommand = ['', '', '', '', '', '', '', ''];
+        let inputTcpDevice = [0, 0, 0, 0, 0, 0, 0, 0];
+        let inputTcpFunction = [0, 0, 0, 0, 0, 0, 0, 0];
+        // Device presets (loaded from API)
+        let tcpDevices = [];
 
         // Tab switching
         function switchTab(tabName) {
@@ -2130,8 +2166,9 @@
                 if (data.inputRelayMap) {
                     inputRelayMap = data.inputRelayMap;
                 }
-                if (data.inputTcpEnabled) {
-                    inputTcpEnabled = data.inputTcpEnabled;
+                // TCP per Input
+                if (data.inputTcpMode) {
+                    inputTcpMode = data.inputTcpMode;
                 }
                 if (data.inputTcpHost) {
                     inputTcpHost = data.inputTcpHost;
@@ -2141,6 +2178,16 @@
                 }
                 if (data.inputTcpCommand) {
                     inputTcpCommand = data.inputTcpCommand;
+                }
+                if (data.inputTcpDevice) {
+                    inputTcpDevice = data.inputTcpDevice;
+                }
+                if (data.inputTcpFunction) {
+                    inputTcpFunction = data.inputTcpFunction;
+                }
+                // Device presets
+                if (data.tcpDevices) {
+                    tcpDevices = data.tcpDevices;
                 }
                 buildInputActionList();
 
@@ -2486,19 +2533,34 @@
                             </div>
                         </div>
                         <div class="action-section">
-                            <label class="action-label">
-                                <input type="checkbox" id="tcp-enabled-${i}" ${inputTcpEnabled[i-1] ? 'checked' : ''}
-                                       onchange="toggleTcpConfig(${i})" disabled>
-                                TCP Befehl senden (in Vorbereitung):
-                            </label>
-                            <div class="tcp-config ${inputTcpEnabled[i-1] ? 'enabled' : ''}" id="tcp-config-${i}">
+                            <label class="action-label">TCP Befehl senden:</label>
+                            <select class="tcp-mode-select" id="tcp-mode-${i}" onchange="updateTcpMode(${i})">
+                                <option value="0" ${inputTcpMode[i-1] === 0 ? 'selected' : ''}>Deaktiviert</option>
+                                <option value="1" ${inputTcpMode[i-1] === 1 ? 'selected' : ''}>Manuell (IP/Port/Befehl)</option>
+                                <option value="2" ${inputTcpMode[i-1] === 2 ? 'selected' : ''}>Geraete-Vorlage</option>
+                            </select>
+
+                            <!-- Manual mode -->
+                            <div class="tcp-config-manual" id="tcp-manual-${i}" style="display: ${inputTcpMode[i-1] === 1 ? 'flex' : 'none'};">
                                 <input type="text" class="tcp-host-input" id="tcp-host-${i}"
-                                       placeholder="192.168.1.x" value="${inputTcpHost[i-1] || ''}" disabled>
+                                       placeholder="192.168.1.x" value="${inputTcpHost[i-1] || ''}">
                                 <span class="tcp-separator">:</span>
                                 <input type="number" class="tcp-port-input" id="tcp-port-${i}"
-                                       placeholder="5000" value="${inputTcpPort[i-1] || ''}" disabled>
+                                       placeholder="5000" value="${inputTcpPort[i-1] || ''}">
                                 <input type="text" class="tcp-cmd-input" id="tcp-cmd-${i}"
-                                       placeholder="r1_on" value="${inputTcpCommand[i-1] || ''}" disabled>
+                                       placeholder="r1_on oder HEX:060e..." value="${inputTcpCommand[i-1] || ''}">
+                            </div>
+
+                            <!-- Preset mode -->
+                            <div class="tcp-config-preset" id="tcp-preset-${i}" style="display: ${inputTcpMode[i-1] === 2 ? 'flex' : 'none'};">
+                                <input type="text" class="tcp-host-input" id="tcp-preset-host-${i}"
+                                       placeholder="192.168.1.x" value="${inputTcpHost[i-1] || ''}">
+                                <select class="tcp-device-select" id="tcp-device-${i}" onchange="updateDeviceFunctions(${i})">
+                                    ${buildDeviceOptions(i)}
+                                </select>
+                                <select class="tcp-function-select" id="tcp-function-${i}">
+                                    ${buildFunctionOptions(i)}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -2506,6 +2568,56 @@
 
                 list.appendChild(row);
             }
+        }
+
+        function buildDeviceOptions(inputNum) {
+            let html = '';
+            for (let d = 0; d < tcpDevices.length; d++) {
+                const selected = inputTcpDevice[inputNum - 1] === d ? 'selected' : '';
+                html += `<option value="${d}" ${selected}>${tcpDevices[d].name}</option>`;
+            }
+            return html || '<option value="0">Keine Geraete</option>';
+        }
+
+        function buildFunctionOptions(inputNum) {
+            const deviceIdx = inputTcpDevice[inputNum - 1];
+            if (deviceIdx >= tcpDevices.length) return '<option value="0">-</option>';
+
+            const device = tcpDevices[deviceIdx];
+            let html = '';
+            for (let f = 0; f < device.functions.length; f++) {
+                const selected = inputTcpFunction[inputNum - 1] === f ? 'selected' : '';
+                html += `<option value="${f}" ${selected}>${device.functions[f]}</option>`;
+            }
+            return html || '<option value="0">-</option>';
+        }
+
+        function updateTcpMode(inputNum) {
+            const mode = parseInt(document.getElementById(`tcp-mode-${inputNum}`).value);
+            inputTcpMode[inputNum - 1] = mode;
+
+            document.getElementById(`tcp-manual-${inputNum}`).style.display = mode === 1 ? 'flex' : 'none';
+            document.getElementById(`tcp-preset-${inputNum}`).style.display = mode === 2 ? 'flex' : 'none';
+
+            updateInputSummary(inputNum);
+        }
+
+        function updateDeviceFunctions(inputNum) {
+            const deviceIdx = parseInt(document.getElementById(`tcp-device-${inputNum}`).value);
+            inputTcpDevice[inputNum - 1] = deviceIdx;
+
+            const funcSelect = document.getElementById(`tcp-function-${inputNum}`);
+            funcSelect.innerHTML = buildFunctionOptions(inputNum);
+            inputTcpFunction[inputNum - 1] = 0;  // Reset to first function
+
+            updateInputSummary(inputNum);
+        }
+
+        function updateInputSummary(inputNum) {
+            const summary = getInputActionSummary(inputNum);
+            const summaryEl = document.getElementById(`input-summary-${inputNum}`);
+            summaryEl.textContent = summary || '-';
+            summaryEl.className = `input-action-summary ${summary ? 'has-mapping' : ''}`;
         }
 
         function buildRelayCheckboxes(inputNum) {
@@ -2545,47 +2657,64 @@
                 label.classList.remove('checked');
             }
 
-            // Update summary
-            const summary = getInputActionSummary(inputNum);
-            const summaryEl = document.getElementById(`input-summary-${inputNum}`);
-            summaryEl.textContent = summary || '-';
-            summaryEl.className = `input-action-summary ${summary ? 'has-mapping' : ''}`;
+            updateInputSummary(inputNum);
         }
 
         function getInputActionSummary(inputNum) {
-            const map = inputRelayMap[inputNum - 1];
-            if (map === 0) return '';
+            const parts = [];
 
-            const relays = [];
-            for (let r = 1; r <= 8; r++) {
-                if (map & (1 << (r - 1))) {
-                    relays.push(`R${r}`);
+            // Relay mapping
+            const map = inputRelayMap[inputNum - 1];
+            if (map !== 0) {
+                const relays = [];
+                for (let r = 1; r <= 8; r++) {
+                    if (map & (1 << (r - 1))) {
+                        relays.push(`R${r}`);
+                    }
+                }
+                parts.push('→ ' + relays.join(', '));
+            }
+
+            // TCP command
+            const mode = inputTcpMode[inputNum - 1];
+            if (mode === 1) {
+                parts.push('TCP:Manuell');
+            } else if (mode === 2 && tcpDevices.length > 0) {
+                const deviceIdx = inputTcpDevice[inputNum - 1];
+                if (deviceIdx < tcpDevices.length) {
+                    parts.push('TCP:' + tcpDevices[deviceIdx].name);
                 }
             }
-            return '→ ' + relays.join(', ');
-        }
 
-        function toggleTcpConfig(inputNum) {
-            const enabled = document.getElementById(`tcp-enabled-${inputNum}`).checked;
-            inputTcpEnabled[inputNum - 1] = enabled;
-            document.getElementById(`tcp-config-${inputNum}`).className =
-                `tcp-config ${enabled ? 'enabled' : ''}`;
+            return parts.join(' | ');
         }
 
         async function saveInputActionsConfig() {
-            // Read TCP values from form (for future use)
+            // Read TCP values from form
             for (let i = 1; i <= 8; i++) {
-                inputTcpHost[i - 1] = document.getElementById(`tcp-host-${i}`).value;
-                inputTcpPort[i - 1] = parseInt(document.getElementById(`tcp-port-${i}`).value) || 0;
-                inputTcpCommand[i - 1] = document.getElementById(`tcp-cmd-${i}`).value;
+                const mode = inputTcpMode[i - 1];
+
+                if (mode === 1) {
+                    // Manual mode
+                    inputTcpHost[i - 1] = document.getElementById(`tcp-host-${i}`).value;
+                    inputTcpPort[i - 1] = parseInt(document.getElementById(`tcp-port-${i}`).value) || 0;
+                    inputTcpCommand[i - 1] = document.getElementById(`tcp-cmd-${i}`).value;
+                } else if (mode === 2) {
+                    // Preset mode
+                    inputTcpHost[i - 1] = document.getElementById(`tcp-preset-host-${i}`).value;
+                    inputTcpDevice[i - 1] = parseInt(document.getElementById(`tcp-device-${i}`).value) || 0;
+                    inputTcpFunction[i - 1] = parseInt(document.getElementById(`tcp-function-${i}`).value) || 0;
+                }
             }
 
             const formData = new FormData();
             formData.append('inputRelayMap', JSON.stringify(inputRelayMap));
-            formData.append('inputTcpEnabled', JSON.stringify(inputTcpEnabled));
+            formData.append('inputTcpMode', JSON.stringify(inputTcpMode));
             formData.append('inputTcpHost', JSON.stringify(inputTcpHost));
             formData.append('inputTcpPort', JSON.stringify(inputTcpPort));
             formData.append('inputTcpCommand', JSON.stringify(inputTcpCommand));
+            formData.append('inputTcpDevice', JSON.stringify(inputTcpDevice));
+            formData.append('inputTcpFunction', JSON.stringify(inputTcpFunction));
 
             try {
                 const response = await fetch('/api/config', {
