@@ -4,6 +4,8 @@
 
 Firmware for the Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO module with web interface, TCP control, WiFi support and OTA updates.
 
+![CineRelais Web Interface](docs/screenshot.png)
+
 ## Features
 
 - **Ethernet (W5500)** with DHCP or static IP
@@ -13,8 +15,11 @@ Firmware for the Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO modul
 - **OTA firmware updates** via web interface
 - **8 Digital inputs** (optocoupler-isolated)
 - **8 Relay outputs** via TCA9554 I2C expander
+- **Input→Relay mapping** — inputs can directly control relays (hall control)
+- **Modbus RS485** — support for external relay modules
+- **Custom labels** for relays and inputs
 - **RGB status LED** (WS2812) showing network and activity status
-- **NTP time synchronization** with configurable server
+- **NTP time synchronization** with configurable timezone
 - **Command log** (last 50 commands with timestamp)
 
 ## Installation
@@ -117,13 +122,16 @@ After startup, the web interface is available at:
 - **WiFi STA**: IP from DHCP or configured static IP
 
 **Features:**
-- Toggle relays on/off (click)
-- Pulse relays (right-click)
+- Toggle relays on/off (click) or pulse (right-click)
+- Pulse mode: all clicks trigger pulses
 - Control all relays at once
+- Custom labels for relays and inputs
+- Input→Relay mapping for hall control (500ms debounce)
+- Modbus RS485 for external relay modules
 - Ethernet configuration (DHCP/static IP)
 - WiFi configuration (AP/STA, DHCP/static IP)
-- Set TCP port and pulse duration
-- System information (Ethernet/WiFi status, TCA9554)
+- NTP timezone selection via dropdown
+- System information (hardware, network, uptime)
 - OTA firmware update
 
 ### TCP Commands
@@ -160,6 +168,38 @@ all_off
 
 # Query status
 status
+```
+
+### Input→Relay Mapping (Hall Control)
+
+Inputs can be configured to control specific relays — ideal for cinema hall control buttons:
+
+- Configure in web interface under **Settings → Input→Actions**
+- Multiple relays can be selected per input (checkboxes)
+- Relays are active as long as the input is active
+- **500ms debounce** prevents flickering from noisy signals
+- Changes take effect immediately (no restart required)
+
+**Example use case:**
+- Input 1 (Hall button "Lights On") → Relay 1 + 2
+- Input 2 (Hall button "Lights Off") → no assignment
+- Input 3 (Curtain button) → Relay 5
+
+### Modbus RS485
+
+External relay modules can be controlled via Modbus RTU (RS485):
+
+- **Connection:** TX=GPIO17, RX=GPIO18
+- **Baud rate:** 9600
+- **Address range:** 1-247 (automatic scan available)
+- **Supported modules:** 6 or 8 relays
+
+TCP commands for Modbus relays:
+```bash
+m1_r1_on        # Turn Modbus relay 1 on
+m1_r3_pulse     # Pulse Modbus relay 3
+m1_all_off      # Turn all Modbus relays off
+modbus_scan     # Scan for Modbus device
 ```
 
 ### OTA Updates

@@ -4,6 +4,8 @@
 
 Firmware für das Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO Modul mit Web-Interface, TCP-Steuerung, WiFi-Support und OTA-Updates.
 
+![CineRelais Web-Interface](docs/screenshot.png)
+
 ## Features
 
 - **Ethernet (W5500)** mit DHCP oder statischer IP
@@ -13,8 +15,11 @@ Firmware für das Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO Modu
 - **OTA-Firmware-Updates** über das Web-Interface
 - **8 Digitale Eingänge** (optokoppler-isoliert)
 - **8 Relaisausgänge** via TCA9554 I2C-Expander
+- **Input→Relais Mapping** — Eingänge können Relais direkt steuern (Saal-Steuerung)
+- **Modbus RS485** — Unterstützung für externe Relais-Module
+- **Benutzerdefinierte Labels** für Relais und Eingänge
 - **RGB Status-LED** (WS2812) mit Netzwerk- und Aktivitätsanzeige
-- **NTP-Zeitsynchronisation** mit konfigurierbarem Server
+- **NTP-Zeitsynchronisation** mit konfigurierbarer Zeitzone
 - **Befehlsprotokoll** (letzte 50 Befehle mit Zeitstempel)
 
 ## Installation
@@ -117,13 +122,16 @@ Nach dem Start ist das Web-Interface erreichbar:
 - **WiFi STA**: IP aus DHCP oder konfigurierte statische IP
 
 **Funktionen:**
-- Relais ein-/ausschalten (Klick)
-- Relais pulsen (Rechtsklick)
+- Relais ein-/ausschalten (Klick) oder pulsen (Rechtsklick)
+- Impuls-Modus: Alle Klicks lösen Impulse aus
 - Alle Relais gleichzeitig steuern
+- Benutzerdefinierte Labels für Relais und Eingänge
+- Input→Relais Mapping für Saal-Steuerung (500ms Entprellung)
+- Modbus RS485 für externe Relais-Module
 - Ethernet-Konfiguration (DHCP/statische IP)
 - WiFi-Konfiguration (AP/STA, DHCP/statische IP)
-- TCP-Port und Impulsdauer einstellen
-- System-Informationen (Ethernet/WiFi Status, TCA9554)
+- NTP-Zeitzone per Dropdown auswählen
+- System-Informationen (Hardware, Netzwerk, Uptime)
 - OTA-Firmware-Update
 
 ### TCP-Befehle
@@ -160,6 +168,38 @@ all_off
 
 # Status abfragen
 status
+```
+
+### Input→Relais Mapping (Saal-Steuerung)
+
+Eingänge können so konfiguriert werden, dass sie bestimmte Relais steuern — ideal für Saal-Steuer-Taster im Kino:
+
+- Im Web-Interface unter **Einstellungen → Input→Aktionen** konfigurieren
+- Pro Eingang mehrere Relais auswählbar (Checkbox)
+- Relais sind aktiv, solange der Eingang aktiv ist
+- **500ms Entprellung** verhindert Flattern bei verrauschten Signalen
+- Änderungen werden sofort wirksam (kein Neustart nötig)
+
+**Anwendungsbeispiel:**
+- Input 1 (Saal-Taster "Licht An") → Relais 1 + 2
+- Input 2 (Saal-Taster "Licht Aus") → keine Zuweisung
+- Input 3 (Vorhang-Taster) → Relais 5
+
+### Modbus RS485
+
+Externe Relais-Module können über Modbus RTU (RS485) angesteuert werden:
+
+- **Anschluss:** TX=GPIO17, RX=GPIO18
+- **Baudrate:** 9600
+- **Adressbereich:** 1-247 (automatischer Scan möglich)
+- **Unterstützte Module:** 6 oder 8 Relais
+
+TCP-Befehle für Modbus-Relais:
+```bash
+m1_r1_on        # Modbus Relais 1 einschalten
+m1_r3_pulse     # Modbus Relais 3 pulsen
+m1_all_off      # Alle Modbus-Relais ausschalten
+modbus_scan     # Nach Modbus-Gerät suchen
 ```
 
 ### OTA-Updates
