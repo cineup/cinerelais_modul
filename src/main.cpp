@@ -1797,9 +1797,9 @@ void sendInputTcpCommand(int inputIndex) {
     Serial.printf("Input %d TCP: Sending to %s:%d\n", inputIndex + 1, host, port);
 
     // Log outgoing TCP command
-    char logTarget[48];
+    static char lastLogTarget[48];
     char logCmd[64];
-    snprintf(logTarget, sizeof(logTarget), "%s:%d", host, port);
+    snprintf(lastLogTarget, sizeof(lastLogTarget), "%s:%d", host, port);
     if (config.inputTcpMode[inputIndex] == 2) {
         // Preset mode - show device and function name
         uint8_t deviceIdx = config.inputTcpDevice[inputIndex];
@@ -1812,7 +1812,7 @@ void sendInputTcpCommand(int inputIndex) {
     } else {
         strlcpy(logCmd, command, sizeof(logCmd));
     }
-    addLogEntry(logTarget, logCmd, "OUT");
+    addLogEntry(lastLogTarget, logCmd, "OUT");
 
     // Create async client for fire-and-forget
     AsyncClient* client = new AsyncClient();
@@ -1837,7 +1837,21 @@ void sendInputTcpCommand(int inputIndex) {
     client->onConnect([](void* arg, AsyncClient* c) {
         Serial.println("TCP Input: Connected, sending command");
         c->write((char*)lastCmdBuffer, lastCmdLen);
-        // Close after short delay to ensure data is sent
+        // Don't close immediately - wait for response
+    }, nullptr);
+
+    client->onData([](void* arg, AsyncClient* c, void* data, size_t len) {
+        // Log incoming response
+        char response[65];
+        size_t copyLen = len < 64 ? len : 64;
+        memcpy(response, data, copyLen);
+        response[copyLen] = '\0';
+        // Clean up non-printable characters for log
+        for (size_t i = 0; i < copyLen; i++) {
+            if (response[i] < 32 || response[i] > 126) response[i] = '.';
+        }
+        Serial.printf("TCP Input: Response: %s\n", response);
+        addLogEntry(lastLogTarget, response, "IN");
         c->close(true);
     }, nullptr);
 
@@ -1852,9 +1866,11 @@ void sendInputTcpCommand(int inputIndex) {
     }, nullptr);
 
     client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
-        Serial.println("TCP Input: Timeout");
+        Serial.println("TCP Input: Timeout (no response)");
         c->close(true);
     }, nullptr);
+
+    client->setRxTimeout(2);  // 2 second timeout for response
 
     // Connect (async)
     if (!client->connect(host, port)) {
