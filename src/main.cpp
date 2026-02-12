@@ -21,6 +21,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <ModbusMaster.h>
 #include <vector>
+#include <esp_netif.h>
 
 // ============================================
 // Hardware Pins
@@ -1061,10 +1062,26 @@ String getStatusJSON() {
     doc["ethEnabled"] = config.ethEnabled;
     doc["ethConnected"] = ethConnected;
 #ifndef ETHERNET_DISABLED
-    doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
-    doc["ethGateway"] = ethConnected ? ETH.gatewayIP().toString() : "";
-    doc["ethSubnet"] = ethConnected ? ETH.subnetMask().toString() : "";
     doc["ethMAC"] = ETH.linkUp() ? ETH.macAddress() : "";
+    if (ethConnected) {
+        // Use ESP-IDF netif API to get correct IP info (fixes DHCP gateway/subnet issue)
+        esp_netif_ip_info_t ip_info;
+        esp_netif_t* eth_netif = esp_netif_get_handle_from_ifkey("ETH_DEF");
+        if (eth_netif && esp_netif_get_ip_info(eth_netif, &ip_info) == ESP_OK) {
+            doc["ethIP"] = IPAddress(ip_info.ip.addr).toString();
+            doc["ethGateway"] = IPAddress(ip_info.gw.addr).toString();
+            doc["ethSubnet"] = IPAddress(ip_info.netmask.addr).toString();
+        } else {
+            // Fallback to ETH class methods
+            doc["ethIP"] = ETH.localIP().toString();
+            doc["ethGateway"] = ETH.gatewayIP().toString();
+            doc["ethSubnet"] = ETH.subnetMask().toString();
+        }
+    } else {
+        doc["ethIP"] = "";
+        doc["ethGateway"] = "";
+        doc["ethSubnet"] = "";
+    }
 #else
     doc["ethIP"] = "";
     doc["ethGateway"] = "";
@@ -1076,9 +1093,25 @@ String getStatusJSON() {
     doc["wifiEnabled"] = config.wifiEnabled;
     doc["wifiSSID"] = config.wifiSSID;
     doc["wifiSTAConnected"] = wifiSTAConnected;
-    doc["wifiSTAIP"] = wifiSTAConnected ? WiFi.localIP().toString() : "";
-    doc["wifiGateway"] = wifiSTAConnected ? WiFi.gatewayIP().toString() : "";
-    doc["wifiSubnet"] = wifiSTAConnected ? WiFi.subnetMask().toString() : "";
+    if (wifiSTAConnected) {
+        // Use ESP-IDF netif API for WiFi STA (consistent with Ethernet fix)
+        esp_netif_ip_info_t wifi_ip_info;
+        esp_netif_t* wifi_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        if (wifi_netif && esp_netif_get_ip_info(wifi_netif, &wifi_ip_info) == ESP_OK) {
+            doc["wifiSTAIP"] = IPAddress(wifi_ip_info.ip.addr).toString();
+            doc["wifiGateway"] = IPAddress(wifi_ip_info.gw.addr).toString();
+            doc["wifiSubnet"] = IPAddress(wifi_ip_info.netmask.addr).toString();
+        } else {
+            // Fallback to WiFi class methods
+            doc["wifiSTAIP"] = WiFi.localIP().toString();
+            doc["wifiGateway"] = WiFi.gatewayIP().toString();
+            doc["wifiSubnet"] = WiFi.subnetMask().toString();
+        }
+    } else {
+        doc["wifiSTAIP"] = "";
+        doc["wifiGateway"] = "";
+        doc["wifiSubnet"] = "";
+    }
     doc["wifiRSSI"] = wifiSTAConnected ? WiFi.RSSI() : 0;
     doc["wifiAPActive"] = wifiAPActive;
     doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";
