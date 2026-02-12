@@ -243,6 +243,41 @@ bool modbusPulseActive[8] = {false};
 // NTP
 bool ntpSynced = false;
 
+// Command Log (circular buffer, newest first)
+struct LogEntry {
+    char timestamp[20];   // "DD.MM.YYYY HH:MM:SS" or uptime
+    char source[32];      // IP address or "Modbus"
+    char command[64];     // Command text
+    char direction[4];    // "IN" or "OUT"
+};
+const int MAX_LOG_ENTRIES = 50;
+LogEntry commandLog[MAX_LOG_ENTRIES];
+int logIndex = 0;
+int logCount = 0;
+
+void addLogEntry(const char* source, const char* command, const char* direction) {
+    LogEntry& entry = commandLog[logIndex];
+
+    // Timestamp
+    if (ntpSynced) {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo, 0)) {
+            strftime(entry.timestamp, sizeof(entry.timestamp), "%d.%m.%Y %H:%M:%S", &timeinfo);
+        } else {
+            snprintf(entry.timestamp, sizeof(entry.timestamp), "Uptime: %lus", millis() / 1000);
+        }
+    } else {
+        snprintf(entry.timestamp, sizeof(entry.timestamp), "Uptime: %lus", millis() / 1000);
+    }
+
+    strlcpy(entry.source, source, sizeof(entry.source));
+    strlcpy(entry.command, command, sizeof(entry.command));
+    strlcpy(entry.direction, direction, sizeof(entry.direction));
+
+    logIndex = (logIndex + 1) % MAX_LOG_ENTRIES;
+    if (logCount < MAX_LOG_ENTRIES) logCount++;
+}
+
 // Input-to-Relay Mapping
 uint8_t inputControlledRelays = 0;  // Bitmask of relays controlled by inputs
 bool inputDebouncedStates[8] = {false};  // Debounced input states
@@ -641,6 +676,19 @@ void setup() {
             return;
         }
 
+        // Log Web API command
+        char logCmd[32];
+        if (state == "pulse") {
+            uint16_t duration = config.pulseDuration;
+            if (request->hasParam("duration", true)) {
+                duration = request->getParam("duration", true)->value().toInt();
+            }
+            snprintf(logCmd, sizeof(logCmd), "r%d_pulse_%d", relay, duration);
+        } else {
+            snprintf(logCmd, sizeof(logCmd), "r%d_%s", relay, state.c_str());
+        }
+        addLogEntry(request->client()->remoteIP().toString().c_str(), logCmd, "IN");
+
         if (state == "on") {
             setRelay(relay, true);
         } else if (state == "off") {
@@ -665,6 +713,19 @@ void setup() {
         }
 
         String state = request->getParam("state", true)->value();
+
+        // Log Web API command
+        char logCmd[32];
+        if (state == "pulse") {
+            uint16_t duration = config.pulseDuration;
+            if (request->hasParam("duration", true)) {
+                duration = request->getParam("duration", true)->value().toInt();
+            }
+            snprintf(logCmd, sizeof(logCmd), "all_pulse_%d", duration);
+        } else {
+            snprintf(logCmd, sizeof(logCmd), "all_%s", state.c_str());
+        }
+        addLogEntry(request->client()->remoteIP().toString().c_str(), logCmd, "IN");
 
         if (state == "on") {
             setAllRelays(true);
@@ -783,9 +844,24 @@ void setup() {
         ESP.restart();
     });
 
-    // API: Log (stub - returns empty for now)
+    // API: Command Log (newest first)
     webServer->on("/api/log", HTTP_GET, [](AsyncWebServerRequest *request){
-        request->send(200, "application/json", "[]");
+        JsonDocument doc;
+        JsonArray arr = doc.to<JsonArray>();
+
+        // Return entries newest first
+        for (int i = 0; i < logCount; i++) {
+            int idx = (logIndex - 1 - i + MAX_LOG_ENTRIES) % MAX_LOG_ENTRIES;
+            JsonObject entry = arr.add<JsonObject>();
+            entry["time"] = commandLog[idx].timestamp;
+            entry["source"] = commandLog[idx].source;
+            entry["command"] = commandLog[idx].command;
+            entry["direction"] = commandLog[idx].direction;
+        }
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
     });
 
     // Serve static files
@@ -1720,6 +1796,24 @@ void sendInputTcpCommand(int inputIndex) {
 
     Serial.printf("Input %d TCP: Sending to %s:%d\n", inputIndex + 1, host, port);
 
+    // Log outgoing TCP command
+    char logTarget[48];
+    char logCmd[64];
+    snprintf(logTarget, sizeof(logTarget), "%s:%d", host, port);
+    if (config.inputTcpMode[inputIndex] == 2) {
+        // Preset mode - show device and function name
+        uint8_t deviceIdx = config.inputTcpDevice[inputIndex];
+        uint8_t funcIdx = config.inputTcpFunction[inputIndex];
+        snprintf(logCmd, sizeof(logCmd), "%s: %s",
+                 DEVICE_PRESETS[deviceIdx].name,
+                 DEVICE_PRESETS[deviceIdx].commands[funcIdx].name);
+    } else if (isHex) {
+        snprintf(logCmd, sizeof(logCmd), "HEX (%d bytes)", (int)strlen(command) / 2);
+    } else {
+        strlcpy(logCmd, command, sizeof(logCmd));
+    }
+    addLogEntry(logTarget, logCmd, "OUT");
+
     // Create async client for fire-and-forget
     AsyncClient* client = new AsyncClient();
 
@@ -1815,6 +1909,14 @@ bool modbusSetRelay(int relay, bool state) {
         modbusRelayStates[relay - 1] = state;
         modbusConnected = true;
         Serial.printf("Modbus Relay %d: %s\n", relay, state ? "ON" : "OFF");
+
+        // Log Modbus command
+        char logCmd[32];
+        snprintf(logCmd, sizeof(logCmd), "mr%d_%s", relay, state ? "on" : "off");
+        char logSource[32];
+        snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
+        addLogEntry(logSource, logCmd, "OUT");
+
         return true;
     } else {
         modbusConnected = false;
@@ -1937,6 +2039,8 @@ void setupTcpServer() {
                 String response = processCommand(cmd);
                 if (cmd != "status" && cmd != "help") {
                     flashEventLED();
+                    // Log incoming TCP command
+                    addLogEntry(c->remoteIP().toString().c_str(), cmd.c_str(), "IN");
                 }
                 if (c->connected()) {
                     c->write((response + "\n").c_str());

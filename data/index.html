@@ -1199,12 +1199,13 @@
                             <thead>
                                 <tr>
                                     <th>Zeit</th>
+                                    <th></th>
                                     <th>Quelle</th>
                                     <th>Befehl</th>
                                 </tr>
                             </thead>
                             <tbody id="log-table">
-                                <tr><td colspan="3" style="text-align: center; color: var(--text-dim); padding: 1rem;">Keine Eintraege</td></tr>
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 1rem;">Keine Eintraege</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2962,17 +2963,24 @@
                 const tbody = document.getElementById('log-table');
 
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = data.map(entry => `
+                tbody.innerHTML = data.map(entry => {
+                    const isOut = entry.direction === 'OUT';
+                    const arrow = isOut ? '&rarr;' : '&larr;';
+                    const arrowColor = isOut ? 'var(--warning)' : 'var(--info)';
+                    const cmdColor = isOut ? 'var(--warning)' : 'var(--accent)';
+                    return `
                     <tr>
                         <td style="color: var(--text-dim);">${entry.time}</td>
+                        <td style="color: ${arrowColor}; font-weight: bold;">${arrow}</td>
                         <td>${entry.source}</td>
-                        <td style="color: var(--accent);">${entry.command}</td>
+                        <td style="color: ${cmdColor};">${entry.command}</td>
                     </tr>
-                `).join('');
+                    `;
+                }).join('');
             } catch (error) {
                 console.error('Log load failed:', error);
             }
