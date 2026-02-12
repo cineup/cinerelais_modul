@@ -600,19 +600,19 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.6rem 0.75rem;
+            padding: 0.75rem 1rem;
             background: var(--bg-dark);
             border-radius: 8px;
         }
 
         .info-label {
             color: var(--text-dim);
-            font-size: 0.85rem;
+            font-size: 0.875rem;
         }
 
         .info-value {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-size: 0.875rem;
         }
 
         .status-badge {
@@ -713,29 +713,29 @@
         .label-input {
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
             background: var(--bg-dark);
             border-radius: 8px;
-            padding: 0.4rem;
+            padding: 0.5rem;
         }
 
         .label-num {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             color: var(--text-dim);
-            min-width: 1.2rem;
+            min-width: 1.25rem;
             text-align: center;
         }
 
         .label-input input {
             flex: 1;
-            padding: 0.4rem 0.5rem;
+            padding: 0.5rem 0.75rem;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             background: var(--bg-card);
             color: var(--text);
-            font-size: 0.8rem;
+            font-size: 0.875rem;
             min-width: 0;
         }
 
@@ -873,7 +873,7 @@
 
         .input-action-row {
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: 12px;
             overflow: hidden;
             background: var(--bg-dark);
         }
@@ -881,7 +881,7 @@
         .input-action-header {
             display: flex;
             align-items: center;
-            padding: 0.75rem 1rem;
+            padding: 0.875rem 1rem;
             cursor: pointer;
             transition: background 0.15s ease;
             gap: 0.75rem;
@@ -901,7 +901,7 @@
 
         .input-action-name {
             flex: 1;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             color: var(--text);
         }
 
@@ -917,7 +917,7 @@
 
         .expand-icon {
             color: var(--text-dim);
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             transition: transform 0.2s ease;
         }
 
@@ -927,8 +927,7 @@
 
         .input-action-content {
             display: none;
-            padding: 1rem;
-            padding-top: 0.5rem;
+            padding: 1.25rem;
             border-top: 1px solid var(--border);
             background: var(--bg-card);
         }
@@ -946,10 +945,8 @@
         }
 
         .action-label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
+            display: block;
+            font-size: 0.875rem;
             color: var(--text-dim);
             margin-bottom: 0.5rem;
         }
@@ -963,15 +960,15 @@
         .relay-checkbox {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
-            padding: 0.4rem 0.6rem;
+            gap: 0.35rem;
+            padding: 0.5rem 0.75rem;
             background: var(--bg-dark);
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.15s ease;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-size: 0.875rem;
         }
 
         .relay-checkbox:hover {
@@ -989,14 +986,14 @@
         }
 
         .tcp-mode-select {
-            padding: 0.5rem 0.75rem;
+            width: 100%;
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
-            font-size: 0.85rem;
-            margin-bottom: 0.5rem;
-            width: 100%;
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
         }
 
         .tcp-mode-select:focus {
@@ -1010,20 +1007,19 @@
             gap: 0.5rem;
             align-items: center;
             flex-wrap: wrap;
-            margin-top: 0.5rem;
         }
 
         .tcp-config-manual input[type="text"],
         .tcp-config-manual input[type="number"],
         .tcp-config-preset input[type="text"],
         .tcp-config-preset select {
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.85rem;
+            font-size: 0.875rem;
         }
 
         .tcp-config-manual input:focus,
@@ -1034,30 +1030,31 @@
         }
 
         .tcp-host-input {
-            width: 130px;
+            width: 140px;
         }
 
         .tcp-port-input {
-            width: 70px;
+            width: 80px;
         }
 
         .tcp-cmd-input {
             flex: 1;
-            min-width: 100px;
-        }
-
-        .tcp-device-select {
             min-width: 120px;
         }
 
+        .tcp-device-select {
+            min-width: 140px;
+        }
+
         .tcp-function-select {
-            min-width: 100px;
+            min-width: 120px;
             flex: 1;
         }
 
         .tcp-separator {
             color: var(--text-dim);
             font-weight: bold;
+            font-size: 1.1rem;
         }
 
         .card-hint {
@@ -1068,11 +1065,11 @@
 
         @media (max-width: 600px) {
             .relay-checkboxes {
-                gap: 0.4rem;
+                gap: 0.5rem;
             }
 
             .relay-checkbox {
-                padding: 0.35rem 0.5rem;
+                padding: 0.5rem 0.6rem;
                 font-size: 0.8rem;
             }
 
@@ -1080,6 +1077,7 @@
             .tcp-config-preset {
                 flex-direction: column;
                 align-items: stretch;
+                gap: 0.5rem;
             }
 
             .tcp-host-input,
@@ -1089,6 +1087,10 @@
             .tcp-function-select {
                 width: 100%;
                 min-width: unset;
+            }
+
+            .tcp-separator {
+                display: none;
             }
 
             .tcp-mode-select {
