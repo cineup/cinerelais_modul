@@ -246,7 +246,7 @@ bool ntpSynced = false;
 uint8_t inputControlledRelays = 0;  // Bitmask of relays controlled by inputs
 bool inputDebouncedStates[8] = {false};  // Debounced input states
 unsigned long inputDebounceTime[8] = {0};  // Timestamp when input changed
-const unsigned long INPUT_DEBOUNCE_MS = 500;  // 500ms debounce delay
+const unsigned long INPUT_DEBOUNCE_MS = 50;  // 50ms debounce delay
 
 // Input TCP command state (track if command was sent for current input state)
 bool inputTcpSent[8] = {false};  // True if TCP command was sent for active input
