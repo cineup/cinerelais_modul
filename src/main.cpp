@@ -1928,16 +1928,17 @@ void setupModbus() {
     Serial.printf("Modbus: Enabled, Address=%d, Relays=%d\n",
                   config.modbusAddress, config.modbusRelayCount);
 
-    // Try to read relay states to verify connection
+    // Try to read relay states to verify connection (Waveshare uses holding register 0x0000)
     delay(100);
-    uint8_t result = modbusNode.readCoils(0x0000, config.modbusRelayCount);
+    uint8_t result = modbusNode.readHoldingRegisters(0x0000, 1);
     if (result == modbusNode.ku8MBSuccess) {
         modbusConnected = true;
-        // Read initial states
+        // Read initial states from bitmap
+        uint16_t data = modbusNode.getResponseBuffer(0);
         for (int i = 0; i < config.modbusRelayCount && i < 8; i++) {
-            modbusRelayStates[i] = modbusNode.getResponseBuffer(i / 16) & (1 << (i % 16));
+            modbusRelayStates[i] = (data >> i) & 0x01;
         }
-        Serial.println("Modbus: Connected");
+        Serial.printf("Modbus: Connected (relay status: 0x%02X)\n", data & 0xFF);
     } else {
         modbusConnected = false;
         Serial.printf("Modbus: Connection failed (error %d)\n", result);
@@ -1958,8 +1959,14 @@ bool modbusSetRelay(int relay, bool state) {
         return false;
     }
 
-    Serial.printf("Modbus: Writing coil %d = %s\n", relay - 1, state ? "ON" : "OFF");
-    uint8_t result = modbusNode.writeSingleCoil(relay - 1, state ? 0xFF00 : 0x0000);
+    // Waveshare Modbus RTU Relay uses register-based control:
+    // Register address = relay number (1-8)
+    // Value: 0x0100 = ON (open), 0x0200 = OFF (close)
+    uint16_t regAddr = relay;  // 1-8 for relays 1-8
+    uint16_t value = state ? 0x0100 : 0x0200;
+
+    Serial.printf("Modbus: Writing register 0x%04X = 0x%04X (%s)\n", regAddr, value, state ? "ON" : "OFF");
+    uint8_t result = modbusNode.writeSingleRegister(regAddr, value);
     if (result == modbusNode.ku8MBSuccess) {
         modbusRelayStates[relay - 1] = state;
         modbusConnected = true;
@@ -2037,7 +2044,8 @@ void modbusReadRelays() {
     if (now - modbusLastPoll < MODBUS_POLL_INTERVAL) return;
     modbusLastPoll = now;
 
-    uint8_t result = modbusNode.readCoils(0x0000, config.modbusRelayCount);
+    // Waveshare Modbus RTU Relay: Read holding register 0x0000 for relay status bitmap
+    uint8_t result = modbusNode.readHoldingRegisters(0x0000, 1);
     if (result == modbusNode.ku8MBSuccess) {
         modbusConnected = true;
         uint16_t data = modbusNode.getResponseBuffer(0);
@@ -2060,7 +2068,8 @@ int modbusScanAddress() {
     for (uint8_t addr = 1; addr <= 32; addr++) {  // Scan first 32 addresses
         modbusNode.begin(addr, Serial1);
         delay(50);
-        uint8_t result = modbusNode.readCoils(0x0000, 1);
+        // Use holding registers for Waveshare compatibility
+        uint8_t result = modbusNode.readHoldingRegisters(0x0000, 1);
         if (result == modbusNode.ku8MBSuccess) {
             Serial.printf("Modbus: Found device at address %d\n", addr);
             return addr;
