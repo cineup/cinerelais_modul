@@ -66,15 +66,9 @@ struct DevicePreset {
     uint8_t commandCount;
 };
 
-// Dolby IMS300 Commands (Port 11730, binary protocol)
-const DeviceCommand IMS300_COMMANDS[] = {
-    {"PlaySPL",      "HEX:060e2b3402050100e1001010101030b008300000401020304"},
-    {"PauseSPL",     "HEX:060e2b3402050100e1001010101030d008300000401020304"},
-    {"EjectSPL",     "HEX:060e2b3402050100e1001010101030f008300000401020304"},
-    {"SkipForward",  "HEX:060e2b34020501000e100101010311008300000401020304"},
-    {"SkipBackward", "HEX:060e2b34020501000e100101010313008300000401020304"},
-    {"JumpForward",  "HEX:060e2b34020501000e100101010315008300000401020304"},
-    {"JumpBackward", "HEX:060e2b34020501000e100101010317008300000401020304"}
+// Dolby IMS3000 Commands (Port 11730, binary SMPTE protocol)
+const DeviceCommand IMS3000_COMMANDS[] = {
+    {"PlaySPL",      "HEX:060e2b340205010a0e10010101030b008300000401020304"}
 };
 
 // AP20 Audio Processor Commands (Port 14500, ASCII protocol)
@@ -89,8 +83,8 @@ const DeviceCommand AP20_COMMANDS[] = {
 
 // Device Presets Array (add new devices here)
 const DevicePreset DEVICE_PRESETS[] = {
-    {"Dolby IMS300", 11730, IMS300_COMMANDS, sizeof(IMS300_COMMANDS) / sizeof(DeviceCommand)},
-    {"AP20",         14500, AP20_COMMANDS,   sizeof(AP20_COMMANDS) / sizeof(DeviceCommand)}
+    {"Dolby IMS3000", 11730, IMS3000_COMMANDS, sizeof(IMS3000_COMMANDS) / sizeof(DeviceCommand)},
+    {"AP20",          14500, AP20_COMMANDS,    sizeof(AP20_COMMANDS) / sizeof(DeviceCommand)}
 };
 const uint8_t DEVICE_PRESET_COUNT = sizeof(DEVICE_PRESETS) / sizeof(DevicePreset);
 
