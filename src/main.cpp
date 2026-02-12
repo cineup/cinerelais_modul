@@ -1062,9 +1062,13 @@ String getStatusJSON() {
     doc["ethConnected"] = ethConnected;
 #ifndef ETHERNET_DISABLED
     doc["ethIP"] = ethConnected ? ETH.localIP().toString() : "";
+    doc["ethGateway"] = ethConnected ? ETH.gatewayIP().toString() : "";
+    doc["ethSubnet"] = ethConnected ? ETH.subnetMask().toString() : "";
     doc["ethMAC"] = ETH.linkUp() ? ETH.macAddress() : "";
 #else
     doc["ethIP"] = "";
+    doc["ethGateway"] = "";
+    doc["ethSubnet"] = "";
     doc["ethMAC"] = "";
 #endif
 
@@ -1073,6 +1077,8 @@ String getStatusJSON() {
     doc["wifiSSID"] = config.wifiSSID;
     doc["wifiSTAConnected"] = wifiSTAConnected;
     doc["wifiSTAIP"] = wifiSTAConnected ? WiFi.localIP().toString() : "";
+    doc["wifiGateway"] = wifiSTAConnected ? WiFi.gatewayIP().toString() : "";
+    doc["wifiSubnet"] = wifiSTAConnected ? WiFi.subnetMask().toString() : "";
     doc["wifiRSSI"] = wifiSTAConnected ? WiFi.RSSI() : 0;
     doc["wifiAPActive"] = wifiAPActive;
     doc["wifiAPIP"] = wifiAPActive ? WiFi.softAPIP().toString() : "";

@@ -1225,12 +1225,28 @@
                             <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
                         </div>
                         <div class="info-item">
+                            <span class="info-label">ETH Gateway</span>
+                            <span class="info-value" id="info-eth-gateway">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ETH Subnetz</span>
+                            <span class="info-value" id="info-eth-subnet">-</span>
+                        </div>
+                        <div class="info-item">
                             <span class="info-label">ETH MAC</span>
                             <span class="info-value" id="info-eth-mac">-</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">WiFi STA</span>
                             <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi Gateway</span>
+                            <span class="info-value" id="info-wifi-gateway">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">WiFi Subnetz</span>
+                            <span class="info-value" id="info-wifi-subnet">-</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">WiFi Signal</span>
@@ -1927,6 +1943,8 @@
                     ethIpEl.textContent = '';
                 }
                 document.getElementById('info-eth-mac').textContent = data.ethMAC || '-';
+                document.getElementById('info-eth-gateway').textContent = data.ethGateway || '-';
+                document.getElementById('info-eth-subnet').textContent = data.ethSubnet || '-';
 
                 const wifiStaStatusEl = document.getElementById('info-wifi-sta-status');
                 const wifiStaIpEl = document.getElementById('info-wifi-sta-ip');
@@ -1934,14 +1952,20 @@
                     wifiStaStatusEl.textContent = 'Online';
                     wifiStaStatusEl.className = 'status-badge online';
                     wifiStaIpEl.textContent = data.wifiSTAIP;
+                    document.getElementById('info-wifi-gateway').textContent = data.wifiGateway || '-';
+                    document.getElementById('info-wifi-subnet').textContent = data.wifiSubnet || '-';
                 } else if (data.wifiEnabled && data.wifiSSID) {
                     wifiStaStatusEl.textContent = 'Verbinde...';
                     wifiStaStatusEl.className = 'status-badge offline';
                     wifiStaIpEl.textContent = '';
+                    document.getElementById('info-wifi-gateway').textContent = '-';
+                    document.getElementById('info-wifi-subnet').textContent = '-';
                 } else {
                     wifiStaStatusEl.textContent = 'Aus';
                     wifiStaStatusEl.className = 'status-badge offline';
                     wifiStaIpEl.textContent = '';
+                    document.getElementById('info-wifi-gateway').textContent = '-';
+                    document.getElementById('info-wifi-subnet').textContent = '-';
                 }
 
                 const wifiApStatusEl = document.getElementById('info-wifi-ap-status');
