@@ -746,8 +746,17 @@ void setup() {
 
     // API: Single Modbus Relay
     webServer->on("/api/modbus/relay", HTTP_POST, [](AsyncWebServerRequest *request){
+        Serial.println("API: /api/modbus/relay called");
+
         if (!config.modbusEnabled) {
+            Serial.println("API: Modbus disabled");
             request->send(400, "application/json", "{\"error\":\"Modbus disabled\"}");
+            return;
+        }
+
+        if (!modbusInitialized) {
+            Serial.println("API: Modbus not initialized");
+            request->send(400, "application/json", "{\"error\":\"Modbus not initialized - restart required\"}");
             return;
         }
 
@@ -758,8 +767,10 @@ void setup() {
 
         int relay = request->getParam("relay", true)->value().toInt();
         String state = request->getParam("state", true)->value();
+        Serial.printf("API: Modbus relay %d state=%s\n", relay, state.c_str());
 
         if (relay < 1 || relay > config.modbusRelayCount) {
+            Serial.printf("API: Invalid relay %d (max %d)\n", relay, config.modbusRelayCount);
             request->send(400, "application/json", "{\"error\":\"Invalid relay number\"}");
             return;
         }
@@ -782,14 +793,24 @@ void setup() {
             flashEventLED();
             request->send(200, "application/json", "{\"success\":true}");
         } else {
+            Serial.println("API: Modbus communication failed");
             request->send(500, "application/json", "{\"error\":\"Modbus communication failed\"}");
         }
     });
 
     // API: All Modbus Relays
     webServer->on("/api/modbus/relays", HTTP_POST, [](AsyncWebServerRequest *request){
+        Serial.println("API: /api/modbus/relays called");
+
         if (!config.modbusEnabled) {
+            Serial.println("API: Modbus disabled (all)");
             request->send(400, "application/json", "{\"error\":\"Modbus disabled\"}");
+            return;
+        }
+
+        if (!modbusInitialized) {
+            Serial.println("API: Modbus not initialized (all)");
+            request->send(400, "application/json", "{\"error\":\"Modbus not initialized - restart required\"}");
             return;
         }
 
@@ -799,6 +820,7 @@ void setup() {
         }
 
         String state = request->getParam("state", true)->value();
+        Serial.printf("API: Modbus all relays state=%s\n", state.c_str());
         bool success = false;
 
         if (state == "on") {
@@ -818,6 +840,7 @@ void setup() {
             flashEventLED();
             request->send(200, "application/json", "{\"success\":true}");
         } else {
+            Serial.println("API: Modbus all relays failed");
             request->send(500, "application/json", "{\"error\":\"Modbus communication failed\"}");
         }
     });
@@ -1922,10 +1945,20 @@ void setupModbus() {
 }
 
 bool modbusSetRelay(int relay, bool state) {
-    if (!config.modbusEnabled || !modbusInitialized || relay < 1 || relay > config.modbusRelayCount) {
+    if (!config.modbusEnabled) {
+        Serial.println("Modbus: Disabled");
+        return false;
+    }
+    if (!modbusInitialized) {
+        Serial.println("Modbus: Not initialized");
+        return false;
+    }
+    if (relay < 1 || relay > config.modbusRelayCount) {
+        Serial.printf("Modbus: Invalid relay %d (max %d)\n", relay, config.modbusRelayCount);
         return false;
     }
 
+    Serial.printf("Modbus: Writing coil %d = %s\n", relay - 1, state ? "ON" : "OFF");
     uint8_t result = modbusNode.writeSingleCoil(relay - 1, state ? 0xFF00 : 0x0000);
     if (result == modbusNode.ku8MBSuccess) {
         modbusRelayStates[relay - 1] = state;
@@ -1948,7 +1981,14 @@ bool modbusSetRelay(int relay, bool state) {
 }
 
 bool modbusSetAllRelays(bool state) {
-    if (!config.modbusEnabled || !modbusInitialized) return false;
+    if (!config.modbusEnabled) {
+        Serial.println("Modbus: Disabled (all relays)");
+        return false;
+    }
+    if (!modbusInitialized) {
+        Serial.println("Modbus: Not initialized (all relays)");
+        return false;
+    }
 
     bool success = true;
     for (int i = 1; i <= config.modbusRelayCount; i++) {

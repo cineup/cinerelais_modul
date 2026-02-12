@@ -2405,10 +2405,12 @@
                 if (response.ok) {
                     btn.classList.toggle('active');
                 } else {
-                    showToast('Modbus Fehler', 'error');
+                    const data = await response.json();
+                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
                 }
             } catch (error) {
-                showToast('Modbus Fehler', 'error');
+                console.error('Modbus toggle error:', error);
+                showToast('Modbus Netzwerkfehler', 'error');
             }
         }
 
@@ -2436,10 +2438,12 @@
                 if (response.ok) {
                     showToast(`Modbus Relais ${relay} Impuls`, 'success');
                 } else {
-                    showToast('Modbus Fehler', 'error');
+                    const data = await response.json();
+                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
                 }
             } catch (error) {
-                showToast('Modbus Fehler', 'error');
+                console.error('Modbus pulse error:', error);
+                showToast('Modbus Netzwerkfehler', 'error');
             }
         }
 
@@ -2457,10 +2461,12 @@
                     updateStatus();
                     showToast(`Modbus alle ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
                 } else {
-                    showToast('Modbus Fehler', 'error');
+                    const data = await response.json();
+                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
                 }
             } catch (error) {
-                showToast('Modbus Fehler', 'error');
+                console.error('Modbus error:', error);
+                showToast('Modbus Netzwerkfehler', 'error');
             }
         }
 
