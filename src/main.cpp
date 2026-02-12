@@ -1907,6 +1907,23 @@ void sendInputTcpCommand(int inputIndex) {
 // ============================================
 // Modbus RS485 Relay Control
 // ============================================
+
+// Helper to decode Modbus error codes
+const char* modbusErrorString(uint8_t error) {
+    switch (error) {
+        case 0x00: return "Success";
+        case 0x01: return "Illegal function";
+        case 0x02: return "Illegal data address";
+        case 0x03: return "Illegal data value";
+        case 0x04: return "Slave device failure";
+        case 0xE0: return "Invalid slave ID";
+        case 0xE1: return "Invalid function";
+        case 0xE2: return "Response timed out";
+        case 0xE3: return "Invalid CRC";
+        default: return "Unknown error";
+    }
+}
+
 void setupModbus() {
     if (!config.modbusEnabled) {
         Serial.println("Modbus: Disabled");
@@ -1941,7 +1958,7 @@ void setupModbus() {
         Serial.printf("Modbus: Connected (relay status: 0x%02X)\n", data & 0xFF);
     } else {
         modbusConnected = false;
-        Serial.printf("Modbus: Connection failed (error %d)\n", result);
+        Serial.printf("Modbus: Connection failed - %s (0x%02X)\n", modbusErrorString(result), result);
     }
 }
 
@@ -1982,7 +1999,7 @@ bool modbusSetRelay(int relay, bool state) {
         return true;
     } else {
         modbusConnected = false;
-        Serial.printf("Modbus Relay %d: FAILED (error %d)\n", relay, result);
+        Serial.printf("Modbus Relay %d: FAILED - %s (0x%02X)\n", relay, modbusErrorString(result), result);
         return false;
     }
 }
@@ -2066,13 +2083,20 @@ int modbusScanAddress() {
     delay(100);
 
     for (uint8_t addr = 1; addr <= 32; addr++) {  // Scan first 32 addresses
+        yield();  // Feed watchdog
         modbusNode.begin(addr, Serial1);
-        delay(50);
-        // Use holding registers for Waveshare compatibility
+        delay(20);
+
+        // Try reading holding register 0x0000 (relay status)
         uint8_t result = modbusNode.readHoldingRegisters(0x0000, 1);
         if (result == modbusNode.ku8MBSuccess) {
             Serial.printf("Modbus: Found device at address %d\n", addr);
             return addr;
+        }
+
+        // Print progress every 8 addresses
+        if (addr % 8 == 0) {
+            Serial.printf("Modbus: Scanned 1-%d, no device yet...\n", addr);
         }
     }
 
