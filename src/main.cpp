@@ -233,6 +233,7 @@ volatile bool ledUpdateNeeded = false;  // Flag for thread-safe LED updates
 
 // Modbus RS485
 ModbusMaster modbusNode;
+bool modbusInitialized = false;  // Set true only after setupModbus() completes
 bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
@@ -1233,6 +1234,7 @@ String getStatusJSON() {
 
     // Modbus status
     doc["modbusEnabled"] = config.modbusEnabled;
+    doc["modbusInitialized"] = modbusInitialized;
     doc["modbusConnected"] = modbusConnected;
     doc["modbusAddress"] = config.modbusAddress;
     doc["modbusRelayCount"] = config.modbusRelayCount;
@@ -1885,6 +1887,7 @@ void sendInputTcpCommand(int inputIndex) {
 void setupModbus() {
     if (!config.modbusEnabled) {
         Serial.println("Modbus: Disabled");
+        modbusInitialized = false;
         return;
     }
 
@@ -1895,6 +1898,9 @@ void setupModbus() {
 
     // Initialize ModbusMaster with device address
     modbusNode.begin(config.modbusAddress, Serial1);
+
+    // Mark as initialized so other functions can safely use it
+    modbusInitialized = true;
 
     Serial.printf("Modbus: Enabled, Address=%d, Relays=%d\n",
                   config.modbusAddress, config.modbusRelayCount);
@@ -1916,7 +1922,7 @@ void setupModbus() {
 }
 
 bool modbusSetRelay(int relay, bool state) {
-    if (!config.modbusEnabled || relay < 1 || relay > config.modbusRelayCount) {
+    if (!config.modbusEnabled || !modbusInitialized || relay < 1 || relay > config.modbusRelayCount) {
         return false;
     }
 
@@ -1942,7 +1948,7 @@ bool modbusSetRelay(int relay, bool state) {
 }
 
 bool modbusSetAllRelays(bool state) {
-    if (!config.modbusEnabled) return false;
+    if (!config.modbusEnabled || !modbusInitialized) return false;
 
     bool success = true;
     for (int i = 1; i <= config.modbusRelayCount; i++) {
@@ -1955,7 +1961,7 @@ bool modbusSetAllRelays(bool state) {
 }
 
 void modbusPulseRelay(int relay, uint16_t duration) {
-    if (!config.modbusEnabled || relay < 1 || relay > config.modbusRelayCount) return;
+    if (!config.modbusEnabled || !modbusInitialized || relay < 1 || relay > config.modbusRelayCount) return;
     int idx = relay - 1;
     modbusSetRelay(relay, true);
     modbusPulseActive[idx] = true;
@@ -1963,7 +1969,7 @@ void modbusPulseRelay(int relay, uint16_t duration) {
 }
 
 void modbusPulseAllRelays(uint16_t duration) {
-    if (!config.modbusEnabled) return;
+    if (!config.modbusEnabled || !modbusInitialized) return;
     modbusSetAllRelays(true);
     unsigned long endTime = millis() + duration;
     for (int i = 0; i < config.modbusRelayCount; i++) {
@@ -1973,7 +1979,7 @@ void modbusPulseAllRelays(uint16_t duration) {
 }
 
 void updateModbusPulses() {
-    if (!config.modbusEnabled) return;
+    if (!config.modbusEnabled || !modbusInitialized) return;
 
     unsigned long now = millis();
     for (int i = 0; i < config.modbusRelayCount; i++) {
@@ -1985,7 +1991,7 @@ void updateModbusPulses() {
 }
 
 void modbusReadRelays() {
-    if (!config.modbusEnabled) return;
+    if (!config.modbusEnabled || !modbusInitialized) return;
 
     unsigned long now = millis();
     if (now - modbusLastPoll < MODBUS_POLL_INTERVAL) return;
@@ -2006,6 +2012,10 @@ void modbusReadRelays() {
 // Scan for Modbus device address (1-247)
 int modbusScanAddress() {
     Serial.println("Modbus: Scanning for device...");
+
+    // Initialize Serial1 if not already done
+    Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
+    delay(100);
 
     for (uint8_t addr = 1; addr <= 32; addr++) {  // Scan first 32 addresses
         modbusNode.begin(addr, Serial1);
