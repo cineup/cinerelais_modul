@@ -1976,20 +1976,13 @@ bool modbusSetRelay(int relay, bool state) {
         return false;
     }
 
-    // Waveshare Modbus RTU Relay - try coil-based control
-    // Coil address = relay - 1 (0-indexed: relay 1 = coil 0)
-    uint16_t coilAddr = relay - 1;
-    uint16_t value = state ? 0xFF00 : 0x0000;
+    // Waveshare Modbus RTU Relay protocol:
+    // Write Single Register (FC 0x06) to register 0x00FF
+    // Value: High byte = Channel (1-8), Low byte = Command (1=ON, 2=OFF)
+    uint16_t regValue = (relay << 8) | (state ? 0x01 : 0x02);
 
-    Serial.printf("Modbus: Writing coil %d = 0x%04X (%s)\n", coilAddr, value, state ? "ON" : "OFF");
-    uint8_t result = modbusNode.writeSingleCoil(coilAddr, value);
-
-    if (result != modbusNode.ku8MBSuccess) {
-        // Try 1-based coil addressing if 0-based fails
-        Serial.printf("Modbus: Coil %d failed, trying coil %d...\n", coilAddr, relay);
-        coilAddr = relay;  // 1-based: relay 1 = coil 1
-        result = modbusNode.writeSingleCoil(coilAddr, value);
-    }
+    Serial.printf("Modbus: Writing reg 0x00FF = 0x%04X (CH%d %s)\n", regValue, relay, state ? "ON" : "OFF");
+    uint8_t result = modbusNode.writeSingleRegister(0x00FF, regValue);
 
     if (result == modbusNode.ku8MBSuccess) {
         modbusRelayStates[relay - 1] = state;
