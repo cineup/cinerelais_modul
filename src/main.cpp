@@ -1986,10 +1986,10 @@ bool modbusSetRelay(int relay, bool state) {
 
     Serial.printf("Modbus: FC05 Coil 0x%04X = 0x%04X (%s)\n", coilAddr, value, state ? "ON" : "OFF");
 
-    // Small delay before transmission
-    delay(5);
+    // Delays for RS485 timing
+    delay(10);
     uint8_t result = modbusNode.writeSingleCoil(coilAddr, value);
-    delay(5);  // Small delay after transmission
+    delay(20);  // Give relay module time to process
 
     if (result == modbusNode.ku8MBSuccess) {
         modbusRelayStates[relay - 1] = state;
@@ -2023,9 +2023,11 @@ bool modbusSetAllRelays(bool state) {
 
     bool success = true;
     for (int i = 1; i <= config.modbusRelayCount; i++) {
+        yield();  // Feed watchdog between commands
         if (!modbusSetRelay(i, state)) {
             success = false;
         }
+        delay(50);  // Give relay module time to process
     }
     Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
     return success;
