@@ -23,31 +23,8 @@
 #include "driver/uart.h"
 #include "config.h"
 
-// ============================================
-// Hardware Pins
-// ============================================
-#define RGB_LED_PIN 38
-#define I2C_SDA_PIN 42
-#define I2C_SCL_PIN 41
-#define TCA9554_ADDR 0x20
-#define TCA9554_OUTPUT_REG 0x01
-#define TCA9554_CONFIG_REG 0x03
-#define CONFIG_FILE "/config.json"
-
-// W5500 Ethernet (SPI)
-#define ETH_MISO_PIN 14
-#define ETH_MOSI_PIN 13
-#define ETH_SCLK_PIN 15
-#define ETH_CS_PIN   16
-#define ETH_INT_PIN  12
-#define ETH_RST_PIN  -1
-
-// RS485 Modbus
-#define RS485_TX_PIN 17
-#define RS485_RX_PIN 18
+// RS485 Modbus baud rate (pin defines are in config.h)
 #define RS485_BAUD   9600
-
-const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
 
 // ============================================
 // TCP Device Presets (for Input→TCP Actions)
