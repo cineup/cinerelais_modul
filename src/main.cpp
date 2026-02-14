@@ -2026,16 +2026,35 @@ bool modbusSetAllRelays(bool state) {
         return false;
     }
 
-    bool success = true;
-    for (int i = 1; i <= config.modbusRelayCount; i++) {
-        yield();  // Feed watchdog between commands
-        if (!modbusSetRelay(i, state)) {
-            success = false;
+    // FC15 (Write Multiple Coils) — single frame for all relays at once
+    uint16_t coilBitmap = state ? ((1u << config.modbusRelayCount) - 1u) : 0u;
+    Serial.printf("Modbus: FC15 Write %d coils = %s (bitmap=0x%04X)\n",
+                  config.modbusRelayCount, state ? "ON" : "OFF", coilBitmap);
+
+    delay(10);
+    modbusNode.setTransmitBuffer(0, coilBitmap);
+    uint8_t result = modbusNode.writeMultipleCoils(0x0000, config.modbusRelayCount);
+    delay(20);
+
+    if (result == modbusNode.ku8MBSuccess) {
+        for (int i = 0; i < config.modbusRelayCount; i++) {
+            modbusRelayStates[i] = state;
         }
-        delay(50);  // Give relay module time to process
+        modbusConnected = true;
+        Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
+
+        char logCmd[32];
+        snprintf(logCmd, sizeof(logCmd), "m1_all_%s", state ? "on" : "off");
+        char logSource[32];
+        snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
+        addLogEntry(logSource, logCmd, "OUT");
+
+        return true;
+    } else {
+        modbusConnected = false;
+        Serial.printf("Modbus All relays FAILED: %s (0x%02X)\n", modbusErrorString(result), result);
+        return false;
     }
-    Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
-    return success;
 }
 
 void modbusPulseRelay(int relay, uint16_t duration) {
@@ -2060,10 +2079,32 @@ void updateModbusPulses() {
     if (!config.modbusEnabled || !modbusInitialized) return;
 
     unsigned long now = millis();
+
+    // Count active and expired pulses
+    int activeCount = 0;
+    int expiredCount = 0;
     for (int i = 0; i < config.modbusRelayCount; i++) {
-        if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
-            modbusSetRelay(i + 1, false);
+        if (modbusPulseActive[i]) {
+            activeCount++;
+            if (now >= modbusPulseEndTime[i]) expiredCount++;
+        }
+    }
+
+    if (expiredCount == 0) return;
+
+    if (expiredCount == activeCount) {
+        // All active pulses expired — use FC15 to turn all off in one frame
+        modbusSetAllRelays(false);
+        for (int i = 0; i < config.modbusRelayCount; i++) {
             modbusPulseActive[i] = false;
+        }
+    } else {
+        // Only some pulses expired — use FC05 per relay
+        for (int i = 0; i < config.modbusRelayCount; i++) {
+            if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
+                modbusSetRelay(i + 1, false);
+                modbusPulseActive[i] = false;
+            }
         }
     }
 }
