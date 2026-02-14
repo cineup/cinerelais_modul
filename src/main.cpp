@@ -215,6 +215,8 @@ bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
 const unsigned long MODBUS_POLL_INTERVAL = 60000;  // Heartbeat every 60s
+bool modbusAllPulseActive = false;     // True while an all-relay pulse is running
+unsigned long modbusAllPulseEndTime = 0;
 
 // NTP
 bool ntpSynced = false;
@@ -1648,11 +1650,20 @@ void pulseAllRelays(uint16_t duration) {
 
 void updatePulses() {
     unsigned long now = millis();
+    bool anyChanged = false;
     for (int i = 0; i < 8; i++) {
         if (pulseActive[i] && now >= pulseEndTime[i]) {
-            setRelay(i + 1, false);
             pulseActive[i] = false;
+            relayStates[i] = false;
+            relayRegister &= ~(1 << i);
+            anyChanged = true;
         }
+    }
+    if (anyChanged && tca9554Found) {
+        Wire.beginTransmission(TCA9554_ADDR);
+        Wire.write(TCA9554_OUTPUT_REG);
+        Wire.write(relayRegister);
+        Wire.endTransmission();
     }
 }
 
@@ -2101,16 +2112,20 @@ void modbusPulseRelay(int relay, uint16_t duration) {
 }
 
 void modbusPulseAllRelays(uint16_t duration) {
-    (void)duration;  // pulseDuration is read from config inside modbusFlashNative
     if (!config.modbusEnabled || !modbusInitialized) return;
-    for (int i = 0; i < config.modbusRelayCount; i++) {
-        modbusFlashNative(i + 1);
+    if (duration < 10) duration = config.pulseDuration;
+    if (modbusSetAllRelays(true)) {
+        modbusAllPulseActive = true;
+        modbusAllPulseEndTime = millis() + duration;
     }
 }
 
 void updateModbusPulses() {
-    // Pulse timing is now handled natively by the Waveshare device (modbusFlashNative).
-    // This function is kept as a no-op for API compatibility.
+    if (!modbusAllPulseActive) return;
+    if (millis() >= modbusAllPulseEndTime) {
+        modbusAllPulseActive = false;
+        modbusSetAllRelays(false);
+    }
 }
 
 void modbusReadRelays() {
