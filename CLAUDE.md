@@ -225,6 +225,7 @@ The WS2812 RGB LED on GPIO 38 provides visual feedback:
 | Orange | Brief flash | Command received (TCP or Web API) |
 | Yellow | Brief flash | Relay activity (follows orange) |
 | Purple | Pulsing | OTA update in progress |
+| Magenta | Brief flash | Input TCP command sent (outgoing) |
 
 - Flash sequence: Orange (command) → Yellow (relay) provides visual confirmation
 - Brightness configurable (0-255, default 51 = 20%)
@@ -295,6 +296,40 @@ The WS2812 RGB LED on GPIO 38 provides visual feedback:
 | RGB LED | 38 | WS2812 |
 | Buzzer | 46 | PWM capable |
 
+## Version Management
+
+Versionen werden in zwei Dateien gepflegt:
+
+| Konstante | Datei | Bedeutung |
+|-----------|-------|-----------|
+| `FIRMWARE_VERSION` | `src/config.h` | Version der Firmware |
+| `REQUIRED_FS_VERSION` | `src/config.h` | Minimale FS-Version, die diese Firmware erwartet |
+| `FS_VERSION` | `data/index.html` | Version der installierten Web-Oberfläche (LittleFS) |
+
+### Wann was erhöhen?
+
+| Szenario | `FIRMWARE_VERSION` | `REQUIRED_FS_VERSION` | `FS_VERSION` |
+|----------|--------------------|-----------------------|--------------|
+| Nur Firmware geändert, kein HTML | ✅ erhöhen | unverändert | unverändert |
+| Firmware + HTML müssen **zusammen** geflasht werden | ✅ erhöhen | ✅ auf neuen Wert setzen | ✅ auf gleichen Wert setzen |
+| Nur HTML geändert (kein Firmware-Update nötig) | unverändert | unverändert | ✅ erhöhen |
+
+### Mismatch-Warnung
+
+Die Web-Oberfläche zeigt im **System Info**-Block:
+- `Firmware: vX.Y.Z` — aus `/api/status` → `version`
+- `Web-Interface: vX.Y.Z` — aus der laufenden `FS_VERSION` in `index.html`
+
+Wenn `FS_VERSION ≠ requiredFsVersion` (geliefert von der Firmware), erscheint ein
+**amber ⚠-Hinweis** mit Tooltip: *"FS-Version stimmt nicht mit Firmware überein — bitte Filesystem neu flashen (`pio run -t uploadfs`)"*
+
+### Versionsformat
+
+Semantisches Versioning `MAJOR.MINOR.PATCH`:
+- `PATCH`: Bugfix (kein API-/Protokoll-Bruch)
+- `MINOR`: Neue Funktion, rückwärtskompatibel
+- `MAJOR`: Breaking change (Protokoll, Config-Format, Hardware)
+
 ## Maintenance Log
 
 | Date | Change |
@@ -306,3 +341,5 @@ The WS2812 RGB LED on GPIO 38 provides visual feedback:
 | 2026-02-03 | **Major rewrite**: Fixed GPIO pins, added TCA9554 I2C relay driver, added WiFi AP/STA support, corrected Ethernet W5500 SPI pins |
 | 2026-02-03 | Added NTP time synchronization (configurable server/timezone) and command log (50 entries) |
 | 2026-02-03 | Added RGB LED status indicator: network status (green/cyan/blue/red), command flash (orange), relay activity (yellow), OTA (purple pulsing) |
+| 2026-02-14 | Added dual-version system (`FIRMWARE_VERSION` + `FS_VERSION`); GUI shows both with amber mismatch warning; version management workflow documented |
+| 2026-02-14 | Added Magenta LED flash for outgoing Input-TCP commands; LED legend in GUI updated; Modbus TCP command reference card added to GUI |

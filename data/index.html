@@ -1555,6 +1555,10 @@
                             <span class="info-value" id="info-version">-</span>
                         </div>
                         <div class="info-item">
+                            <span class="info-label">Web-Interface</span>
+                            <span class="info-value" id="info-fs-version">-</span>
+                        </div>
+                        <div class="info-item">
                             <span class="info-label">Hardware</span>
                             <span class="info-value" id="info-hardware">-</span>
                         </div>
@@ -1647,6 +1651,10 @@
                                 <span class="info-label" style="color: #a855f7;">Lila pulsierend</span>
                                 <span class="info-value">OTA Update laeuft</span>
                             </div>
+                            <div class="info-item">
+                                <span class="info-label" style="color: #e879f9;">Magenta Blitz</span>
+                                <span class="info-value">Eingang sendet TCP-Befehl</span>
+                            </div>
                         </div>
                     </div>
 
@@ -1683,6 +1691,40 @@
                         <div class="info-item">
                             <span class="info-label">Status / Hilfe</span>
                             <span class="info-value">status / help</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modbus TCP Commands Help (visible only when Modbus is enabled) -->
+                <div class="card" id="modbus-tcp-help-card" style="display: none;">
+                    <div class="card-header">
+                        <h2 class="card-title">Modbus TCP Befehle</h2>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Relais EIN</span>
+                            <span class="info-value">m1_r1_on ... m1_r8_on</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Relais AUS</span>
+                            <span class="info-value">m1_r1_off ... m1_r8_off</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Impuls</span>
+                            <span class="info-value">m1_r1_pulse / m1_r1_pulse_500</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Alle EIN/AUS</span>
+                            <span class="info-value">m1_all_on / m1_all_off</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Alle Impuls</span>
+                            <span class="info-value">m1_all_pulse / m1_all_pulse_500</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Adresse scannen</span>
+                            <span class="info-value">modbus_scan</span>
                         </div>
                     </div>
                 </div>
@@ -1813,6 +1855,9 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // Web interface (FS) version — bump this when index.html is updated
+        const FS_VERSION = "1.0.0";
+
         // Pulse mode state (default ON for cinema use)
         let pulseMode = true;
 
@@ -2014,10 +2059,17 @@
                     }
                 }
 
-                // Firmware version
+                // Firmware version + FS version mismatch check
                 if (data.version) {
                     const versionEl = document.getElementById('info-version');
                     if (versionEl) versionEl.textContent = 'v' + data.version;
+                }
+                const fsVersionEl = document.getElementById('info-fs-version');
+                if (fsVersionEl) {
+                    const mismatch = data.requiredFsVersion && data.requiredFsVersion !== FS_VERSION;
+                    fsVersionEl.textContent = 'v' + FS_VERSION + (mismatch ? ' ⚠ (erwartet v' + data.requiredFsVersion + ')' : '');
+                    fsVersionEl.style.color = mismatch ? '#f59e0b' : '';
+                    fsVersionEl.title = mismatch ? 'FS-Version stimmt nicht mit Firmware überein — bitte Filesystem neu flashen (pio run -t uploadfs)' : '';
                 }
 
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
@@ -2094,6 +2146,7 @@
                 // Modbus status
                 if (data.modbusEnabled) {
                     document.getElementById('modbus-card').style.display = 'block';
+                    document.getElementById('modbus-tcp-help-card').style.display = 'block';
 
                     // Update connection status
                     const statusEl = document.querySelector('.modbus-status');
@@ -2121,6 +2174,7 @@
                     }
                 } else {
                     document.getElementById('modbus-card').style.display = 'none';
+                    document.getElementById('modbus-tcp-help-card').style.display = 'none';
                 }
             } catch (error) {
                 console.error('Status update failed:', error);
@@ -2200,6 +2254,7 @@
 
                 // Show/hide Modbus card based on enabled state
                 document.getElementById('modbus-card').style.display = modbusEnabled ? 'block' : 'none';
+                document.getElementById('modbus-tcp-help-card').style.display = modbusEnabled ? 'block' : 'none';
                 if (modbusEnabled) {
                     initModbusGrid();
                 }
@@ -2522,6 +2577,7 @@
         function toggleModbusSection() {
             const enabled = document.getElementById('modbusEnabled').checked;
             document.getElementById('modbus-config').style.display = enabled ? 'block' : 'none';
+            document.getElementById('modbus-tcp-help-card').style.display = enabled ? 'block' : 'none';
         }
 
         function initModbusGrid() {

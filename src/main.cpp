@@ -3,8 +3,6 @@
  * Ethernet, WiFi AP/STA, Web Interface, TCP Server, Relay Control
  */
 
-#define FIRMWARE_VERSION "1.0.0"
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -23,32 +21,10 @@
 #include <vector>
 #include <esp_netif.h>
 #include "driver/uart.h"
+#include "config.h"
 
-// ============================================
-// Hardware Pins
-// ============================================
-#define RGB_LED_PIN 38
-#define I2C_SDA_PIN 42
-#define I2C_SCL_PIN 41
-#define TCA9554_ADDR 0x20
-#define TCA9554_OUTPUT_REG 0x01
-#define TCA9554_CONFIG_REG 0x03
-#define CONFIG_FILE "/config.json"
-
-// W5500 Ethernet (SPI)
-#define ETH_MISO_PIN 14
-#define ETH_MOSI_PIN 13
-#define ETH_SCLK_PIN 15
-#define ETH_CS_PIN   16
-#define ETH_INT_PIN  12
-#define ETH_RST_PIN  -1
-
-// RS485 Modbus
-#define RS485_TX_PIN 17
-#define RS485_RX_PIN 18
+// RS485 Modbus baud rate (pin defines are in config.h)
 #define RS485_BAUD   9600
-
-const int DI_PINS[8] = {4, 5, 6, 7, 8, 9, 10, 11};
 
 // ============================================
 // TCP Device Presets (for Input→TCP Actions)
@@ -314,6 +290,7 @@ String getStatusJSON();
 String getConfigJSON();
 void setStatusLED();
 void flashEventLED();
+void flashInputTcpLED();
 void setupModbus();
 bool modbusSetRelay(int relay, bool state);
 bool modbusSetAllRelays(bool state);
@@ -1219,6 +1196,7 @@ String getStatusJSON() {
 
     // Firmware version
     doc["version"] = FIRMWARE_VERSION;
+    doc["requiredFsVersion"] = REQUIRED_FS_VERSION;
 
     // IP for header (priority: Ethernet > WiFi STA > WiFi AP)
 #ifndef ETHERNET_DISABLED
@@ -1821,6 +1799,7 @@ void sendInputTcpCommand(int inputIndex) {
     }
 
     Serial.printf("Input %d TCP: Sending to %s:%d\n", inputIndex + 1, host, port);
+    flashInputTcpLED();
 
     // Log outgoing TCP command
     static char lastLogTarget[48];
@@ -2387,6 +2366,17 @@ void flashEventLED() {
     // Orange flash at ~2.5x status brightness (capped at 255)
     uint8_t eventBrightness = min(255, (int)config.ledBrightness * 5 / 2);
     rgbLed->setPixelColor(0, rgbLed->Color(eventBrightness, eventBrightness / 2, 0));
+    rgbLed->show();
+    ledEventActive = true;
+    ledEventEndTime = millis() + 150;  // 150ms flash
+}
+
+void flashInputTcpLED() {
+    if (!config.ledEnabled || rgbLed == nullptr) return;
+
+    // Magenta flash — outgoing TCP command triggered by digital input
+    uint8_t eventBrightness = min(255, (int)config.ledBrightness * 5 / 2);
+    rgbLed->setPixelColor(0, rgbLed->Color(eventBrightness, 0, eventBrightness));
     rgbLed->show();
     ledEventActive = true;
     ledEventEndTime = millis() + 150;  // 150ms flash
