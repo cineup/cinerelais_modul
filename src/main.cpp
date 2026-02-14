@@ -215,8 +215,6 @@ bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
 const unsigned long MODBUS_POLL_INTERVAL = 60000;  // Heartbeat every 60s
-bool modbusAllPulseActive = false;     // True while an all-relay pulse is running
-unsigned long modbusAllPulseEndTime = 0;
 
 // NTP
 bool ntpSynced = false;
@@ -2113,19 +2111,42 @@ void modbusPulseRelay(int relay, uint16_t duration) {
 
 void modbusPulseAllRelays(uint16_t duration) {
     if (!config.modbusEnabled || !modbusInitialized) return;
-    if (duration < 10) duration = config.pulseDuration;
-    if (modbusSetAllRelays(true)) {
-        modbusAllPulseActive = true;
-        modbusAllPulseEndTime = millis() + duration;
-    }
+    if (duration < 100) duration = config.pulseDuration;
+
+    uint16_t delay100 = duration / 100;
+    if (delay100 < 1)      delay100 = 1;
+    if (delay100 > 0x7FFF) delay100 = 0x7FFF;
+
+    // FC05 to coil address 0x02FF = flash-ON all relays simultaneously
+    uint8_t frame[8];
+    frame[0] = config.modbusAddress;
+    frame[1] = 0x05;
+    frame[2] = 0x02;                        // flash-on command
+    frame[3] = 0xFF;                        // 0xFF = all relays
+    frame[4] = (uint8_t)(delay100 >> 8);
+    frame[5] = (uint8_t)(delay100 & 0xFF);
+    uint16_t crc = crc16Modbus(frame, 6);
+    frame[6] = (uint8_t)(crc & 0xFF);
+    frame[7] = (uint8_t)(crc >> 8);
+
+    Serial.printf("Modbus: FC05 Flash ALL relays for %dms (%d * 100ms)\n", duration, delay100);
+    Serial.printf("Modbus Frame: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                  frame[0], frame[1], frame[2], frame[3], frame[4], frame[5], frame[6], frame[7]);
+
+    delay(10);
+    Serial1.write(frame, 8);
+    delay(50);
+    while (Serial1.available()) Serial1.read();
+
+    modbusConnected = true;
+    // Update local state: all relays will self-turn-off after duration (device handles timing)
+    for (int i = 0; i < config.modbusRelayCount && i < 8; i++) modbusRelayStates[i] = true;
+
+    addLogEntry("Modbus", "mall_flash", "OUT");
 }
 
 void updateModbusPulses() {
-    if (!modbusAllPulseActive) return;
-    if (millis() >= modbusAllPulseEndTime) {
-        modbusAllPulseActive = false;
-        modbusSetAllRelays(false);
-    }
+    // No-op: all-relay flash is handled natively by the Waveshare device (0x02FF).
 }
 
 void modbusReadRelays() {
