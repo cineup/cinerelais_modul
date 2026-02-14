@@ -22,6 +22,7 @@
 #include <ModbusMaster.h>
 #include <vector>
 #include <esp_netif.h>
+#include "driver/uart.h"
 
 // ============================================
 // Hardware Pins
@@ -1936,6 +1937,9 @@ void setupModbus() {
     // Initialize Serial1 for RS485 (TX=17, RX=18)
     Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
 
+    // Enable RS485 Half-Duplex mode - prevents reading own TX data
+    uart_set_mode(UART_NUM_1, UART_MODE_RS485_HALF_DUPLEX);
+
     // Initialize ModbusMaster with device address
     modbusNode.begin(config.modbusAddress, Serial1);
 
@@ -1977,11 +1981,11 @@ bool modbusSetRelay(int relay, bool state) {
         return false;
     }
 
-    // Waveshare Modbus RTU Relay Protocol (per official documentation):
+    // Waveshare Modbus RTU Relay Protocol (per Wiki SSCOM screenshots):
     // Function Code 0x05 (Write Single Coil)
-    // Coil Address: 0x0000-0x0007 for relays 1-8
+    // Coil Address: 0x0001-0x0008 for relays 1-8 (1-based!)
     // Value: 0xFF00 = ON, 0x0000 = OFF, 0x5500 = Toggle
-    uint16_t coilAddr = relay - 1;  // Relay 1 = Coil 0, Relay 8 = Coil 7
+    uint16_t coilAddr = relay;  // Relay 1 = Coil 1, Relay 8 = Coil 8
     uint16_t value = state ? 0xFF00 : 0x0000;
 
     Serial.printf("Modbus: FC05 Coil 0x%04X = 0x%04X (%s)\n", coilAddr, value, state ? "ON" : "OFF");
