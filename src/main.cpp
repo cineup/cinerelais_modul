@@ -290,6 +290,7 @@ String getStatusJSON();
 String getConfigJSON();
 void setStatusLED();
 void flashEventLED();
+void flashInputTcpLED();
 void setupModbus();
 bool modbusSetRelay(int relay, bool state);
 bool modbusSetAllRelays(bool state);
@@ -1798,6 +1799,7 @@ void sendInputTcpCommand(int inputIndex) {
     }
 
     Serial.printf("Input %d TCP: Sending to %s:%d\n", inputIndex + 1, host, port);
+    flashInputTcpLED();
 
     // Log outgoing TCP command
     static char lastLogTarget[48];
@@ -2364,6 +2366,17 @@ void flashEventLED() {
     // Orange flash at ~2.5x status brightness (capped at 255)
     uint8_t eventBrightness = min(255, (int)config.ledBrightness * 5 / 2);
     rgbLed->setPixelColor(0, rgbLed->Color(eventBrightness, eventBrightness / 2, 0));
+    rgbLed->show();
+    ledEventActive = true;
+    ledEventEndTime = millis() + 150;  // 150ms flash
+}
+
+void flashInputTcpLED() {
+    if (!config.ledEnabled || rgbLed == nullptr) return;
+
+    // Magenta flash — outgoing TCP command triggered by digital input
+    uint8_t eventBrightness = min(255, (int)config.ledBrightness * 5 / 2);
+    rgbLed->setPixelColor(0, rgbLed->Color(eventBrightness, 0, eventBrightness));
     rgbLed->show();
     ledEventActive = true;
     ledEventEndTime = millis() + 150;  // 150ms flash

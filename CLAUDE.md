@@ -225,6 +225,7 @@ The WS2812 RGB LED on GPIO 38 provides visual feedback:
 | Orange | Brief flash | Command received (TCP or Web API) |
 | Yellow | Brief flash | Relay activity (follows orange) |
 | Purple | Pulsing | OTA update in progress |
+| Magenta | Brief flash | Input TCP command sent (outgoing) |
 
 - Flash sequence: Orange (command) → Yellow (relay) provides visual confirmation
 - Brightness configurable (0-255, default 51 = 20%)
@@ -341,3 +342,4 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 | 2026-02-03 | Added NTP time synchronization (configurable server/timezone) and command log (50 entries) |
 | 2026-02-03 | Added RGB LED status indicator: network status (green/cyan/blue/red), command flash (orange), relay activity (yellow), OTA (purple pulsing) |
 | 2026-02-14 | Added dual-version system (`FIRMWARE_VERSION` + `FS_VERSION`); GUI shows both with amber mismatch warning; version management workflow documented |
+| 2026-02-14 | Added Magenta LED flash for outgoing Input-TCP commands; LED legend in GUI updated; Modbus TCP command reference card added to GUI |
