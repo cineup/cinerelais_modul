@@ -215,8 +215,6 @@ bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
 const unsigned long MODBUS_POLL_INTERVAL = 60000;  // Heartbeat every 60s
-unsigned long modbusPulseEndTime[8] = {0};
-bool modbusPulseActive[8] = {false};
 
 // NTP
 bool ntpSynced = false;
@@ -294,6 +292,7 @@ void flashInputTcpLED();
 void setupModbus();
 bool modbusSetRelay(int relay, bool state);
 bool modbusSetAllRelays(bool state);
+bool modbusFlashNative(int relay);
 void modbusPulseRelay(int relay, uint16_t duration);
 void modbusPulseAllRelays(uint16_t duration);
 void updateModbusPulses();
@@ -2036,56 +2035,82 @@ bool modbusSetAllRelays(bool state) {
     }
 }
 
+// CRC16 Modbus (polynomial 0xA001, initial value 0xFFFF, low byte first in frame)
+static uint16_t crc16Modbus(const uint8_t *data, uint8_t len) {
+    uint16_t crc = 0xFFFF;
+    for (uint8_t i = 0; i < len; i++) {
+        crc ^= (uint16_t)data[i];
+        for (uint8_t j = 0; j < 8; j++) {
+            if (crc & 0x0001) crc = (crc >> 1) ^ 0xA001;
+            else              crc >>= 1;
+        }
+    }
+    return crc;
+}
+
+// Waveshare native flash command:
+//   FC05, coil address = 0x02XX (XX = relay 0-indexed), data = delay in 100ms units
+//   Frame: [addr] 05 02 [relay] [delay_hi] [delay_lo] [CRC_lo] [CRC_hi]
+//   Example: 01 05 02 00 00 07 8D B0  → relay 1, 700ms
+//   Delay is taken from config.pulseDuration (ms).
+bool modbusFlashNative(int relay) {
+    if (!config.modbusEnabled || !modbusInitialized) return false;
+    if (relay < 1 || relay > config.modbusRelayCount) return false;
+
+    uint16_t delay100 = config.pulseDuration / 100;
+    if (delay100 < 1)      delay100 = 1;
+    if (delay100 > 0x7FFF) delay100 = 0x7FFF;
+
+    uint8_t frame[8];
+    frame[0] = config.modbusAddress;
+    frame[1] = 0x05;
+    frame[2] = 0x02;                        // flash-on command
+    frame[3] = (uint8_t)(relay - 1);        // relay index 0-7
+    frame[4] = (uint8_t)(delay100 >> 8);    // delay high byte
+    frame[5] = (uint8_t)(delay100 & 0xFF);  // delay low byte
+    uint16_t crc = crc16Modbus(frame, 6);
+    frame[6] = (uint8_t)(crc & 0xFF);       // CRC low byte first
+    frame[7] = (uint8_t)(crc >> 8);         // CRC high byte
+
+    Serial.printf("Modbus: FC05 Flash relay %d for %dms (%d * 100ms)\n", relay, config.pulseDuration, delay100);
+    Serial.printf("Modbus Frame: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                  frame[0], frame[1], frame[2], frame[3], frame[4], frame[5], frame[6], frame[7]);
+
+    delay(10);
+    Serial1.write(frame, 8);
+    delay(50);  // Wait for device to process and respond
+
+    // Drain response echo (device mirrors the request frame)
+    while (Serial1.available()) Serial1.read();
+
+    modbusConnected = true;
+
+    char logCmd[40];
+    snprintf(logCmd, sizeof(logCmd), "mr%d_flash_%d", relay, config.pulseDuration);
+    char logSource[32];
+    snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
+    addLogEntry(logSource, logCmd, "OUT");
+
+    return true;
+}
+
 void modbusPulseRelay(int relay, uint16_t duration) {
+    (void)duration;  // pulseDuration is read from config inside modbusFlashNative
     if (!config.modbusEnabled || !modbusInitialized || relay < 1 || relay > config.modbusRelayCount) return;
-    int idx = relay - 1;
-    modbusSetRelay(relay, true);
-    modbusPulseActive[idx] = true;
-    modbusPulseEndTime[idx] = millis() + duration;
+    modbusFlashNative(relay);
 }
 
 void modbusPulseAllRelays(uint16_t duration) {
+    (void)duration;  // pulseDuration is read from config inside modbusFlashNative
     if (!config.modbusEnabled || !modbusInitialized) return;
-    modbusSetAllRelays(true);
-    unsigned long endTime = millis() + duration;
     for (int i = 0; i < config.modbusRelayCount; i++) {
-        modbusPulseActive[i] = true;
-        modbusPulseEndTime[i] = endTime;
+        modbusFlashNative(i + 1);
     }
 }
 
 void updateModbusPulses() {
-    if (!config.modbusEnabled || !modbusInitialized) return;
-
-    unsigned long now = millis();
-
-    // Count active and expired pulses
-    int activeCount = 0;
-    int expiredCount = 0;
-    for (int i = 0; i < config.modbusRelayCount; i++) {
-        if (modbusPulseActive[i]) {
-            activeCount++;
-            if (now >= modbusPulseEndTime[i]) expiredCount++;
-        }
-    }
-
-    if (expiredCount == 0) return;
-
-    if (expiredCount == activeCount) {
-        // All active pulses expired — use FC15 to turn all off in one frame
-        modbusSetAllRelays(false);
-        for (int i = 0; i < config.modbusRelayCount; i++) {
-            modbusPulseActive[i] = false;
-        }
-    } else {
-        // Only some pulses expired — use FC05 per relay
-        for (int i = 0; i < config.modbusRelayCount; i++) {
-            if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
-                modbusSetRelay(i + 1, false);
-                modbusPulseActive[i] = false;
-            }
-        }
-    }
+    // Pulse timing is now handled natively by the Waveshare device (modbusFlashNative).
+    // This function is kept as a no-op for API compatibility.
 }
 
 void modbusReadRelays() {
