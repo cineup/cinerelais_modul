@@ -1981,18 +1981,19 @@ bool modbusSetRelay(int relay, bool state) {
         return false;
     }
 
-    // Waveshare Modbus RTU Relay Protocol (per Wiki SSCOM screenshots):
+    // Waveshare Modbus RTU Relay Protocol:
     // Function Code 0x05 (Write Single Coil)
-    // Coil Address: 0x0001-0x0008 for relays 1-8 (1-based!)
-    // Value: 0xFF00 = ON, 0x0000 = OFF, 0x5500 = Toggle
-    uint16_t coilAddr = relay;  // Relay 1 = Coil 1, Relay 8 = Coil 8
-    uint16_t value = state ? 0xFF00 : 0x0000;
+    // Coil Address: 0x0000-0x0007 for relays 1-8 (0-based, consistent with readCoils)
+    // ModbusMaster writeSingleCoil(addr, u8State): u8State is uint8_t (0=OFF, non-zero=ON)
+    // IMPORTANT: Do NOT pass 0xFF00 here — it is truncated to 0x00 (uint8_t), which always sends OFF!
+    uint16_t coilAddr = relay - 1;  // 0-based: relay 1 = coil 0x0000
+    uint8_t  coilState = state ? 1 : 0;  // ModbusMaster converts 1→0xFF00, 0→0x0000 in frame
 
-    Serial.printf("Modbus: FC05 Coil 0x%04X = 0x%04X (%s)\n", coilAddr, value, state ? "ON" : "OFF");
+    Serial.printf("Modbus: FC05 Coil 0x%04X = %s\n", coilAddr, state ? "ON (0xFF00)" : "OFF (0x0000)");
 
     // Delays for RS485 timing
     delay(10);
-    uint8_t result = modbusNode.writeSingleCoil(coilAddr, value);
+    uint8_t result = modbusNode.writeSingleCoil(coilAddr, coilState);
     delay(20);  // Give relay module time to process
 
     if (result == modbusNode.ku8MBSuccess) {
