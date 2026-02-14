@@ -292,7 +292,7 @@ void flashInputTcpLED();
 void setupModbus();
 bool modbusSetRelay(int relay, bool state);
 bool modbusSetAllRelays(bool state);
-bool modbusFlashNative(int relay, uint16_t duration_ms);
+bool modbusFlashNative(int relay);
 void modbusPulseRelay(int relay, uint16_t duration);
 void modbusPulseAllRelays(uint16_t duration);
 void updateModbusPulses();
@@ -2052,11 +2052,12 @@ static uint16_t crc16Modbus(const uint8_t *data, uint8_t len) {
 //   FC05, coil address = 0x02XX (XX = relay 0-indexed), data = delay in 100ms units
 //   Frame: [addr] 05 02 [relay] [delay_hi] [delay_lo] [CRC_lo] [CRC_hi]
 //   Example: 01 05 02 00 00 07 8D B0  → relay 1, 700ms
-bool modbusFlashNative(int relay, uint16_t duration_ms) {
+//   Delay is taken from config.pulseDuration (ms).
+bool modbusFlashNative(int relay) {
     if (!config.modbusEnabled || !modbusInitialized) return false;
     if (relay < 1 || relay > config.modbusRelayCount) return false;
 
-    uint16_t delay100 = duration_ms / 100;
+    uint16_t delay100 = config.pulseDuration / 100;
     if (delay100 < 1)      delay100 = 1;
     if (delay100 > 0x7FFF) delay100 = 0x7FFF;
 
@@ -2071,7 +2072,7 @@ bool modbusFlashNative(int relay, uint16_t duration_ms) {
     frame[6] = (uint8_t)(crc & 0xFF);       // CRC low byte first
     frame[7] = (uint8_t)(crc >> 8);         // CRC high byte
 
-    Serial.printf("Modbus: FC05 Flash relay %d for %dms (%d * 100ms)\n", relay, duration_ms, delay100);
+    Serial.printf("Modbus: FC05 Flash relay %d for %dms (%d * 100ms)\n", relay, config.pulseDuration, delay100);
     Serial.printf("Modbus Frame: %02X %02X %02X %02X %02X %02X %02X %02X\n",
                   frame[0], frame[1], frame[2], frame[3], frame[4], frame[5], frame[6], frame[7]);
 
@@ -2085,7 +2086,7 @@ bool modbusFlashNative(int relay, uint16_t duration_ms) {
     modbusConnected = true;
 
     char logCmd[40];
-    snprintf(logCmd, sizeof(logCmd), "mr%d_flash_%d", relay, duration_ms);
+    snprintf(logCmd, sizeof(logCmd), "mr%d_flash_%d", relay, config.pulseDuration);
     char logSource[32];
     snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
     addLogEntry(logSource, logCmd, "OUT");
@@ -2094,14 +2095,16 @@ bool modbusFlashNative(int relay, uint16_t duration_ms) {
 }
 
 void modbusPulseRelay(int relay, uint16_t duration) {
+    (void)duration;  // pulseDuration is read from config inside modbusFlashNative
     if (!config.modbusEnabled || !modbusInitialized || relay < 1 || relay > config.modbusRelayCount) return;
-    modbusFlashNative(relay, duration);
+    modbusFlashNative(relay);
 }
 
 void modbusPulseAllRelays(uint16_t duration) {
+    (void)duration;  // pulseDuration is read from config inside modbusFlashNative
     if (!config.modbusEnabled || !modbusInitialized) return;
     for (int i = 0; i < config.modbusRelayCount; i++) {
-        modbusFlashNative(i + 1, duration);
+        modbusFlashNative(i + 1);
     }
 }
 
