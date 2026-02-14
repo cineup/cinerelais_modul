@@ -238,7 +238,7 @@ bool modbusInitialized = false;  // Set true only after setupModbus() completes
 bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
-const unsigned long MODBUS_POLL_INTERVAL = 500;  // Poll every 500ms
+const unsigned long MODBUS_POLL_INTERVAL = 60000;  // Heartbeat every 60s
 unsigned long modbusPulseEndTime[8] = {0};
 bool modbusPulseActive[8] = {false};
 
@@ -1981,18 +1981,19 @@ bool modbusSetRelay(int relay, bool state) {
         return false;
     }
 
-    // Waveshare Modbus RTU Relay Protocol (per Wiki SSCOM screenshots):
+    // Waveshare Modbus RTU Relay Protocol:
     // Function Code 0x05 (Write Single Coil)
-    // Coil Address: 0x0001-0x0008 for relays 1-8 (1-based!)
-    // Value: 0xFF00 = ON, 0x0000 = OFF, 0x5500 = Toggle
-    uint16_t coilAddr = relay;  // Relay 1 = Coil 1, Relay 8 = Coil 8
-    uint16_t value = state ? 0xFF00 : 0x0000;
+    // Coil Address: 0x0000-0x0007 for relays 1-8 (0-based, consistent with readCoils)
+    // ModbusMaster writeSingleCoil(addr, u8State): u8State is uint8_t (0=OFF, non-zero=ON)
+    // IMPORTANT: Do NOT pass 0xFF00 here — it is truncated to 0x00 (uint8_t), which always sends OFF!
+    uint16_t coilAddr = relay - 1;  // 0-based: relay 1 = coil 0x0000
+    uint8_t  coilState = state ? 1 : 0;  // ModbusMaster converts 1→0xFF00, 0→0x0000 in frame
 
-    Serial.printf("Modbus: FC05 Coil 0x%04X = 0x%04X (%s)\n", coilAddr, value, state ? "ON" : "OFF");
+    Serial.printf("Modbus: FC05 Coil 0x%04X = %s\n", coilAddr, state ? "ON (0xFF00)" : "OFF (0x0000)");
 
     // Delays for RS485 timing
     delay(10);
-    uint8_t result = modbusNode.writeSingleCoil(coilAddr, value);
+    uint8_t result = modbusNode.writeSingleCoil(coilAddr, coilState);
     delay(20);  // Give relay module time to process
 
     if (result == modbusNode.ku8MBSuccess) {
@@ -2025,16 +2026,35 @@ bool modbusSetAllRelays(bool state) {
         return false;
     }
 
-    bool success = true;
-    for (int i = 1; i <= config.modbusRelayCount; i++) {
-        yield();  // Feed watchdog between commands
-        if (!modbusSetRelay(i, state)) {
-            success = false;
+    // FC15 (Write Multiple Coils) — single frame for all relays at once
+    uint16_t coilBitmap = state ? ((1u << config.modbusRelayCount) - 1u) : 0u;
+    Serial.printf("Modbus: FC15 Write %d coils = %s (bitmap=0x%04X)\n",
+                  config.modbusRelayCount, state ? "ON" : "OFF", coilBitmap);
+
+    delay(10);
+    modbusNode.setTransmitBuffer(0, coilBitmap);
+    uint8_t result = modbusNode.writeMultipleCoils(0x0000, config.modbusRelayCount);
+    delay(20);
+
+    if (result == modbusNode.ku8MBSuccess) {
+        for (int i = 0; i < config.modbusRelayCount; i++) {
+            modbusRelayStates[i] = state;
         }
-        delay(50);  // Give relay module time to process
+        modbusConnected = true;
+        Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
+
+        char logCmd[32];
+        snprintf(logCmd, sizeof(logCmd), "m1_all_%s", state ? "on" : "off");
+        char logSource[32];
+        snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
+        addLogEntry(logSource, logCmd, "OUT");
+
+        return true;
+    } else {
+        modbusConnected = false;
+        Serial.printf("Modbus All relays FAILED: %s (0x%02X)\n", modbusErrorString(result), result);
+        return false;
     }
-    Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
-    return success;
 }
 
 void modbusPulseRelay(int relay, uint16_t duration) {
@@ -2059,10 +2079,32 @@ void updateModbusPulses() {
     if (!config.modbusEnabled || !modbusInitialized) return;
 
     unsigned long now = millis();
+
+    // Count active and expired pulses
+    int activeCount = 0;
+    int expiredCount = 0;
     for (int i = 0; i < config.modbusRelayCount; i++) {
-        if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
-            modbusSetRelay(i + 1, false);
+        if (modbusPulseActive[i]) {
+            activeCount++;
+            if (now >= modbusPulseEndTime[i]) expiredCount++;
+        }
+    }
+
+    if (expiredCount == 0) return;
+
+    if (expiredCount == activeCount) {
+        // All active pulses expired — use FC15 to turn all off in one frame
+        modbusSetAllRelays(false);
+        for (int i = 0; i < config.modbusRelayCount; i++) {
             modbusPulseActive[i] = false;
+        }
+    } else {
+        // Only some pulses expired — use FC05 per relay
+        for (int i = 0; i < config.modbusRelayCount; i++) {
+            if (modbusPulseActive[i] && now >= modbusPulseEndTime[i]) {
+                modbusSetRelay(i + 1, false);
+                modbusPulseActive[i] = false;
+            }
         }
     }
 }
