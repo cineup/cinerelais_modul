@@ -238,7 +238,7 @@ bool modbusInitialized = false;  // Set true only after setupModbus() completes
 bool modbusConnected = false;
 bool modbusRelayStates[8] = {false};
 unsigned long modbusLastPoll = 0;
-const unsigned long MODBUS_POLL_INTERVAL = 500;  // Poll every 500ms
+const unsigned long MODBUS_POLL_INTERVAL = 60000;  // Heartbeat every 60s
 unsigned long modbusPulseEndTime[8] = {0};
 bool modbusPulseActive[8] = {false};
 
