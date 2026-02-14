@@ -1555,6 +1555,10 @@
                             <span class="info-value" id="info-version">-</span>
                         </div>
                         <div class="info-item">
+                            <span class="info-label">Web-Interface</span>
+                            <span class="info-value" id="info-fs-version">-</span>
+                        </div>
+                        <div class="info-item">
                             <span class="info-label">Hardware</span>
                             <span class="info-value" id="info-hardware">-</span>
                         </div>
@@ -1813,6 +1817,9 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // Web interface (FS) version — bump this when index.html is updated
+        const FS_VERSION = "1.0.0";
+
         // Pulse mode state (default ON for cinema use)
         let pulseMode = true;
 
@@ -2014,10 +2021,17 @@
                     }
                 }
 
-                // Firmware version
+                // Firmware version + FS version mismatch check
                 if (data.version) {
                     const versionEl = document.getElementById('info-version');
                     if (versionEl) versionEl.textContent = 'v' + data.version;
+                }
+                const fsVersionEl = document.getElementById('info-fs-version');
+                if (fsVersionEl) {
+                    const mismatch = data.requiredFsVersion && data.requiredFsVersion !== FS_VERSION;
+                    fsVersionEl.textContent = 'v' + FS_VERSION + (mismatch ? ' ⚠ (erwartet v' + data.requiredFsVersion + ')' : '');
+                    fsVersionEl.style.color = mismatch ? '#f59e0b' : '';
+                    fsVersionEl.title = mismatch ? 'FS-Version stimmt nicht mit Firmware überein — bitte Filesystem neu flashen (pio run -t uploadfs)' : '';
                 }
 
                 document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';

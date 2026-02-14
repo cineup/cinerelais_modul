@@ -3,8 +3,6 @@
  * Ethernet, WiFi AP/STA, Web Interface, TCP Server, Relay Control
  */
 
-#define FIRMWARE_VERSION "1.0.0"
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -1219,6 +1217,7 @@ String getStatusJSON() {
 
     // Firmware version
     doc["version"] = FIRMWARE_VERSION;
+    doc["requiredFsVersion"] = REQUIRED_FS_VERSION;
 
     // IP for header (priority: Ethernet > WiFi STA > WiFi AP)
 #ifndef ETHERNET_DISABLED
