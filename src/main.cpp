@@ -21,6 +21,7 @@
 #include <vector>
 #include <esp_netif.h>
 #include "driver/uart.h"
+#include "config.h"
 
 // ============================================
 // Hardware Pins
