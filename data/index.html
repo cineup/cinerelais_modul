@@ -38,6 +38,7 @@
             color: var(--text);
             min-height: 100vh;
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
         /* Header */
@@ -217,7 +218,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
             gap: 1.5rem;
         }
 
@@ -1105,9 +1106,47 @@
                 width: 100%;
             }
         }
+        /* Pull-to-refresh */
+        .pull-refresh {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            z-index: 200;
+            background: var(--bg-card);
+            transition: height 0.2s ease;
+        }
+
+        .pull-refresh.active {
+            transition: none;
+        }
+
+        .pull-refresh .pull-arrow {
+            margin-right: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .pull-refresh.ready .pull-arrow {
+            transform: rotate(180deg);
+        }
+
+        .pull-refresh.refreshing {
+            height: 50px !important;
+        }
     </style>
 </head>
 <body>
+    <div class="pull-refresh" id="pull-refresh">
+        <span class="pull-arrow">&#8595;</span>
+        <span class="pull-text">Zum Aktualisieren ziehen</span>
+    </div>
     <!-- Header -->
     <header>
         <div class="header-content">
@@ -1737,13 +1776,11 @@
                     </div>
                 </div>
 
-                <!-- Labels Configuration -->
+                <!-- Relay Labels -->
                 <div class="card grid-full">
                     <div class="card-header">
-                        <h2 class="card-title">Beschriftungen</h2>
+                        <h2 class="card-title">Relais Beschriftungen</h2>
                     </div>
-
-                    <div class="subsection-title">Relais Beschriftungen</div>
                     <div class="label-grid">
                         <div class="label-input">
                             <span class="label-num">1</span>
@@ -1779,56 +1816,25 @@
                         </div>
                     </div>
 
-                    <div class="subsection-title" style="margin-top: 1rem;">Input Beschriftungen</div>
-                    <div class="label-grid">
-                        <div class="label-input">
-                            <span class="label-num">1</span>
-                            <input type="text" id="inputLabel1" placeholder="Input 1" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">2</span>
-                            <input type="text" id="inputLabel2" placeholder="Input 2" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">3</span>
-                            <input type="text" id="inputLabel3" placeholder="Input 3" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">4</span>
-                            <input type="text" id="inputLabel4" placeholder="Input 4" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">5</span>
-                            <input type="text" id="inputLabel5" placeholder="Input 5" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">6</span>
-                            <input type="text" id="inputLabel6" placeholder="Input 6" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">7</span>
-                            <input type="text" id="inputLabel7" placeholder="Input 7" maxlength="12">
-                        </div>
-                        <div class="label-input">
-                            <span class="label-num">8</span>
-                            <input type="text" id="inputLabel8" placeholder="Input 8" maxlength="12">
-                        </div>
+                    <div id="modbus-labels-section" style="display: none;">
+                        <div class="subsection-title" style="margin-top: 1rem;">Modbus Relais Beschriftungen</div>
+                        <div class="label-grid" id="modbus-label-grid"></div>
                     </div>
 
                     <button class="btn btn-full" onclick="saveLabelsConfig()">Beschriftungen speichern</button>
                 </div>
 
-                <!-- Input to Relay Mapping -->
+                <!-- Input Configuration (Labels + Actions merged) -->
                 <div class="card grid-full">
                     <div class="card-header">
-                        <h2 class="card-title">Input &rarr; Aktionen</h2>
+                        <h2 class="card-title">Digitale Eingaenge</h2>
                     </div>
                     <p class="card-hint">
-                        Wenn ein Input aktiv ist, werden die konfigurierten Relais geschlossen (500ms Entprellung).
+                        Beschriftung, Relais-Zuordnung und TCP-Befehle pro Eingang konfigurieren.
                     </p>
                     <div class="input-action-list" id="input-action-list"></div>
                     <button class="btn btn-full" onclick="saveInputActionsConfig()">
-                        Aktionen speichern
+                        Eingaenge speichern
                     </button>
                 </div>
 
@@ -2155,6 +2161,7 @@
                 if (data.modbusEnabled) {
                     document.getElementById('modbus-card').style.display = 'block';
                     document.getElementById('modbus-tcp-help-card').style.display = 'block';
+                    document.getElementById('modbus-labels-section').style.display = 'block';
 
                     // Update connection status
                     const statusEl = document.querySelector('.modbus-status');
@@ -2183,6 +2190,7 @@
                 } else {
                     document.getElementById('modbus-card').style.display = 'none';
                     document.getElementById('modbus-tcp-help-card').style.display = 'none';
+                    document.getElementById('modbus-labels-section').style.display = 'none';
                 }
             } catch (error) {
                 console.error('Status update failed:', error);
@@ -2245,9 +2253,6 @@
                 }
                 if (data.inputLabels) {
                     inputLabels = data.inputLabels;
-                    for (let i = 1; i <= 8; i++) {
-                        document.getElementById(`inputLabel${i}`).value = inputLabels[i - 1] || '';
-                    }
                 }
 
                 // Modbus
@@ -2263,8 +2268,10 @@
                 // Show/hide Modbus card based on enabled state
                 document.getElementById('modbus-card').style.display = modbusEnabled ? 'block' : 'none';
                 document.getElementById('modbus-tcp-help-card').style.display = modbusEnabled ? 'block' : 'none';
+                document.getElementById('modbus-labels-section').style.display = modbusEnabled ? 'block' : 'none';
                 if (modbusEnabled) {
                     initModbusGrid();
+                    buildModbusLabelGrid();
                 }
 
                 // Input-to-Relay Mapping
@@ -2586,6 +2593,19 @@
             const enabled = document.getElementById('modbusEnabled').checked;
             document.getElementById('modbus-config').style.display = enabled ? 'block' : 'none';
             document.getElementById('modbus-tcp-help-card').style.display = enabled ? 'block' : 'none';
+            document.getElementById('modbus-labels-section').style.display = enabled ? 'block' : 'none';
+            if (enabled) buildModbusLabelGrid();
+        }
+
+        function buildModbusLabelGrid() {
+            const grid = document.getElementById('modbus-label-grid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= modbusRelayCount; i++) {
+                const div = document.createElement('div');
+                div.className = 'label-input';
+                div.innerHTML = `<span class="label-num">${i}</span><input type="text" id="modbusLabel${i}" placeholder="Modbus ${i}" maxlength="12" value="${modbusLabels[i-1] || ''}">`;
+                grid.appendChild(div);
+            }
         }
 
         function initModbusGrid() {
@@ -2617,7 +2637,7 @@
             }
         }
 
-        // Input-to-Relay Mapping Functions
+        // Input Configuration Functions (Labels + Actions merged)
         function buildInputActionList() {
             const list = document.getElementById('input-action-list');
             list.innerHTML = '';
@@ -2633,11 +2653,18 @@
                 row.innerHTML = `
                     <div class="input-action-header" onclick="toggleInputAction(${i})">
                         <span class="input-action-num">${i}</span>
-                        <span class="input-action-name">${inputName}</span>
+                        <span class="input-action-name" id="input-action-name-${i}">${inputName}</span>
                         <span class="input-action-summary ${summary ? 'has-mapping' : ''}" id="input-summary-${i}">${summary || '-'}</span>
                         <span class="expand-icon">&#9660;</span>
                     </div>
                     <div class="input-action-content" id="input-action-content-${i}">
+                        <div class="action-section">
+                            <label class="action-label">Beschriftung:</label>
+                            <input type="text" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
+                                   value="${inputLabels[i-1] || ''}"
+                                   oninput="updateInputActionName(${i})"
+                                   style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dark); color: var(--text); font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.875rem;">
+                        </div>
                         <div class="action-section">
                             <label class="action-label">Relais aktivieren:</label>
                             <div class="relay-checkboxes" id="relay-checkboxes-${i}">
@@ -2680,6 +2707,12 @@
 
                 list.appendChild(row);
             }
+        }
+
+        function updateInputActionName(inputNum) {
+            const val = document.getElementById(`inputLabel${inputNum}`).value.trim();
+            const nameEl = document.getElementById(`input-action-name-${inputNum}`);
+            nameEl.textContent = val || `Input ${inputNum}`;
         }
 
         function buildDeviceOptions(inputNum) {
@@ -2802,17 +2835,16 @@
         }
 
         async function saveInputActionsConfig() {
-            // Read TCP values from form
+            // Collect input labels + TCP values from form
             for (let i = 1; i <= 8; i++) {
-                const mode = inputTcpMode[i - 1];
+                inputLabels[i - 1] = document.getElementById(`inputLabel${i}`).value.trim();
 
+                const mode = inputTcpMode[i - 1];
                 if (mode === 1) {
-                    // Manual mode
                     inputTcpHost[i - 1] = document.getElementById(`tcp-host-${i}`).value;
                     inputTcpPort[i - 1] = parseInt(document.getElementById(`tcp-port-${i}`).value) || 0;
                     inputTcpCommand[i - 1] = document.getElementById(`tcp-cmd-${i}`).value;
                 } else if (mode === 2) {
-                    // Preset mode
                     inputTcpHost[i - 1] = document.getElementById(`tcp-preset-host-${i}`).value;
                     inputTcpDevice[i - 1] = parseInt(document.getElementById(`tcp-device-${i}`).value) || 0;
                     inputTcpFunction[i - 1] = parseInt(document.getElementById(`tcp-function-${i}`).value) || 0;
@@ -2820,6 +2852,7 @@
             }
 
             const formData = new FormData();
+            formData.append('inputLabels', JSON.stringify(inputLabels));
             formData.append('inputRelayMap', JSON.stringify(inputRelayMap));
             formData.append('inputTcpMode', JSON.stringify(inputTcpMode));
             formData.append('inputTcpHost', JSON.stringify(inputTcpHost));
@@ -2834,7 +2867,8 @@
                     body: formData
                 });
                 const result = await response.json();
-                showToast('Aktionen gespeichert', 'success');
+                showToast('Eingaenge gespeichert', 'success');
+                updateInputLabels();
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
@@ -2934,15 +2968,20 @@
 
         async function saveLabelsConfig() {
             try {
-                // Collect labels from inputs
                 for (let i = 1; i <= 8; i++) {
                     relayLabels[i - 1] = document.getElementById(`relayLabel${i}`).value.trim();
-                    inputLabels[i - 1] = document.getElementById(`inputLabel${i}`).value.trim();
+                }
+                // Collect modbus labels if enabled
+                if (modbusEnabled) {
+                    for (let i = 1; i <= modbusRelayCount; i++) {
+                        const el = document.getElementById(`modbusLabel${i}`);
+                        if (el) modbusLabels[i - 1] = el.value.trim();
+                    }
                 }
 
                 const formData = new FormData();
                 formData.append('relayLabels', JSON.stringify(relayLabels));
-                formData.append('inputLabels', JSON.stringify(inputLabels));
+                formData.append('modbusLabels', JSON.stringify(modbusLabels));
 
                 const response = await fetch('/api/config', {
                     method: 'POST',
@@ -2952,9 +2991,8 @@
                 const result = await response.json();
                 showToast(result.message || 'Beschriftungen gespeichert', 'success');
 
-                // Update display immediately
                 updateRelayLabels();
-                updateInputLabels();
+                updateModbusLabels();
             } catch (error) {
                 showToast('Fehler beim Speichern', 'error');
             }
@@ -3123,28 +3161,82 @@
             }, 3000);
         }
 
-        // Generate apple-touch-icon (180x180 PNG from SVG)
-        function createAppIcon() {
+        // Pull-to-refresh for iOS standalone mode
+        (function() {
+            const el = document.getElementById('pull-refresh');
+            const textEl = el.querySelector('.pull-text');
+            const threshold = 80;
+            let startY = 0;
+            let pulling = false;
+
+            document.addEventListener('touchstart', (e) => {
+                if (window.scrollY === 0 && e.touches.length === 1) {
+                    startY = e.touches[0].clientY;
+                }
+            }, {passive: true});
+
+            document.addEventListener('touchmove', (e) => {
+                if (!startY) return;
+                const dy = e.touches[0].clientY - startY;
+                if (dy > 10 && window.scrollY === 0) {
+                    pulling = true;
+                    const h = Math.min(dy * 0.4, threshold);
+                    el.classList.add('active');
+                    el.style.height = h + 'px';
+                    if (h >= threshold * 0.9) {
+                        el.classList.add('ready');
+                        textEl.textContent = 'Loslassen zum Aktualisieren';
+                    } else {
+                        el.classList.remove('ready');
+                        textEl.textContent = 'Zum Aktualisieren ziehen';
+                    }
+                }
+            }, {passive: true});
+
+            document.addEventListener('touchend', () => {
+                if (pulling && el.classList.contains('ready')) {
+                    el.classList.remove('active');
+                    el.classList.add('refreshing');
+                    textEl.textContent = 'Aktualisiere...';
+                    setTimeout(() => location.reload(), 300);
+                } else {
+                    el.classList.remove('active', 'ready');
+                    el.style.height = '0';
+                }
+                startY = 0;
+                pulling = false;
+            });
+        })();
+
+        // Generate app icons (apple-touch-icon 180px + PNG favicon 32px for Safari)
+        function createAppIcons() {
             const svg = `<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"><rect width="1000" height="1000" fill="#0d2339" rx="180" ry="180"/><rect x="100" y="200" width="800" height="600" rx="40" ry="40" fill="#fff"/><rect x="40" y="623" width="360" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><g transform="rotate(-30 400 663)"><rect x="398" y="623" width="312" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="400" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></g><rect x="710" y="623" width="250" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="710" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></svg>`;
-            const canvas = document.createElement('canvas');
-            canvas.width = 180;
-            canvas.height = 180;
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0, 180, 180);
-                const link = document.createElement('link');
-                link.rel = 'apple-touch-icon';
-                link.href = canvas.toDataURL('image/png');
-                document.head.appendChild(link);
-                URL.revokeObjectURL(img.src);
-            };
-            img.src = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'}));
+            const blob = new Blob([svg], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            const sizes = [{size: 180, rel: 'apple-touch-icon'}, {size: 32, rel: 'icon'}];
+            let loaded = 0;
+            sizes.forEach(({size, rel}) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = function() {
+                    ctx.drawImage(img, 0, 0, size, size);
+                    const link = document.createElement('link');
+                    link.rel = rel;
+                    link.type = 'image/png';
+                    link.href = canvas.toDataURL('image/png');
+                    document.head.appendChild(link);
+                    if (++loaded === sizes.length) URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            });
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            createAppIcon();
+            createAppIcons();
             initGrids();
             loadConfig();
             updateStatus();
