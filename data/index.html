@@ -16,6 +16,7 @@
             --bg-card: #0d2339;
             --bg-card-hover: #112d4a;
             --border: #1a3a5a;
+            --border-hover: #1e4d73;
             --text: #e4e4e7;
             --text-dim: #7a9bbd;
             --accent: #3399ff;
@@ -238,7 +239,7 @@
         }
 
         .card:hover {
-            border-color: #1e4d73;
+            border-color: var(--border-hover);
         }
 
         .card-header {
@@ -648,7 +649,7 @@
         }
 
         .status-badge.offline {
-            background: rgba(113, 113, 122, 0.2);
+            background: rgba(122, 155, 189, 0.15);
             color: var(--text-dim);
         }
 
@@ -665,14 +666,6 @@
             color: var(--text-dim);
             margin-bottom: 0.5rem;
             margin-top: 0.5rem;
-        }
-
-        .section-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-dim);
-            margin-bottom: 0.75rem;
         }
 
         /* Log Table */
@@ -699,7 +692,7 @@
 
         .log-table td {
             padding: 0.4rem 0.5rem;
-            font-family: monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             border-bottom: 1px solid var(--border);
         }
 
@@ -733,9 +726,6 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background: var(--bg-dark);
-            border-radius: 8px;
-            padding: 0.5rem;
         }
 
         .label-num {
@@ -1028,6 +1018,7 @@
             border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
             margin-bottom: 0.75rem;
         }
