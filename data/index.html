@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#0d2339">
     <title>CineRelais Controller</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 1000 1000' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1000' height='1000' fill='%230d2339'/%3E%3Crect x='100' y='200' width='800' height='600' rx='40' ry='40' fill='%23fff'/%3E%3Crect x='40' y='623' width='360' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Cg transform='rotate(-30 400 663)'%3E%3Crect x='398' y='623' width='312' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='400' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/g%3E%3Crect x='710' y='623' width='250' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='710' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/svg%3E">
+    <script>(function(){var c=document.createElement('canvas'),x=c.getContext('2d');c.width=c.height=32;x.fillStyle='#0d2339';x.fillRect(0,0,32,32);x.fillStyle='#fff';x.fillRect(3,6,26,19);x.fillStyle='#3399ff';x.fillRect(1,20,12,3);x.fillRect(23,20,8,3);x.beginPath();x.arc(23,21.5,2,0,6.3);x.fill();x.beginPath();x.arc(13,21.5,2,0,6.3);x.fill();x.save();x.translate(13,21.5);x.rotate(-0.52);x.fillRect(0,-1.5,10,3);x.restore();var d=c.toDataURL();document.write('<link rel="icon" type="image/png" sizes="32x32" href="'+d+'">')})()</script>
     <style>
         :root {
             --bg-dark: #0a0c14;
@@ -232,6 +233,8 @@
             border-radius: 16px;
             padding: 1.5rem;
             transition: all 0.2s ease;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .card:hover {
@@ -450,6 +453,7 @@
 
         .form-group input, .form-group select {
             width: 100%;
+            min-width: 0;
             padding: 0.75rem 1rem;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -612,15 +616,21 @@
             padding: 0.75rem 1rem;
             background: var(--bg-dark);
             border-radius: 8px;
-        }
-
-        .info-label {
-            color: var(--text-dim);
-            font-size: 0.875rem;
+            min-width: 0;
+            gap: 0.5rem;
         }
 
         .info-value {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            overflow-wrap: break-word;
+            word-break: break-all;
+            text-align: right;
+            min-width: 0;
+        }
+
+        .info-label {
+            color: var(--text-dim);
             font-size: 0.875rem;
         }
 
