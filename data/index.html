@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CineRelais">
+    <meta name="theme-color" content="#0d2339">
     <title>CineRelais Controller</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 1000 1000' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1000' height='1000' fill='%230d2339'/%3E%3Crect x='100' y='200' width='800' height='600' rx='40' ry='40' fill='%23fff'/%3E%3Crect x='40' y='623' width='360' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Cg transform='rotate(-30 400 663)'%3E%3Crect x='398' y='623' width='312' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='400' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/g%3E%3Crect x='710' y='623' width='250' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='710' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/svg%3E">
     <style>
         :root {
             --bg-dark: #0a0c14;
@@ -3118,8 +3123,28 @@
             }, 3000);
         }
 
+        // Generate apple-touch-icon (180x180 PNG from SVG)
+        function createAppIcon() {
+            const svg = `<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"><rect width="1000" height="1000" fill="#0d2339" rx="180" ry="180"/><rect x="100" y="200" width="800" height="600" rx="40" ry="40" fill="#fff"/><rect x="40" y="623" width="360" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><g transform="rotate(-30 400 663)"><rect x="398" y="623" width="312" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="400" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></g><rect x="710" y="623" width="250" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="710" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></svg>`;
+            const canvas = document.createElement('canvas');
+            canvas.width = 180;
+            canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 180, 180);
+                const link = document.createElement('link');
+                link.rel = 'apple-touch-icon';
+                link.href = canvas.toDataURL('image/png');
+                document.head.appendChild(link);
+                URL.revokeObjectURL(img.src);
+            };
+            img.src = URL.createObjectURL(new Blob([svg], {type: 'image/svg+xml'}));
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            createAppIcon();
             initGrids();
             loadConfig();
             updateStatus();
