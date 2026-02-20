@@ -16,6 +16,7 @@
             --bg-card: #0d2339;
             --bg-card-hover: #112d4a;
             --border: #1a3a5a;
+            --border-hover: #1e4d73;
             --text: #e4e4e7;
             --text-dim: #7a9bbd;
             --accent: #3399ff;
@@ -238,7 +239,7 @@
         }
 
         .card:hover {
-            border-color: #1e4d73;
+            border-color: var(--border-hover);
         }
 
         .card-header {
@@ -648,7 +649,7 @@
         }
 
         .status-badge.offline {
-            background: rgba(113, 113, 122, 0.2);
+            background: rgba(122, 155, 189, 0.15);
             color: var(--text-dim);
         }
 
@@ -665,14 +666,6 @@
             color: var(--text-dim);
             margin-bottom: 0.5rem;
             margin-top: 0.5rem;
-        }
-
-        .section-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-dim);
-            margin-bottom: 0.75rem;
         }
 
         /* Log Table */
@@ -699,7 +692,7 @@
 
         .log-table td {
             padding: 0.4rem 0.5rem;
-            font-family: monospace;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             border-bottom: 1px solid var(--border);
         }
 
@@ -733,27 +726,25 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            background: var(--bg-dark);
-            border-radius: 8px;
-            padding: 0.5rem;
         }
 
         .label-num {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-weight: 700;
-            font-size: 0.875rem;
-            color: var(--text-dim);
-            min-width: 1.25rem;
+            font-size: 1rem;
+            color: var(--info);
+            min-width: 1.5rem;
             text-align: center;
         }
 
         .label-input input {
             flex: 1;
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
             border-radius: 8px;
-            background: var(--bg-card);
+            background: var(--bg-dark);
             color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
             min-width: 0;
         }
@@ -765,7 +756,7 @@
 
         @media (max-width: 600px) {
             .label-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr;
             }
         }
 
@@ -970,6 +961,22 @@
             margin-bottom: 0.5rem;
         }
 
+        .action-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+
+        .action-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
         .relay-checkboxes {
             display: flex;
             flex-wrap: wrap;
@@ -1011,6 +1018,7 @@
             border-radius: 8px;
             background: var(--bg-dark);
             color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
             margin-bottom: 0.75rem;
         }
@@ -2670,10 +2678,9 @@
                     <div class="input-action-content" id="input-action-content-${i}">
                         <div class="action-section">
                             <label class="action-label">Beschriftung:</label>
-                            <input type="text" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
+                            <input type="text" class="action-input" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
                                    value="${inputLabels[i-1] || ''}"
-                                   oninput="updateInputActionName(${i})"
-                                   style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dark); color: var(--text); font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.875rem;">
+                                   oninput="updateInputActionName(${i})">
                         </div>
                         <div class="action-section">
                             <label class="action-label">Relais aktivieren:</label>
