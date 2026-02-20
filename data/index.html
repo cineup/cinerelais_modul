@@ -1218,14 +1218,6 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="relay-grid"></div>
-                    <div class="relay-actions" id="relay-actions-toggle">
-                        <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
-                        <button class="btn btn-warning" onclick="pulseAllRelays()">Alle IMPULS</button>
-                        <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
-                    </div>
-                    <div class="relay-actions" id="relay-actions-pulse" style="display: none;">
-                        <button class="btn btn-warning" onclick="pulseAllRelays()" style="flex: 1;">Alle IMPULS</button>
-                    </div>
                 </div>
 
                 <!-- Digital Inputs -->
@@ -1246,11 +1238,6 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="modbus-relay-grid"></div>
-                    <div class="relay-actions">
-                        <button class="btn" onclick="modbusSetAllRelays('on')">Alle EIN</button>
-                        <button class="btn btn-warning" onclick="modbusPulseAllRelays()">Alle IMPULS</button>
-                        <button class="btn btn-danger" onclick="modbusSetAllRelays('off')">Alle AUS</button>
-                    </div>
                 </div>
 
                 <!-- Command Log -->
@@ -1335,7 +1322,7 @@
 
                     <div class="form-group">
                         <label>Hostname</label>
-                        <input type="text" id="hostnameInput" placeholder="cinerelais1">
+                        <input type="text" id="hostnameInput" placeholder="CineRelais">
                     </div>
 
                     <div class="toggle-container">
@@ -1931,8 +1918,6 @@
         // Toggle pulse mode
         function togglePulseMode() {
             pulseMode = document.getElementById('pulseMode').checked;
-            document.getElementById('relay-actions-toggle').style.display = pulseMode ? 'none' : 'flex';
-            document.getElementById('relay-actions-pulse').style.display = pulseMode ? 'flex' : 'none';
             updateRelayLabels();
             updateModbusLabels();
         }
@@ -2425,51 +2410,6 @@
             }
         }
 
-        async function setAllRelays(state) {
-            try {
-                const formData = new FormData();
-                formData.append('state', state);
-
-                await fetch('/api/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                updateStatus();
-                showToast(`Alle Relais ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
-            } catch (error) {
-                showToast('Fehler beim Schalten', 'error');
-            }
-        }
-
-        async function pulseAllRelays() {
-            try {
-                const duration = document.getElementById('pulseDuration').value || 500;
-                const formData = new FormData();
-                formData.append('state', 'pulse');
-                formData.append('duration', duration);
-
-                // Visual feedback for all buttons
-                for (let i = 1; i <= 8; i++) {
-                    const btn = document.getElementById(`relay-${i}`);
-                    if (btn) {
-                        btn.classList.remove('pulse-flash');
-                        void btn.offsetWidth;
-                        btn.classList.add('pulse-flash');
-                    }
-                }
-
-                await fetch('/api/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                showToast('Alle Relais Impuls', 'success');
-            } catch (error) {
-                showToast('Fehler beim Impuls', 'error');
-            }
-        }
-
         // Modbus relay control
         async function modbusToggleRelay(relay) {
             if (pulseMode) {
@@ -2532,61 +2472,6 @@
             } catch (error) {
                 console.error('Modbus pulse error:', error);
                 showToast('Modbus Netzwerkfehler', 'error');
-            }
-        }
-
-        async function modbusSetAllRelays(state) {
-            try {
-                const formData = new FormData();
-                formData.append('state', state);
-
-                const response = await fetch('/api/modbus/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    updateStatus();
-                    showToast(`Modbus alle ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
-                } else {
-                    const data = await response.json();
-                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Modbus error:', error);
-                showToast('Modbus Netzwerkfehler', 'error');
-            }
-        }
-
-        async function modbusPulseAllRelays() {
-            try {
-                const duration = document.getElementById('pulseDuration').value || 500;
-                const formData = new FormData();
-                formData.append('state', 'pulse');
-                formData.append('duration', duration);
-
-                // Visual feedback for all modbus buttons
-                for (let i = 1; i <= modbusRelayCount; i++) {
-                    const btn = document.getElementById(`modbus-relay-${i}`);
-                    if (btn) {
-                        btn.classList.remove('pulse-flash');
-                        void btn.offsetWidth;
-                        btn.classList.add('pulse-flash');
-                    }
-                }
-
-                const response = await fetch('/api/modbus/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    showToast('Modbus alle Impuls', 'success');
-                } else {
-                    showToast('Modbus Fehler', 'error');
-                }
-            } catch (error) {
-                showToast('Modbus Fehler', 'error');
             }
         }
 
