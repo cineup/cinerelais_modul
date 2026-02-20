@@ -741,19 +741,20 @@
         .label-num {
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-weight: 700;
-            font-size: 0.875rem;
-            color: var(--text-dim);
-            min-width: 1.25rem;
+            font-size: 1rem;
+            color: var(--info);
+            min-width: 1.5rem;
             text-align: center;
         }
 
         .label-input input {
             flex: 1;
-            padding: 0.5rem 0.75rem;
+            padding: 0.75rem 1rem;
             border: 1px solid var(--border);
             border-radius: 8px;
-            background: var(--bg-card);
+            background: var(--bg-dark);
             color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 0.875rem;
             min-width: 0;
         }
@@ -765,7 +766,7 @@
 
         @media (max-width: 600px) {
             .label-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr;
             }
         }
 
@@ -968,6 +969,22 @@
             font-size: 0.875rem;
             color: var(--text-dim);
             margin-bottom: 0.5rem;
+        }
+
+        .action-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+
+        .action-input:focus {
+            outline: none;
+            border-color: var(--accent);
         }
 
         .relay-checkboxes {
@@ -2670,10 +2687,9 @@
                     <div class="input-action-content" id="input-action-content-${i}">
                         <div class="action-section">
                             <label class="action-label">Beschriftung:</label>
-                            <input type="text" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
+                            <input type="text" class="action-input" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
                                    value="${inputLabels[i-1] || ''}"
-                                   oninput="updateInputActionName(${i})"
-                                   style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dark); color: var(--text); font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 0.875rem;">
+                                   oninput="updateInputActionName(${i})">
                         </div>
                         <div class="action-section">
                             <label class="action-label">Relais aktivieren:</label>
