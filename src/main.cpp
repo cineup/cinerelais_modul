@@ -132,7 +132,7 @@ struct Config {
 };
 
 Config config = {
-    "cinerelais1",  // hostname
+    "CineRelais",   // hostname
     5000,           // tcpPort
     500,            // pulseDuration
     // Ethernet
@@ -1370,7 +1370,7 @@ void loadConfig() {
         return;
     }
 
-    strlcpy(config.hostname, doc["hostname"] | "cinerelais1", sizeof(config.hostname));
+    strlcpy(config.hostname, doc["hostname"] | "CineRelais", sizeof(config.hostname));
     config.tcpPort = doc["tcpPort"] | 5000;
     config.pulseDuration = doc["pulseDuration"] | 500;
 

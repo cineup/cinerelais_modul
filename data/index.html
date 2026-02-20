@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="CineRelais">
     <meta name="theme-color" content="#0d2339">
     <title>CineRelais Controller</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 1000 1000' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1000' height='1000' fill='%230d2339'/%3E%3Crect x='100' y='200' width='800' height='600' rx='40' ry='40' fill='%23fff'/%3E%3Crect x='40' y='623' width='360' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Cg transform='rotate(-30 400 663)'%3E%3Crect x='398' y='623' width='312' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='400' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/g%3E%3Crect x='710' y='623' width='250' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='710' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/svg%3E">
-    <script>(function(){var c=document.createElement('canvas'),x=c.getContext('2d');c.width=c.height=32;x.fillStyle='#0d2339';x.fillRect(0,0,32,32);x.fillStyle='#fff';x.fillRect(3,6,26,19);x.fillStyle='#3399ff';x.fillRect(1,20,12,3);x.fillRect(23,20,8,3);x.beginPath();x.arc(23,21.5,2,0,6.3);x.fill();x.beginPath();x.arc(13,21.5,2,0,6.3);x.fill();x.save();x.translate(13,21.5);x.rotate(-0.52);x.fillRect(0,-1.5,10,3);x.restore();var d=c.toDataURL();document.write('<link rel="icon" type="image/png" sizes="32x32" href="'+d+'">')})()</script>
+    <script>(function(){var c=document.createElement('canvas'),x=c.getContext('2d');c.width=c.height=48;x.fillStyle='#0d2339';x.fillRect(0,0,48,48);x.fillStyle='#fff';x.fillRect(4,9,39,28);x.fillStyle='#3399ff';x.fillRect(1,30,18,4);x.fillRect(34,30,12,4);x.beginPath();x.arc(34,32,3,0,6.3);x.fill();x.beginPath();x.arc(19,32,3,0,6.3);x.fill();x.save();x.translate(19,32);x.rotate(-0.52);x.fillRect(0,-2,15,4);x.restore();document.write('<link rel="icon" type="image/png" sizes="48x48" href="'+c.toDataURL()+'">')})()</script>
+    <link rel="icon" sizes="any" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 1000 1000' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='1000' height='1000' fill='%230d2339'/%3E%3Crect x='100' y='200' width='800' height='600' rx='40' ry='40' fill='%23fff'/%3E%3Crect x='40' y='623' width='360' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Cg transform='rotate(-30 400 663)'%3E%3Crect x='398' y='623' width='312' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='400' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/g%3E%3Crect x='710' y='623' width='250' height='80' rx='40' ry='40' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3Ccircle cx='710' cy='663' r='50' fill='%233399ff' stroke='%230d2339' stroke-width='20'/%3E%3C/svg%3E">
     <style>
         :root {
             --bg-dark: #0a0c14;
@@ -1218,14 +1218,6 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="relay-grid"></div>
-                    <div class="relay-actions" id="relay-actions-toggle">
-                        <button class="btn" onclick="setAllRelays('on')">Alle EIN</button>
-                        <button class="btn btn-warning" onclick="pulseAllRelays()">Alle IMPULS</button>
-                        <button class="btn btn-danger" onclick="setAllRelays('off')">Alle AUS</button>
-                    </div>
-                    <div class="relay-actions" id="relay-actions-pulse" style="display: none;">
-                        <button class="btn btn-warning" onclick="pulseAllRelays()" style="flex: 1;">Alle IMPULS</button>
-                    </div>
                 </div>
 
                 <!-- Digital Inputs -->
@@ -1246,11 +1238,6 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="modbus-relay-grid"></div>
-                    <div class="relay-actions">
-                        <button class="btn" onclick="modbusSetAllRelays('on')">Alle EIN</button>
-                        <button class="btn btn-warning" onclick="modbusPulseAllRelays()">Alle IMPULS</button>
-                        <button class="btn btn-danger" onclick="modbusSetAllRelays('off')">Alle AUS</button>
-                    </div>
                 </div>
 
                 <!-- Command Log -->
@@ -1335,7 +1322,7 @@
 
                     <div class="form-group">
                         <label>Hostname</label>
-                        <input type="text" id="hostnameInput" placeholder="cinerelais1">
+                        <input type="text" id="hostnameInput" placeholder="CineRelais">
                     </div>
 
                     <div class="toggle-container">
@@ -1931,8 +1918,6 @@
         // Toggle pulse mode
         function togglePulseMode() {
             pulseMode = document.getElementById('pulseMode').checked;
-            document.getElementById('relay-actions-toggle').style.display = pulseMode ? 'none' : 'flex';
-            document.getElementById('relay-actions-pulse').style.display = pulseMode ? 'flex' : 'none';
             updateRelayLabels();
             updateModbusLabels();
         }
@@ -2425,51 +2410,6 @@
             }
         }
 
-        async function setAllRelays(state) {
-            try {
-                const formData = new FormData();
-                formData.append('state', state);
-
-                await fetch('/api/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                updateStatus();
-                showToast(`Alle Relais ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
-            } catch (error) {
-                showToast('Fehler beim Schalten', 'error');
-            }
-        }
-
-        async function pulseAllRelays() {
-            try {
-                const duration = document.getElementById('pulseDuration').value || 500;
-                const formData = new FormData();
-                formData.append('state', 'pulse');
-                formData.append('duration', duration);
-
-                // Visual feedback for all buttons
-                for (let i = 1; i <= 8; i++) {
-                    const btn = document.getElementById(`relay-${i}`);
-                    if (btn) {
-                        btn.classList.remove('pulse-flash');
-                        void btn.offsetWidth;
-                        btn.classList.add('pulse-flash');
-                    }
-                }
-
-                await fetch('/api/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                showToast('Alle Relais Impuls', 'success');
-            } catch (error) {
-                showToast('Fehler beim Impuls', 'error');
-            }
-        }
-
         // Modbus relay control
         async function modbusToggleRelay(relay) {
             if (pulseMode) {
@@ -2532,61 +2472,6 @@
             } catch (error) {
                 console.error('Modbus pulse error:', error);
                 showToast('Modbus Netzwerkfehler', 'error');
-            }
-        }
-
-        async function modbusSetAllRelays(state) {
-            try {
-                const formData = new FormData();
-                formData.append('state', state);
-
-                const response = await fetch('/api/modbus/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    updateStatus();
-                    showToast(`Modbus alle ${state === 'on' ? 'EIN' : 'AUS'}`, 'success');
-                } else {
-                    const data = await response.json();
-                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Modbus error:', error);
-                showToast('Modbus Netzwerkfehler', 'error');
-            }
-        }
-
-        async function modbusPulseAllRelays() {
-            try {
-                const duration = document.getElementById('pulseDuration').value || 500;
-                const formData = new FormData();
-                formData.append('state', 'pulse');
-                formData.append('duration', duration);
-
-                // Visual feedback for all modbus buttons
-                for (let i = 1; i <= modbusRelayCount; i++) {
-                    const btn = document.getElementById(`modbus-relay-${i}`);
-                    if (btn) {
-                        btn.classList.remove('pulse-flash');
-                        void btn.offsetWidth;
-                        btn.classList.add('pulse-flash');
-                    }
-                }
-
-                const response = await fetch('/api/modbus/relays', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    showToast('Modbus alle Impuls', 'success');
-                } else {
-                    showToast('Modbus Fehler', 'error');
-                }
-            } catch (error) {
-                showToast('Modbus Fehler', 'error');
             }
         }
 
@@ -3225,30 +3110,25 @@
             });
         })();
 
-        // Generate app icons (apple-touch-icon 180px + PNG favicon 32px for Safari)
+        // Generate apple-touch-icon (180px PNG for iOS home screen)
         function createAppIcons() {
             const svg = `<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg"><rect width="1000" height="1000" fill="#0d2339" rx="180" ry="180"/><rect x="100" y="200" width="800" height="600" rx="40" ry="40" fill="#fff"/><rect x="40" y="623" width="360" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><g transform="rotate(-30 400 663)"><rect x="398" y="623" width="312" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="400" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></g><rect x="710" y="623" width="250" height="80" rx="40" ry="40" fill="#3399ff" stroke="#0d2339" stroke-width="20"/><circle cx="710" cy="663" r="50" fill="#3399ff" stroke="#0d2339" stroke-width="20"/></svg>`;
             const blob = new Blob([svg], {type: 'image/svg+xml'});
             const url = URL.createObjectURL(blob);
-            const sizes = [{size: 180, rel: 'apple-touch-icon'}, {size: 32, rel: 'icon'}];
-            let loaded = 0;
-            sizes.forEach(({size, rel}) => {
-                const canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
-                const img = new Image();
-                img.onload = function() {
-                    ctx.drawImage(img, 0, 0, size, size);
-                    const link = document.createElement('link');
-                    link.rel = rel;
-                    link.type = 'image/png';
-                    link.href = canvas.toDataURL('image/png');
-                    document.head.appendChild(link);
-                    if (++loaded === sizes.length) URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            });
+            const canvas = document.createElement('canvas');
+            canvas.width = 180;
+            canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, 180, 180);
+                const link = document.createElement('link');
+                link.rel = 'apple-touch-icon';
+                link.href = canvas.toDataURL('image/png');
+                document.head.appendChild(link);
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
         }
 
         // Initialize
