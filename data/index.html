@@ -158,6 +158,38 @@
             color: var(--text);
         }
 
+        .ws-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            border: 1px solid var(--border);
+            opacity: 0.5;
+            cursor: default;
+        }
+        .ws-indicator.ws-online {
+            opacity: 1;
+            border-color: var(--green);
+        }
+        .ws-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-dim);
+        }
+        .ws-indicator.ws-online .ws-dot {
+            background: var(--green);
+        }
+        .ws-label {
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+        .ws-indicator.ws-online .ws-label {
+            color: var(--green);
+        }
+
         /* Tab Navigation */
         .tab-nav {
             background: var(--bg-card);
@@ -1188,6 +1220,10 @@
                     <span class="conn-label">AP</span>
                     <span class="conn-ip" id="conn-ap-ip">-</span>
                 </div>
+                <div class="ws-indicator ws-offline" id="ws-indicator" title="WebSocket getrennt (Polling)">
+                    <span class="ws-dot"></span>
+                    <span class="ws-label">WS</span>
+                </div>
             </div>
         </div>
     </header>
@@ -1875,7 +1911,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.0.0";
+        const FS_VERSION = "1.1.0";
 
         // Pulse mode state (default ON for cinema use)
         let pulseMode = true;
@@ -1903,6 +1939,92 @@
         let inputTcpFunction = [0, 0, 0, 0, 0, 0, 0, 0];
         // Device presets (loaded from API)
         let tcpDevices = [];
+
+        // WebSocket state
+        let wsConnection = null;
+        let wsReconnectTimer = null;
+        let wsReconnectDelay = 1000;
+        let wsConnected = false;
+        let statusInterval = null;
+
+        function connectWebSocket() {
+            if (wsConnection && wsConnection.readyState <= WebSocket.OPEN) return;
+
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/ws`;
+
+            try {
+                wsConnection = new WebSocket(wsUrl);
+            } catch (e) {
+                console.error('WebSocket creation failed:', e);
+                scheduleReconnect();
+                return;
+            }
+
+            wsConnection.onopen = function() {
+                console.log('WebSocket connected');
+                wsConnected = true;
+                wsReconnectDelay = 1000;
+                setPollingInterval(10000);  // Slow polling as fallback
+                updateWsIndicator();
+            };
+
+            wsConnection.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    // Only apply status if it looks like a status object (has relays array)
+                    if (data.relays) {
+                        applyStatus(data);
+                    }
+                } catch (e) {
+                    // Command response (plain text like "OK: Relay 1 ON") — ignore
+                }
+            };
+
+            wsConnection.onclose = function() {
+                console.log('WebSocket disconnected');
+                wsConnected = false;
+                wsConnection = null;
+                setPollingInterval(2000);  // Fast polling fallback
+                updateWsIndicator();
+                scheduleReconnect();
+            };
+
+            wsConnection.onerror = function(e) {
+                console.error('WebSocket error:', e);
+            };
+        }
+
+        function scheduleReconnect() {
+            if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = setTimeout(() => {
+                wsReconnectTimer = null;
+                connectWebSocket();
+            }, wsReconnectDelay);
+            wsReconnectDelay = Math.min(wsReconnectDelay * 2, 10000);
+        }
+
+        function setPollingInterval(ms) {
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(updateStatus, ms);
+        }
+
+        // Send command via WebSocket (falls back to false if not connected)
+        function wsSend(cmd) {
+            if (wsConnected && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+                wsConnection.send(cmd);
+                return true;
+            }
+            return false;
+        }
+
+        function updateWsIndicator() {
+            const el = document.getElementById('ws-indicator');
+            if (el) {
+                el.className = 'ws-indicator ' + (wsConnected ? 'ws-online' : 'ws-offline');
+                el.title = wsConnected ? 'WebSocket verbunden (Live)' : 'WebSocket getrennt (Polling)';
+            }
+        }
 
         // Tab switching
         function switchTab(tabName) {
@@ -1969,12 +2091,8 @@
             }
         }
 
-        // Fetch and update status
-        async function updateStatus() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-
+        // Apply status data to DOM (used by both WebSocket and HTTP polling)
+        function applyStatus(data) {
                 // Update hostname
                 document.getElementById('hostname').textContent = data.hostname;
                 document.title = `${data.hostname} - CineRelais`;
@@ -2195,6 +2313,14 @@
                     document.getElementById('modbus-tcp-help-card').style.display = 'none';
                     document.getElementById('modbus-labels-section').style.display = 'none';
                 }
+        }
+
+        // HTTP polling fallback (also used for initial load)
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                applyStatus(data);
             } catch (error) {
                 console.error('Status update failed:', error);
             }
@@ -2367,6 +2493,12 @@
             const btn = document.getElementById(`relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
 
+            // Try WebSocket first, fall back to HTTP
+            if (wsSend(`r${relay}_${newState}`)) {
+                btn.classList.toggle('active');
+                return;
+            }
+
             try {
                 const formData = new FormData();
                 formData.append('relay', relay);
@@ -2385,19 +2517,26 @@
 
         async function pulseRelay(relay) {
             const btn = document.getElementById(`relay-${relay}`);
+            const duration = document.getElementById('pulseDuration').value || 500;
+
+            // Visual feedback immediately
+            if (btn) {
+                btn.classList.remove('pulse-flash');
+                void btn.offsetWidth; // Force reflow to restart animation
+                btn.classList.add('pulse-flash');
+            }
+
+            // Try WebSocket first, fall back to HTTP
+            if (wsSend(`r${relay}_pulse_${duration}`)) {
+                showToast(`Relais ${relay} Impuls`, 'success');
+                return;
+            }
+
             try {
-                const duration = document.getElementById('pulseDuration').value || 500;
                 const formData = new FormData();
                 formData.append('relay', relay);
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
-
-                // Visual feedback immediately
-                if (btn) {
-                    btn.classList.remove('pulse-flash');
-                    void btn.offsetWidth; // Force reflow to restart animation
-                    btn.classList.add('pulse-flash');
-                }
 
                 await fetch('/api/relay', {
                     method: 'POST',
@@ -2419,6 +2558,12 @@
 
             const btn = document.getElementById(`modbus-relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
+
+            // Try WebSocket first
+            if (wsSend(`m1_r${relay}_${newState}`)) {
+                btn.classList.toggle('active');
+                return;
+            }
 
             try {
                 const formData = new FormData();
@@ -2444,19 +2589,26 @@
 
         async function modbusPulseRelay(relay) {
             const btn = document.getElementById(`modbus-relay-${relay}`);
+            const duration = document.getElementById('pulseDuration').value || 500;
+
+            // Visual feedback immediately
+            if (btn) {
+                btn.classList.remove('pulse-flash');
+                void btn.offsetWidth; // Force reflow to restart animation
+                btn.classList.add('pulse-flash');
+            }
+
+            // Try WebSocket first
+            if (wsSend(`m1_r${relay}_pulse_${duration}`)) {
+                showToast(`Modbus Relais ${relay} Impuls`, 'success');
+                return;
+            }
+
             try {
-                const duration = document.getElementById('pulseDuration').value || 500;
                 const formData = new FormData();
                 formData.append('relay', relay);
                 formData.append('state', 'pulse');
                 formData.append('duration', duration);
-
-                // Visual feedback immediately
-                if (btn) {
-                    btn.classList.remove('pulse-flash');
-                    void btn.offsetWidth; // Force reflow to restart animation
-                    btn.classList.add('pulse-flash');
-                }
 
                 const response = await fetch('/api/modbus/relay', {
                     method: 'POST',
@@ -3139,7 +3291,8 @@
             updateStatus();
             loadLog();
             togglePulseMode(); // Apply default pulse mode
-            setInterval(updateStatus, 2000);
+            setPollingInterval(2000);  // Start with fast polling
+            connectWebSocket();        // Upgrade to WebSocket (slows polling on connect)
             setInterval(loadLog, 10000);
         });
     </script>
