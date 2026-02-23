@@ -1895,7 +1895,7 @@ void sendInputTcpCommand(int inputIndex) {
         }
         Serial.printf("TCP Input: Response: %s\n", response);
         addLogEntry(lastLogTarget, response, "IN");
-        c->close(true);
+        c->close();
     }, nullptr);
 
     client->onDisconnect([](void* arg, AsyncClient* c) {
@@ -1910,7 +1910,7 @@ void sendInputTcpCommand(int inputIndex) {
 
     client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
         Serial.println("TCP Input: Timeout (no response)");
-        c->close(true);
+        c->close();
     }, nullptr);
 
     client->setRxTimeout(2);  // 2 second timeout for response
