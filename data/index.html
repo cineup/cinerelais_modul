@@ -1934,6 +1934,8 @@
     <script>
         // Web interface (FS) version — bump this when index.html is updated
         const FS_VERSION = "1.2.0";
+        // Minimum firmware version required by this web interface
+        const REQUIRED_FW_VERSION = "1.1.0";
 
         // ============================================================
         // Internationalization (i18n) — DE (default), EN, FR
@@ -2006,6 +2008,8 @@
             'signal.good':'Gut','signal.medium':'Mittel','signal.weak':'Schwach',
             'tca.found':'OK (0x20)','tca.notfound':'Nicht gefunden',
             'modbus.connected':'Verbunden','modbus.disconnected':'Nicht verbunden','modbus.addr':'Adr.',
+            'fw.mismatch':' \u26a0 (min. v{0})',
+            'fw.mismatch.tooltip':'Firmware zu alt für dieses Web-Interface \u2014 bitte Firmware aktualisieren',
             'fs.mismatch':' \u26a0 (erwartet v{0})',
             'fs.mismatch.tooltip':'FS-Version stimmt nicht mit Firmware überein \u2014 bitte Filesystem neu flashen (pio run -t uploadfs)',
             'relay':'Relais','input':'Input','relay.n':'Relais {0}',
@@ -2103,6 +2107,8 @@
             'signal.good':'Good','signal.medium':'Medium','signal.weak':'Weak',
             'tca.found':'OK (0x20)','tca.notfound':'Not found',
             'modbus.connected':'Connected','modbus.disconnected':'Not connected','modbus.addr':'Addr.',
+            'fw.mismatch':' \u26a0 (min. v{0})',
+            'fw.mismatch.tooltip':'Firmware too old for this web interface \u2014 please update firmware',
             'fs.mismatch':' \u26a0 (expected v{0})',
             'fs.mismatch.tooltip':'FS version does not match firmware \u2014 please re-flash filesystem (pio run -t uploadfs)',
             'relay':'Relay','input':'Input','relay.n':'Relay {0}',
@@ -2200,6 +2206,8 @@
             'signal.good':'Bon','signal.medium':'Moyen','signal.weak':'Faible',
             'tca.found':'OK (0x20)','tca.notfound':'Non trouvé',
             'modbus.connected':'Connecté','modbus.disconnected':'Non connecté','modbus.addr':'Adr.',
+            'fw.mismatch':' \u26a0 (min. v{0})',
+            'fw.mismatch.tooltip':'Firmware trop ancienne pour cette interface web \u2014 veuillez mettre à jour le firmware',
             'fs.mismatch':' \u26a0 (attendu v{0})',
             'fs.mismatch.tooltip':'La version FS ne correspond pas au firmware \u2014 veuillez re-flasher le filesystem (pio run -t uploadfs)',
             'relay':'Relais','input':'Entrée','relay.n':'Relais {0}',
@@ -2573,10 +2581,15 @@
                     }
                 }
 
-                // Firmware version + FS version mismatch check
+                // Firmware version + mismatch checks
                 if (data.version) {
                     const versionEl = document.getElementById('info-version');
-                    if (versionEl) versionEl.textContent = 'v' + data.version;
+                    if (versionEl) {
+                        const fwTooOld = REQUIRED_FW_VERSION && data.version < REQUIRED_FW_VERSION;
+                        versionEl.textContent = 'v' + data.version + (fwTooOld ? t('fw.mismatch', REQUIRED_FW_VERSION) : '');
+                        versionEl.style.color = fwTooOld ? '#f59e0b' : '';
+                        versionEl.title = fwTooOld ? t('fw.mismatch.tooltip') : '';
+                    }
                 }
                 const fsVersionEl = document.getElementById('info-fs-version');
                 if (fsVersionEl) {
