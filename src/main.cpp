@@ -223,6 +223,10 @@ unsigned long modbusAllPulseEndTime = 0;
 // NTP
 bool ntpSynced = false;
 
+// Deferred restart (non-blocking)
+bool restartPending = false;
+unsigned long restartTime = 0;
+
 // Command Log (circular buffer, newest first)
 struct LogEntry {
     char timestamp[20];   // "DD.MM.YYYY HH:MM:SS" or uptime
@@ -264,8 +268,6 @@ bool inputDebouncedStates[8] = {false};  // Debounced input states
 unsigned long inputDebounceTime[8] = {0};  // Timestamp when input changed
 const unsigned long INPUT_DEBOUNCE_MS = 50;  // 50ms debounce delay
 
-// Input TCP command state (track if command was sent for current input state)
-bool inputTcpSent[8] = {false};  // True if TCP command was sent for active input
 
 // ============================================
 // Forward Declarations
@@ -852,11 +854,11 @@ void setup() {
         request->send(200, "application/json", output);
     });
 
-    // API: Restart
+    // API: Restart (non-blocking — deferred to loop())
     webServer->on("/api/restart", HTTP_POST, [](AsyncWebServerRequest *request){
         request->send(200, "text/plain", "Restarting...");
-        delay(500);
-        ESP.restart();
+        restartPending = true;
+        restartTime = millis() + 500;
     });
 
     // API: Command Log (newest first)
@@ -946,6 +948,11 @@ void loop() {
     if (wsBroadcastNeeded) {
         wsBroadcastNeeded = false;
         wsBroadcast();
+    }
+
+    // Deferred restart (allows HTTP response to be sent first)
+    if (restartPending && millis() >= restartTime) {
+        ESP.restart();
     }
 
     delay(10);
@@ -1857,9 +1864,9 @@ void sendInputTcpCommand(int inputIndex) {
     flashInputTcpLED();
 
     // Log outgoing TCP command
-    static char lastLogTarget[48];
+    char logTarget[48];
     char logCmd[64];
-    snprintf(lastLogTarget, sizeof(lastLogTarget), "%s:%d", host, port);
+    snprintf(logTarget, sizeof(logTarget), "%s:%d", host, port);
     if (config.inputTcpMode[inputIndex] == 2) {
         // Preset mode - show device and function name
         uint8_t deviceIdx = config.inputTcpDevice[inputIndex];
@@ -1872,35 +1879,38 @@ void sendInputTcpCommand(int inputIndex) {
     } else {
         strlcpy(logCmd, command, sizeof(logCmd));
     }
-    addLogEntry(lastLogTarget, logCmd, "OUT");
+    addLogEntry(logTarget, logCmd, "OUT");
+
+    // Heap-allocated context for async callbacks (avoids race condition with static buffers)
+    struct TcpCmdContext {
+        uint8_t data[128];
+        int len;
+        char logTarget[48];
+    };
+
+    TcpCmdContext* ctx = new TcpCmdContext();
+    strlcpy(ctx->logTarget, logTarget, sizeof(ctx->logTarget));
+
+    // Prepare command data into context buffer
+    if (isHex) {
+        ctx->len = hexStringToBytes(command, ctx->data, sizeof(ctx->data));
+    } else {
+        ctx->len = strlen(command);
+        memcpy(ctx->data, command, ctx->len);
+    }
 
     // Create async client for fire-and-forget
     AsyncClient* client = new AsyncClient();
 
-    // Prepare command data
-    static uint8_t cmdBuffer[128];
-    int cmdLen;
-
-    if (isHex) {
-        cmdLen = hexStringToBytes(command, cmdBuffer, sizeof(cmdBuffer));
-    } else {
-        cmdLen = strlen(command);
-        memcpy(cmdBuffer, command, cmdLen);
-    }
-
-    // Store command info for callback (simple approach using static for last command)
-    static uint8_t lastCmdBuffer[128];
-    static int lastCmdLen;
-    memcpy(lastCmdBuffer, cmdBuffer, cmdLen);
-    lastCmdLen = cmdLen;
-
     client->onConnect([](void* arg, AsyncClient* c) {
+        TcpCmdContext* ctx = (TcpCmdContext*)arg;
         Serial.println("TCP Input: Connected, sending command");
-        c->write((char*)lastCmdBuffer, lastCmdLen);
+        c->write((char*)ctx->data, ctx->len);
         // Don't close immediately - wait for response
-    }, nullptr);
+    }, ctx);
 
     client->onData([](void* arg, AsyncClient* c, void* data, size_t len) {
+        TcpCmdContext* ctx = (TcpCmdContext*)arg;
         // Log incoming response
         char response[65];
         size_t copyLen = len < 64 ? len : 64;
@@ -1911,30 +1921,35 @@ void sendInputTcpCommand(int inputIndex) {
             if (response[i] < 32 || response[i] > 126) response[i] = '.';
         }
         Serial.printf("TCP Input: Response: %s\n", response);
-        addLogEntry(lastLogTarget, response, "IN");
+        addLogEntry(ctx->logTarget, response, "IN");
         c->close();
-    }, nullptr);
+    }, ctx);
 
     client->onDisconnect([](void* arg, AsyncClient* c) {
+        TcpCmdContext* ctx = (TcpCmdContext*)arg;
         Serial.println("TCP Input: Disconnected");
+        delete ctx;
         delete c;
-    }, nullptr);
+    }, ctx);
 
     client->onError([](void* arg, AsyncClient* c, int8_t error) {
+        TcpCmdContext* ctx = (TcpCmdContext*)arg;
         Serial.printf("TCP Input: Error %d\n", error);
+        delete ctx;
         delete c;
-    }, nullptr);
+    }, ctx);
 
     client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
         Serial.println("TCP Input: Timeout (no response)");
         c->close();
-    }, nullptr);
+    }, ctx);
 
     client->setRxTimeout(2);  // 2 second timeout for response
 
     // Connect (async)
     if (!client->connect(host, port)) {
         Serial.printf("TCP Input: Connect to %s:%d failed\n", host, port);
+        delete ctx;
         delete client;
     }
 }
@@ -2259,7 +2274,7 @@ void setupTcpServer() {
         tcpClients.push_back(client);
 
         client->onData([](void* arg, AsyncClient* c, void* data, size_t len) {
-            String cmd = String((char*)data).substring(0, len);
+            String cmd = String((char*)data, len);
             cmd.trim();
             cmd.toLowerCase();
             if (cmd.length() > 0) {
@@ -2324,7 +2339,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         case WS_EVT_DATA: {
             AwsFrameInfo *info = (AwsFrameInfo*)arg;
             if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-                String cmd = String((char*)data).substring(0, len);
+                String cmd = String((char*)data, len);
                 cmd.trim();
                 cmd.toLowerCase();
                 if (cmd.length() > 0) {
