@@ -292,7 +292,7 @@
             font-size: 1.5rem;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -302,12 +302,11 @@
         }
 
         .relay-btn:hover {
-            transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         .relay-btn:active {
-            transform: translateY(0);
+            opacity: 0.8;
         }
 
         .relay-btn.active {
