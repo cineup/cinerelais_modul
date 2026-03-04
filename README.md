@@ -206,8 +206,9 @@ modbus_scan     # Nach Modbus-Gerät suchen
 
 1. Web-Interface öffnen
 2. "OTA Firmware Update öffnen" klicken
-3. `.bin` Datei auswählen und hochladen
-4. Gerät startet automatisch neu
+3. Login: Benutzer `admin`, Passwort `flash`
+4. `.bin` Datei auswählen und hochladen
+5. Gerät startet automatisch neu
 
 ### Status-LED
 

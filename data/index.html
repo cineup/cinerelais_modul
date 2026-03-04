@@ -1939,7 +1939,6 @@
                     <div class="card-header">
                         <h2 class="card-title" data-i18n="firmware.update">Firmware Update</h2>
                     </div>
-                    <p style="color: var(--text-dim); font-size: 0.75rem; margin: 0 0 0.25rem 0;" data-i18n="ota.hint">Login: admin / flash</p>
                     <a href="/update" class="ota-link" data-i18n="ota.link">
                         OTA Firmware Update öffnen
                     </a>
@@ -1955,6 +1954,17 @@
         const FS_VERSION = "1.2.2";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
+
+        // Numeric semver comparison: returns -1, 0, or 1
+        function semverCompare(a, b) {
+            const pa = a.split('.').map(Number);
+            const pb = b.split('.').map(Number);
+            for (let i = 0; i < 3; i++) {
+                if ((pa[i]||0) > (pb[i]||0)) return 1;
+                if ((pa[i]||0) < (pb[i]||0)) return -1;
+            }
+            return 0;
+        }
 
         // ============================================================
         // Internationalization (i18n) — DE (default), EN, FR
@@ -2019,7 +2029,7 @@
             'backup':'Backup',
             'backup.hint':'Einstellungen exportieren oder importieren. Bei Firmware-Updates (ohne Filesystem) bleiben die Einstellungen erhalten.',
             'export':'Exportieren','import':'Importieren',
-            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'OTA Firmware Update öffnen',
+            'firmware.update':'Firmware Update','ota.link':'OTA Firmware Update öffnen',
             'status.online':'Online','status.offline':'Offline','status.active':'Aktiv','status.off':'Aus',
             'status.connecting':'Verbinde...','status.syncing':'Synchronisiere...',
             'ntp.disabled':'NTP deaktiviert',
@@ -2118,7 +2128,7 @@
             'backup':'Backup',
             'backup.hint':'Export or import settings. Settings are preserved during firmware updates (without filesystem).',
             'export':'Export','import':'Import',
-            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'Open OTA Firmware Update',
+            'firmware.update':'Firmware Update','ota.link':'Open OTA Firmware Update',
             'status.online':'Online','status.offline':'Offline','status.active':'Active','status.off':'Off',
             'status.connecting':'Connecting...','status.syncing':'Syncing...',
             'ntp.disabled':'NTP disabled',
@@ -2217,7 +2227,7 @@
             'backup':'Sauvegarde',
             'backup.hint':'Exporter ou importer les paramètres. Les paramètres sont conservés lors des mises à jour firmware (sans filesystem).',
             'export':'Exporter','import':'Importer',
-            'firmware.update':'Mise à jour Firmware','ota.hint':'Login : admin / flash','ota.link':'Ouvrir mise à jour OTA',
+            'firmware.update':'Mise à jour Firmware','ota.link':'Ouvrir mise à jour OTA',
             'status.online':'En ligne','status.offline':'Hors ligne','status.active':'Actif','status.off':'Arrêté',
             'status.connecting':'Connexion...','status.syncing':'Synchronisation...',
             'ntp.disabled':'NTP désactivé',
@@ -2607,7 +2617,7 @@
                 if (data.version) {
                     const versionEl = document.getElementById('info-version');
                     if (versionEl) {
-                        const fwTooOld = REQUIRED_FW_VERSION && data.version < REQUIRED_FW_VERSION;
+                        const fwTooOld = REQUIRED_FW_VERSION && semverCompare(data.version, REQUIRED_FW_VERSION) < 0;
                         versionEl.textContent = 'v' + data.version + (fwTooOld ? t('fw.mismatch', REQUIRED_FW_VERSION) : '');
                         versionEl.style.color = fwTooOld ? '#f59e0b' : '';
                         versionEl.title = fwTooOld ? t('fw.mismatch.tooltip') : '';
@@ -2615,7 +2625,7 @@
                 }
                 const fsVersionEl = document.getElementById('info-fs-version');
                 if (fsVersionEl) {
-                    const mismatch = data.requiredFsVersion && data.requiredFsVersion !== FS_VERSION;
+                    const mismatch = data.requiredFsVersion && semverCompare(FS_VERSION, data.requiredFsVersion) < 0;
                     fsVersionEl.textContent = 'v' + FS_VERSION + (mismatch ? t('fs.mismatch', data.requiredFsVersion) : '');
                     fsVersionEl.style.color = mismatch ? '#f59e0b' : '';
                     fsVersionEl.title = mismatch ? t('fs.mismatch.tooltip') : '';
