@@ -647,7 +647,7 @@ void setup() {
 
         JsonDocument doc;
         doc["success"] = true;
-        doc["message"] = "Konfiguration gespeichert. Neustart fuer Aenderungen.";
+        doc["message"] = "ok";
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);
@@ -1769,6 +1769,23 @@ void processInputMappings() {
 
             if (shouldBeOn != wasOn) {
                 setRelay(r + 1, shouldBeOn);
+
+                // Log which input(s) triggered this relay change
+                char logSource[32] = "";
+                for (int di = 0; di < 8; di++) {
+                    if (config.inputRelayMap[di] & (1 << r)) {
+                        if (inputDebouncedStates[di] == shouldBeOn) {
+                            if (logSource[0] != '\0') strlcat(logSource, "+", sizeof(logSource));
+                            char tmp[4];
+                            snprintf(tmp, sizeof(tmp), "DI%d", di + 1);
+                            strlcat(logSource, tmp, sizeof(logSource));
+                        }
+                    }
+                }
+                if (logSource[0] == '\0') strlcpy(logSource, "INPUT", sizeof(logSource));
+                char logCmd[16];
+                snprintf(logCmd, sizeof(logCmd), "r%d_%s", r + 1, shouldBeOn ? "on" : "off");
+                addLogEntry(logSource, logCmd, "MAP");
             }
         }
         inputControlledRelays = newInputControlled;
