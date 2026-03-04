@@ -158,36 +158,20 @@
             color: var(--text);
         }
 
-        .ws-indicator {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            border: 1px solid var(--border);
+        .conn-badge.ws-badge {
             opacity: 0.5;
             cursor: default;
         }
-        .ws-indicator.ws-online {
+
+        .conn-badge.ws-badge.ws-online {
             opacity: 1;
             border-color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
         }
-        .ws-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--text-dim);
-        }
-        .ws-indicator.ws-online .ws-dot {
+
+        .conn-badge.ws-badge.ws-online .conn-dot {
             background: var(--green);
-        }
-        .ws-label {
-            font-weight: 600;
-            color: var(--text-dim);
-        }
-        .ws-indicator.ws-online .ws-label {
-            color: var(--green);
+            box-shadow: 0 0 6px var(--green);
         }
 
         /* Tab Navigation */
@@ -444,15 +428,18 @@
 
         .btn-full {
             width: 100%;
-            margin-top: 1rem;
-            padding: 0.875rem;
-            background: var(--accent-dim);
+            margin-top: 0.75rem;
+            padding: 0.6rem;
+            background: var(--accent);
             border: 1px solid var(--accent);
-            color: var(--accent);
+            color: #000;
+            font-weight: 600;
+            font-size: 0.8rem;
         }
 
         .btn-full:hover {
-            background: var(--accent);
+            background: #4da8ff;
+            border-color: #4da8ff;
             color: #000;
         }
 
@@ -1220,9 +1207,9 @@
                     <span class="conn-label">AP</span>
                     <span class="conn-ip" id="conn-ap-ip">-</span>
                 </div>
-                <div class="ws-indicator ws-offline" id="ws-indicator" title="WebSocket getrennt (Polling)">
-                    <span class="ws-dot"></span>
-                    <span class="ws-label">WS</span>
+                <div class="conn-badge ws-badge" id="ws-indicator" title="WebSocket getrennt (Polling)">
+                    <div class="conn-dot"></div>
+                    <span class="conn-label">WS</span>
                 </div>
             </div>
         </div>
@@ -2021,7 +2008,7 @@
         function updateWsIndicator() {
             const el = document.getElementById('ws-indicator');
             if (el) {
-                el.className = 'ws-indicator ' + (wsConnected ? 'ws-online' : 'ws-offline');
+                el.className = 'conn-badge ws-badge' + (wsConnected ? ' ws-online' : '');
                 el.title = wsConnected ? 'WebSocket verbunden (Live)' : 'WebSocket getrennt (Polling)';
             }
         }
