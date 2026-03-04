@@ -1183,12 +1183,32 @@
         .pull-refresh.refreshing {
             height: 50px !important;
         }
+
+        /* Language selector */
+        .lang-select {
+            padding: 0.35rem 0.5rem;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 0.5rem;
+        }
+
+        .lang-select:focus {
+            border-color: var(--accent);
+        }
     </style>
 </head>
 <body>
     <div class="pull-refresh" id="pull-refresh">
         <span class="pull-arrow">&#8595;</span>
-        <span class="pull-text">Zum Aktualisieren ziehen</span>
+        <span class="pull-text" data-i18n="pull.down">Zum Aktualisieren ziehen</span>
     </div>
     <!-- Header -->
     <header>
@@ -1213,10 +1233,15 @@
                     <span class="conn-label">AP</span>
                     <span class="conn-ip" id="conn-ap-ip">-</span>
                 </div>
-                <div class="conn-badge ws-badge" id="ws-indicator" title="WebSocket getrennt (Polling)">
+                <div class="conn-badge ws-badge" id="ws-indicator" data-i18n-title="ws.disconnected">
                     <div class="conn-dot"></div>
                     <span class="conn-label">WS</span>
                 </div>
+                <select class="lang-select" id="langSelect" onchange="setLanguage(this.value)">
+                    <option value="de">DE</option>
+                    <option value="en">EN</option>
+                    <option value="fr">FR</option>
+                </select>
             </div>
         </div>
     </header>
@@ -1224,9 +1249,9 @@
     <!-- Tab Navigation -->
     <nav class="tab-nav">
         <div class="tab-nav-inner">
-            <button class="tab-btn active" onclick="switchTab('control')">Steuerung</button>
-            <button class="tab-btn" onclick="switchTab('network')">Netzwerk</button>
-            <button class="tab-btn" onclick="switchTab('settings')">Einstellungen</button>
+            <button class="tab-btn active" onclick="switchTab('control')" data-i18n="tab.control">Steuerung</button>
+            <button class="tab-btn" onclick="switchTab('network')" data-i18n="tab.network">Netzwerk</button>
+            <button class="tab-btn" onclick="switchTab('settings')" data-i18n="tab.settings">Einstellungen</button>
         </div>
     </nav>
 
@@ -1237,9 +1262,9 @@
                 <!-- Relay Control -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Relais Ausgaenge</h2>
+                        <h2 class="card-title" data-i18n="relay.outputs">Relais Ausgänge</h2>
                         <div class="pulse-mode-toggle">
-                            <span class="pulse-mode-label">Impuls</span>
+                            <span class="pulse-mode-label" data-i18n="pulse">Impuls</span>
                             <label class="toggle toggle-sm">
                                 <input type="checkbox" id="pulseMode" checked onchange="togglePulseMode()">
                                 <span class="toggle-slider"></span>
@@ -1252,7 +1277,7 @@
                 <!-- Digital Inputs -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Digitale Eingaenge</h2>
+                        <h2 class="card-title" data-i18n="digital.inputs">Digitale Eingänge</h2>
                     </div>
                     <div class="input-grid" id="input-grid"></div>
                 </div>
@@ -1260,7 +1285,7 @@
                 <!-- Modbus Relays -->
                 <div class="card" id="modbus-card" style="display: none;">
                     <div class="card-header">
-                        <h2 class="card-title">Modbus Relais</h2>
+                        <h2 class="card-title" data-i18n="modbus.relays">Modbus Relais</h2>
                         <div class="modbus-status">
                             <span class="conn-dot" id="modbus-status-dot"></span>
                             <span id="modbus-status-text">-</span>
@@ -1272,21 +1297,21 @@
                 <!-- Command Log -->
                 <div class="card grid-full">
                     <div class="card-header">
-                        <h2 class="card-title">Befehlsprotokoll</h2>
-                        <button class="btn btn-sm" onclick="loadLog()">Aktualisieren</button>
+                        <h2 class="card-title" data-i18n="command.log">Befehlsprotokoll</h2>
+                        <button class="btn btn-sm" onclick="loadLog()" data-i18n="refresh">Aktualisieren</button>
                     </div>
                     <div class="log-container">
                         <table class="log-table">
                             <thead>
                                 <tr>
-                                    <th>Zeit</th>
+                                    <th data-i18n="log.time">Zeit</th>
                                     <th></th>
-                                    <th>Quelle</th>
-                                    <th>Befehl</th>
+                                    <th data-i18n="log.source">Quelle</th>
+                                    <th data-i18n="log.command">Befehl</th>
                                 </tr>
                             </thead>
                             <tbody id="log-table">
-                                <tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 1rem;">Keine Eintraege</td></tr>
+                                <tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 1rem;" data-i18n="log.empty">Keine Einträge</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1300,45 +1325,45 @@
                 <!-- Network Status -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Netzwerk Status</h2>
+                        <h2 class="card-title" data-i18n="network.status">Netzwerk Status</h2>
                     </div>
 
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Ethernet</span>
-                            <span class="info-value"><span id="info-eth-status" class="status-badge offline">Offline</span> <span id="info-eth-ip"></span></span>
+                            <span class="info-label" data-i18n="ethernet">Ethernet</span>
+                            <span class="info-value"><span id="info-eth-status" class="status-badge offline" data-i18n="status.offline">Offline</span> <span id="info-eth-ip"></span></span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">ETH Gateway</span>
+                            <span class="info-label" data-i18n="eth.gateway">ETH Gateway</span>
                             <span class="info-value" id="info-eth-gateway">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">ETH Subnetz</span>
+                            <span class="info-label" data-i18n="eth.subnet">ETH Subnetz</span>
                             <span class="info-value" id="info-eth-subnet">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">ETH MAC</span>
+                            <span class="info-label" data-i18n="eth.mac">ETH MAC</span>
                             <span class="info-value" id="info-eth-mac">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi STA</span>
-                            <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
+                            <span class="info-label" data-i18n="wifi.sta">WiFi STA</span>
+                            <span class="info-value"><span id="info-wifi-sta-status" class="status-badge offline" data-i18n="status.offline">Offline</span> <span id="info-wifi-sta-ip"></span></span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi Gateway</span>
+                            <span class="info-label" data-i18n="wifi.gateway">WiFi Gateway</span>
                             <span class="info-value" id="info-wifi-gateway">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi Subnetz</span>
+                            <span class="info-label" data-i18n="wifi.subnet">WiFi Subnetz</span>
                             <span class="info-value" id="info-wifi-subnet">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi Signal</span>
+                            <span class="info-label" data-i18n="wifi.signal">WiFi Signal</span>
                             <span class="info-value" id="info-wifi-rssi">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi AP</span>
-                            <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline">Aus</span> <span id="info-wifi-ap-ip"></span></span>
+                            <span class="info-label" data-i18n="wifi.ap">WiFi AP</span>
+                            <span class="info-value"><span id="info-wifi-ap-status" class="status-badge offline" data-i18n="status.off">Aus</span> <span id="info-wifi-ap-ip"></span></span>
                         </div>
                     </div>
                 </div>
@@ -1346,16 +1371,16 @@
                 <!-- Ethernet Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Ethernet</h2>
+                        <h2 class="card-title" data-i18n="ethernet">Ethernet</h2>
                     </div>
 
                     <div class="form-group">
-                        <label>Hostname</label>
+                        <label data-i18n="hostname">Hostname</label>
                         <input type="text" id="hostnameInput" placeholder="CineRelais">
                     </div>
 
                     <div class="toggle-container">
-                        <span>DHCP aktiviert</span>
+                        <span data-i18n="dhcp.enabled">DHCP aktiviert</span>
                         <label class="toggle">
                             <input type="checkbox" id="useDHCP" checked onchange="toggleDHCP()">
                             <span class="toggle-slider"></span>
@@ -1365,37 +1390,37 @@
                     <div id="static-ip-config">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Statische IP</label>
+                                <label data-i18n="static.ip">Statische IP</label>
                                 <input type="text" id="staticIP" placeholder="192.168.1.100">
                             </div>
                             <div class="form-group">
-                                <label>Subnetz</label>
+                                <label data-i18n="subnet">Subnetz</label>
                                 <input type="text" id="subnet" placeholder="255.255.255.0">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Gateway</label>
+                                <label data-i18n="gateway">Gateway</label>
                                 <input type="text" id="gateway" placeholder="192.168.1.1">
                             </div>
                             <div class="form-group">
-                                <label>DNS</label>
+                                <label data-i18n="dns">DNS</label>
                                 <input type="text" id="dns" placeholder="8.8.8.8">
                             </div>
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveEthernetConfig()">Ethernet speichern</button>
+                    <button class="btn btn-full" onclick="saveEthernetConfig()" data-i18n="save.ethernet">Ethernet speichern</button>
                 </div>
 
                 <!-- WiFi Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">WiFi</h2>
+                        <h2 class="card-title" data-i18n="wifi">WiFi</h2>
                     </div>
 
                     <div class="toggle-container">
-                        <span>WiFi aktiviert</span>
+                        <span data-i18n="wifi.enabled">WiFi aktiviert</span>
                         <label class="toggle">
                             <input type="checkbox" id="wifiEnabled" checked onchange="toggleWiFiSections()">
                             <span class="toggle-slider"></span>
@@ -1404,9 +1429,9 @@
 
                     <div id="wifi-config-details">
                         <!-- AP Section -->
-                        <div class="subsection-title">Access Point (AP)</div>
+                        <div class="subsection-title" data-i18n="ap.section">Access Point (AP)</div>
                         <div class="toggle-container">
-                            <span>AP aktiviert</span>
+                            <span data-i18n="ap.enabled">AP aktiviert</span>
                             <label class="toggle">
                                 <input type="checkbox" id="wifiAPEnabled" checked onchange="toggleAPSection()">
                                 <span class="toggle-slider"></span>
@@ -1414,27 +1439,27 @@
                         </div>
                         <div id="ap-config">
                             <div class="form-group">
-                                <label>AP Passwort (leer = offen, min. 8 Zeichen)</label>
-                                <input type="text" id="wifiAPPassword" placeholder="(offen)">
+                                <label data-i18n="ap.password">AP Passwort (leer = offen, min. 8 Zeichen)</label>
+                                <input type="text" id="wifiAPPassword" placeholder="(offen)" data-i18n-placeholder="ap.password.ph">
                             </div>
                         </div>
 
                         <!-- STA Section -->
                         <div class="section-divider">
-                            <div class="subsection-title">WLAN Verbindung (STA)</div>
+                            <div class="subsection-title" data-i18n="sta.section">WLAN Verbindung (STA)</div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>WLAN SSID</label>
-                                    <input type="text" id="wifiSSID" placeholder="(leer = deaktiviert)">
+                                    <label data-i18n="wifi.ssid">WLAN SSID</label>
+                                    <input type="text" id="wifiSSID" placeholder="(leer = deaktiviert)" data-i18n-placeholder="wifi.ssid.ph">
                                 </div>
                                 <div class="form-group">
-                                    <label>WLAN Passwort</label>
+                                    <label data-i18n="wifi.password">WLAN Passwort</label>
                                     <input type="password" id="wifiPassword" placeholder="">
                                 </div>
                             </div>
 
                             <div class="toggle-container">
-                                <span>DHCP (STA)</span>
+                                <span data-i18n="dhcp.sta">DHCP (STA)</span>
                                 <label class="toggle">
                                     <input type="checkbox" id="wifiDHCP" checked onchange="toggleWiFiDHCP()">
                                     <span class="toggle-slider"></span>
@@ -1444,21 +1469,21 @@
                             <div id="wifi-static-config">
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>WiFi IP</label>
+                                        <label data-i18n="wifi.ip">WiFi IP</label>
                                         <input type="text" id="wifiIP" placeholder="192.168.4.100">
                                     </div>
                                     <div class="form-group">
-                                        <label>WiFi Subnetz</label>
+                                        <label data-i18n="wifi.subnet.f">WiFi Subnetz</label>
                                         <input type="text" id="wifiSubnet" placeholder="255.255.255.0">
                                     </div>
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>WiFi Gateway</label>
+                                        <label data-i18n="wifi.gw">WiFi Gateway</label>
                                         <input type="text" id="wifiGateway" placeholder="192.168.4.1">
                                     </div>
                                     <div class="form-group">
-                                        <label>WiFi DNS</label>
+                                        <label data-i18n="wifi.dns">WiFi DNS</label>
                                         <input type="text" id="wifiDNS" placeholder="8.8.8.8">
                                     </div>
                                 </div>
@@ -1466,17 +1491,17 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveWiFiConfig()">WiFi speichern</button>
+                    <button class="btn btn-full" onclick="saveWiFiConfig()" data-i18n="save.wifi">WiFi speichern</button>
                 </div>
 
                 <!-- NTP Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Zeit / NTP</h2>
+                        <h2 class="card-title" data-i18n="time.ntp">Zeit / NTP</h2>
                     </div>
 
                     <div class="toggle-container">
-                        <span>NTP aktiviert</span>
+                        <span data-i18n="ntp.enabled">NTP aktiviert</span>
                         <label class="toggle">
                             <input type="checkbox" id="ntpEnabled" checked onchange="toggleNTPSection()">
                             <span class="toggle-slider"></span>
@@ -1485,13 +1510,13 @@
 
                     <div id="ntp-config">
                         <div class="form-group">
-                            <label>NTP Server</label>
+                            <label data-i18n="ntp.server">NTP Server</label>
                             <input type="text" id="ntpServer" placeholder="pool.ntp.org">
                         </div>
                         <div class="form-group">
-                            <label>Zeitzone</label>
+                            <label data-i18n="timezone">Zeitzone</label>
                             <select id="ntpTimezone">
-                                <optgroup label="Europa">
+                                <optgroup label="Europa" data-i18n-label="tz.europe">
                                     <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Berlin</option>
                                     <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Amsterdam</option>
                                     <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Athens</option>
@@ -1525,7 +1550,7 @@
                                     <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Warsaw</option>
                                     <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Zurich</option>
                                 </optgroup>
-                                <optgroup label="Amerika">
+                                <optgroup label="Amerika" data-i18n-label="tz.americas">
                                     <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York</option>
                                     <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago</option>
                                     <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver</option>
@@ -1534,7 +1559,7 @@
                                     <option value="EST5">America/Panama</option>
                                     <option value="<-03>3">America/Sao_Paulo</option>
                                 </optgroup>
-                                <optgroup label="Asien/Pazifik">
+                                <optgroup label="Asien/Pazifik" data-i18n-label="tz.asia">
                                     <option value="<+03>-3">Asia/Dubai</option>
                                     <option value="IST-5:30">Asia/Kolkata</option>
                                     <option value="<+07>-7">Asia/Bangkok</option>
@@ -1551,12 +1576,12 @@
                             </select>
                         </div>
                         <div class="info-item" style="margin-top: 0.5rem;">
-                            <span class="info-label">Aktuelle Zeit</span>
+                            <span class="info-label" data-i18n="current.time">Aktuelle Zeit</span>
                             <span class="info-value" id="info-current-time">-</span>
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveNTPConfig()">NTP speichern</button>
+                    <button class="btn btn-full" onclick="saveNTPConfig()" data-i18n="save.ntp">NTP speichern</button>
                 </div>
             </div>
         </div>
@@ -1567,31 +1592,31 @@
                 <!-- TCP/Control Settings -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Steuerung</h2>
+                        <h2 class="card-title" data-i18n="control">Steuerung</h2>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>TCP Port</label>
+                            <label data-i18n="tcp.port">TCP Port</label>
                             <input type="number" id="tcpPort" placeholder="5000" min="1" max="65535">
                         </div>
                         <div class="form-group">
-                            <label>Impuls Dauer (ms)</label>
+                            <label data-i18n="pulse.duration">Impulsdauer (ms)</label>
                             <input type="number" id="pulseDuration" placeholder="500" min="50" max="30000">
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveControlConfig()">Steuerung speichern</button>
+                    <button class="btn btn-full" onclick="saveControlConfig()" data-i18n="save.control">Steuerung speichern</button>
                 </div>
 
                 <!-- Modbus Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Modbus RS485</h2>
+                        <h2 class="card-title" data-i18n="modbus.rs485">Modbus RS485</h2>
                     </div>
 
                     <div class="toggle-container">
-                        <span>Modbus aktiviert</span>
+                        <span data-i18n="modbus.enabled">Modbus aktiviert</span>
                         <label class="toggle">
                             <input type="checkbox" id="modbusEnabled" onchange="toggleModbusSection()">
                             <span class="toggle-slider"></span>
@@ -1601,46 +1626,46 @@
                     <div id="modbus-config">
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Geraete-Adresse (1-247)</label>
+                                <label data-i18n="modbus.address">Geräte-Adresse (1-247)</label>
                                 <input type="number" id="modbusAddress" placeholder="1" min="1" max="247">
                             </div>
                             <div class="form-group">
-                                <label>Anzahl Relais</label>
+                                <label data-i18n="relay.count">Anzahl Relais</label>
                                 <select id="modbusRelayCount">
-                                    <option value="6">6 Relais</option>
-                                    <option value="8" selected>8 Relais</option>
+                                    <option value="6" data-i18n="relays.6">6 Relais</option>
+                                    <option value="8" selected data-i18n="relays.8">8 Relais</option>
                                 </select>
                             </div>
                         </div>
 
                         <div class="info-item" style="margin-top: 0.5rem;">
-                            <span class="info-label">Verbindung</span>
+                            <span class="info-label" data-i18n="connection">Verbindung</span>
                             <span class="info-value" id="info-modbus-status">-</span>
                         </div>
 
-                        <button class="btn" style="width: 100%; margin-top: 0.75rem;" onclick="scanModbusAddress()">Adresse scannen</button>
+                        <button class="btn" style="width: 100%; margin-top: 0.75rem;" onclick="scanModbusAddress()" data-i18n="scan.address">Adresse scannen</button>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveModbusConfig()">Modbus speichern</button>
+                    <button class="btn btn-full" onclick="saveModbusConfig()" data-i18n="save.modbus">Modbus speichern</button>
                 </div>
 
                 <!-- System Info -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">System Info</h2>
+                        <h2 class="card-title" data-i18n="system.info">System Info</h2>
                     </div>
 
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Firmware</span>
+                            <span class="info-label" data-i18n="firmware">Firmware</span>
                             <span class="info-value" id="info-version">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Web-Interface</span>
+                            <span class="info-label" data-i18n="web.interface">Web-Interface</span>
                             <span class="info-value" id="info-fs-version">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Hardware</span>
+                            <span class="info-label" data-i18n="hardware">Hardware</span>
                             <span class="info-value" id="info-hardware">-</span>
                         </div>
                         <div class="info-item">
@@ -1648,27 +1673,27 @@
                             <span class="info-value" id="info-tca9554">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">TCP Port</span>
+                            <span class="info-label" data-i18n="tcp.port">TCP Port</span>
                             <span class="info-value" id="info-tcpport">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Betriebszeit</span>
+                            <span class="info-label" data-i18n="uptime">Betriebszeit</span>
                             <span class="info-value" id="info-uptime">-</span>
                         </div>
                     </div>
 
-                    <div class="subsection-title" style="margin-top: 1rem;">Netzwerk</div>
+                    <div class="subsection-title" style="margin-top: 1rem;" data-i18n="network">Netzwerk</div>
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Ethernet</span>
+                            <span class="info-label" data-i18n="ethernet">Ethernet</span>
                             <span class="info-value" id="info-sys-eth">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">ETH MAC</span>
+                            <span class="info-label" data-i18n="eth.mac">ETH MAC</span>
                             <span class="info-value" id="info-sys-mac">-</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">WiFi</span>
+                            <span class="info-label" data-i18n="wifi">WiFi</span>
                             <span class="info-value" id="info-sys-wifi">-</span>
                         </div>
                         <div class="info-item">
@@ -1677,19 +1702,19 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-full btn-danger-full" onclick="restartDevice()">
-                        Geraet neustarten
+                    <button class="btn btn-full btn-danger-full" onclick="restartDevice()" data-i18n="restart.device">
+                        Gerät neustarten
                     </button>
                 </div>
 
                 <!-- LED Configuration -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Status LED</h2>
+                        <h2 class="card-title" data-i18n="status.led">Status LED</h2>
                     </div>
 
                     <div class="toggle-container">
-                        <span>LED aktiviert</span>
+                        <span data-i18n="led.enabled">LED aktiviert</span>
                         <label class="toggle">
                             <input type="checkbox" id="ledEnabled" checked onchange="toggleLEDSection()">
                             <span class="toggle-slider"></span>
@@ -1698,79 +1723,79 @@
 
                     <div id="led-config">
                         <div class="form-group">
-                            <label>Helligkeit (<span id="brightnessPercent">20</span>%)</label>
+                            <label><span data-i18n="brightness">Helligkeit</span> (<span id="brightnessPercent">20</span>%)</label>
                             <input type="range" id="ledBrightness" min="0" max="255" value="51"
                                    oninput="updateBrightnessPercent(this.value)">
                         </div>
 
                         <div class="led-legend">
                             <div class="info-item">
-                                <span class="info-label" style="color: #22c55e;">Gruen</span>
-                                <span class="info-value">Ethernet verbunden</span>
+                                <span class="info-label" style="color: #22c55e;" data-i18n="led.green">Grün</span>
+                                <span class="info-value" data-i18n="led.green.desc">Ethernet verbunden</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #22d3ee;">Cyan</span>
-                                <span class="info-value">WiFi STA verbunden</span>
+                                <span class="info-label" style="color: #22d3ee;" data-i18n="led.cyan">Cyan</span>
+                                <span class="info-value" data-i18n="led.cyan.desc">WiFi STA verbunden</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #3b82f6;">Blau pulsierend</span>
-                                <span class="info-value">Nur WiFi AP</span>
+                                <span class="info-label" style="color: #3b82f6;" data-i18n="led.blue">Blau pulsierend</span>
+                                <span class="info-value" data-i18n="led.blue.desc">Nur WiFi AP</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #ef4444;">Rot blinkend</span>
-                                <span class="info-value">Keine Verbindung</span>
+                                <span class="info-label" style="color: #ef4444;" data-i18n="led.red">Rot blinkend</span>
+                                <span class="info-value" data-i18n="led.red.desc">Keine Verbindung</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #f97316;">Orange Blitz</span>
-                                <span class="info-value">Befehl empfangen</span>
+                                <span class="info-label" style="color: #f97316;" data-i18n="led.orange">Orange Blitz</span>
+                                <span class="info-value" data-i18n="led.orange.desc">Befehl empfangen</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #eab308;">Gelb Blitz</span>
-                                <span class="info-value">Relais Aktivitaet</span>
+                                <span class="info-label" style="color: #eab308;" data-i18n="led.yellow">Gelb Blitz</span>
+                                <span class="info-value" data-i18n="led.yellow.desc">Relais Aktivität</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #a855f7;">Lila pulsierend</span>
-                                <span class="info-value">OTA Update laeuft</span>
+                                <span class="info-label" style="color: #a855f7;" data-i18n="led.purple">Lila pulsierend</span>
+                                <span class="info-value" data-i18n="led.purple.desc">OTA Update läuft</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label" style="color: #e879f9;">Magenta Blitz</span>
-                                <span class="info-value">Eingang sendet TCP-Befehl</span>
+                                <span class="info-label" style="color: #e879f9;" data-i18n="led.magenta">Magenta Blitz</span>
+                                <span class="info-value" data-i18n="led.magenta.desc">Eingang sendet TCP-Befehl</span>
                             </div>
                         </div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveLEDConfig()">LED speichern</button>
+                    <button class="btn btn-full" onclick="saveLEDConfig()" data-i18n="save.led">LED speichern</button>
                 </div>
 
                 <!-- TCP Commands Help -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">TCP Befehle</h2>
+                        <h2 class="card-title" data-i18n="tcp.commands">TCP Befehle</h2>
                     </div>
 
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Relais EIN</span>
+                            <span class="info-label" data-i18n="relay.on">Relais EIN</span>
                             <span class="info-value">r1_on ... r8_on</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Relais AUS</span>
+                            <span class="info-label" data-i18n="relay.off">Relais AUS</span>
                             <span class="info-value">r1_off ... r8_off</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Impuls</span>
+                            <span class="info-label" data-i18n="pulse">Impuls</span>
                             <span class="info-value">r1_pulse / r1_pulse_500</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Alle EIN/AUS</span>
+                            <span class="info-label" data-i18n="all.onoff">Alle EIN/AUS</span>
                             <span class="info-value">all_on / all_off</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Alle Impuls</span>
+                            <span class="info-label" data-i18n="all.pulse">Alle Impuls</span>
                             <span class="info-value">all_pulse / all_pulse_500</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Status / Hilfe</span>
+                            <span class="info-label" data-i18n="status.help">Status / Hilfe</span>
                             <span class="info-value">status / help</span>
                         </div>
                     </div>
@@ -1779,32 +1804,32 @@
                 <!-- Modbus TCP Commands Help (visible only when Modbus is enabled) -->
                 <div class="card" id="modbus-tcp-help-card" style="display: none;">
                     <div class="card-header">
-                        <h2 class="card-title">Modbus TCP Befehle</h2>
+                        <h2 class="card-title" data-i18n="modbus.tcp.commands">Modbus TCP Befehle</h2>
                     </div>
 
                     <div class="info-grid">
                         <div class="info-item">
-                            <span class="info-label">Relais EIN</span>
+                            <span class="info-label" data-i18n="relay.on">Relais EIN</span>
                             <span class="info-value">m1_r1_on ... m1_r8_on</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Relais AUS</span>
+                            <span class="info-label" data-i18n="relay.off">Relais AUS</span>
                             <span class="info-value">m1_r1_off ... m1_r8_off</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Impuls</span>
+                            <span class="info-label" data-i18n="pulse">Impuls</span>
                             <span class="info-value">m1_r1_pulse / m1_r1_pulse_500</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Alle EIN/AUS</span>
+                            <span class="info-label" data-i18n="all.onoff">Alle EIN/AUS</span>
                             <span class="info-value">m1_all_on / m1_all_off</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Alle Impuls</span>
+                            <span class="info-label" data-i18n="all.pulse">Alle Impuls</span>
                             <span class="info-value">m1_all_pulse / m1_all_pulse_500</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Adresse scannen</span>
+                            <span class="info-label" data-i18n="scan.address">Adresse scannen</span>
                             <span class="info-value">modbus_scan</span>
                         </div>
                     </div>
@@ -1813,12 +1838,12 @@
                 <!-- Relay Labels -->
                 <div class="card grid-full">
                     <div class="card-header">
-                        <h2 class="card-title">Relais Beschriftungen</h2>
+                        <h2 class="card-title" data-i18n="relay.labels">Relais Beschriftungen</h2>
                     </div>
                     <div class="label-grid">
                         <div class="label-input">
                             <span class="label-num">1</span>
-                            <input type="text" id="relayLabel1" placeholder="Relais 1" maxlength="12">
+                            <input type="text" id="relayLabel1" placeholder="Relais 1"  maxlength="12">
                         </div>
                         <div class="label-input">
                             <span class="label-num">2</span>
@@ -1851,38 +1876,38 @@
                     </div>
 
                     <div id="modbus-labels-section" style="display: none;">
-                        <div class="subsection-title" style="margin-top: 1rem;">Modbus Relais Beschriftungen</div>
+                        <div class="subsection-title" style="margin-top: 1rem;" data-i18n="modbus.relay.labels">Modbus Relais Beschriftungen</div>
                         <div class="label-grid" id="modbus-label-grid"></div>
                     </div>
 
-                    <button class="btn btn-full" onclick="saveLabelsConfig()">Beschriftungen speichern</button>
+                    <button class="btn btn-full" onclick="saveLabelsConfig()" data-i18n="save.labels">Beschriftungen speichern</button>
                 </div>
 
                 <!-- Input Configuration (Labels + Actions merged) -->
                 <div class="card grid-full">
                     <div class="card-header">
-                        <h2 class="card-title">Digitale Eingaenge</h2>
+                        <h2 class="card-title" data-i18n="digital.inputs.config">Digitale Eingänge</h2>
                     </div>
-                    <p class="card-hint">
+                    <p class="card-hint" data-i18n="inputs.hint">
                         Beschriftung, Relais-Zuordnung und TCP-Befehle pro Eingang konfigurieren.
                     </p>
                     <div class="input-action-list" id="input-action-list"></div>
-                    <button class="btn btn-full" onclick="saveInputActionsConfig()">
-                        Eingaenge speichern
+                    <button class="btn btn-full" onclick="saveInputActionsConfig()" data-i18n="save.inputs">
+                        Eingänge speichern
                     </button>
                 </div>
 
                 <!-- Backup -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Backup</h2>
+                        <h2 class="card-title" data-i18n="backup">Backup</h2>
                     </div>
-                    <p class="card-hint">
+                    <p class="card-hint" data-i18n="backup.hint">
                         Einstellungen exportieren oder importieren. Bei Firmware-Updates (ohne Filesystem) bleiben die Einstellungen erhalten.
                     </p>
                     <div class="relay-actions">
-                        <button class="btn" onclick="exportConfig()">Exportieren</button>
-                        <button class="btn" onclick="document.getElementById('importFile').click()">Importieren</button>
+                        <button class="btn" onclick="exportConfig()" data-i18n="export">Exportieren</button>
+                        <button class="btn" onclick="document.getElementById('importFile').click()" data-i18n="import">Importieren</button>
                         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importConfig(this)">
                     </div>
                 </div>
@@ -1890,10 +1915,10 @@
                 <!-- OTA Update -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Firmware Update</h2>
+                        <h2 class="card-title" data-i18n="firmware.update">Firmware Update</h2>
                     </div>
-                    <a href="/update" class="ota-link">
-                        OTA Firmware Update oeffnen
+                    <a href="/update" class="ota-link" data-i18n="ota.link">
+                        OTA Firmware Update öffnen
                     </a>
                 </div>
             </div>
@@ -1904,7 +1929,359 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.1.0";
+        const FS_VERSION = "1.2.0";
+
+        // ============================================================
+        // Internationalization (i18n) — DE (default), EN, FR
+        // ============================================================
+        const I18N = {
+          de: {
+            'pull.down':'Zum Aktualisieren ziehen','pull.release':'Loslassen zum Aktualisieren','pull.refreshing':'Aktualisiere...',
+            'ws.connected':'WebSocket verbunden','ws.disconnected':'WebSocket getrennt',
+            'tab.control':'Steuerung','tab.network':'Netzwerk','tab.settings':'Einstellungen',
+            'relay.outputs':'Relais Ausgänge','pulse':'Impuls','digital.inputs':'Digitale Eingänge',
+            'modbus.relays':'Modbus Relais','command.log':'Befehlsprotokoll','refresh':'Aktualisieren',
+            'log.time':'Zeit','log.source':'Quelle','log.command':'Befehl','log.empty':'Keine Einträge',
+            'network.status':'Netzwerk Status','ethernet':'Ethernet',
+            'eth.gateway':'ETH Gateway','eth.subnet':'ETH Subnetz','eth.mac':'ETH MAC',
+            'wifi.sta':'WiFi STA','wifi.gateway':'WiFi Gateway','wifi.subnet':'WiFi Subnetz',
+            'wifi.signal':'WiFi Signal','wifi.ap':'WiFi AP',
+            'hostname':'Hostname','dhcp.enabled':'DHCP aktiviert',
+            'static.ip':'Statische IP','subnet':'Subnetz','gateway':'Gateway','dns':'DNS',
+            'save.ethernet':'Ethernet speichern',
+            'wifi':'WiFi','wifi.enabled':'WiFi aktiviert',
+            'ap.section':'Access Point (AP)','ap.enabled':'AP aktiviert',
+            'ap.password':'AP Passwort (leer = offen, min. 8 Zeichen)','ap.password.ph':'(offen)',
+            'sta.section':'WLAN Verbindung (STA)',
+            'wifi.ssid':'WLAN SSID','wifi.ssid.ph':'(leer = deaktiviert)','wifi.password':'WLAN Passwort',
+            'dhcp.sta':'DHCP (STA)','wifi.ip':'WiFi IP','wifi.subnet.f':'WiFi Subnetz',
+            'wifi.gw':'WiFi Gateway','wifi.dns':'WiFi DNS','save.wifi':'WiFi speichern',
+            'time.ntp':'Zeit / NTP','ntp.enabled':'NTP aktiviert','ntp.server':'NTP Server',
+            'timezone':'Zeitzone','tz.europe':'Europa','tz.americas':'Amerika','tz.asia':'Asien/Pazifik',
+            'current.time':'Aktuelle Zeit','save.ntp':'NTP speichern',
+            'control':'Steuerung','tcp.port':'TCP Port','pulse.duration':'Impulsdauer (ms)',
+            'save.control':'Steuerung speichern',
+            'modbus.rs485':'Modbus RS485','modbus.enabled':'Modbus aktiviert',
+            'modbus.address':'Geräte-Adresse (1-247)','relay.count':'Anzahl Relais',
+            'relays.6':'6 Relais','relays.8':'8 Relais','connection':'Verbindung',
+            'scan.address':'Adresse scannen','save.modbus':'Modbus speichern',
+            'system.info':'System Info','firmware':'Firmware','web.interface':'Web-Interface',
+            'hardware':'Hardware','uptime':'Betriebszeit','network':'Netzwerk',
+            'restart.device':'Gerät neustarten',
+            'status.led':'Status LED','led.enabled':'LED aktiviert','brightness':'Helligkeit',
+            'led.green':'Grün','led.green.desc':'Ethernet verbunden',
+            'led.cyan':'Cyan','led.cyan.desc':'WiFi STA verbunden',
+            'led.blue':'Blau pulsierend','led.blue.desc':'Nur WiFi AP',
+            'led.red':'Rot blinkend','led.red.desc':'Keine Verbindung',
+            'led.orange':'Orange Blitz','led.orange.desc':'Befehl empfangen',
+            'led.yellow':'Gelb Blitz','led.yellow.desc':'Relais Aktivität',
+            'led.purple':'Lila pulsierend','led.purple.desc':'OTA Update läuft',
+            'led.magenta':'Magenta Blitz','led.magenta.desc':'Eingang sendet TCP-Befehl',
+            'save.led':'LED speichern',
+            'tcp.commands':'TCP Befehle','relay.on':'Relais EIN','relay.off':'Relais AUS',
+            'all.onoff':'Alle EIN/AUS','all.pulse':'Alle Impuls','status.help':'Status / Hilfe',
+            'modbus.tcp.commands':'Modbus TCP Befehle',
+            'relay.labels':'Relais Beschriftungen','modbus.relay.labels':'Modbus Relais Beschriftungen',
+            'save.labels':'Beschriftungen speichern',
+            'digital.inputs.config':'Digitale Eingänge',
+            'inputs.hint':'Beschriftung, Relais-Zuordnung und TCP-Befehle pro Eingang konfigurieren.',
+            'save.inputs':'Eingänge speichern',
+            'label.field':'Beschriftung:','relay.activate':'Relais aktivieren:',
+            'tcp.send':'TCP Befehl senden:',
+            'tcp.disabled':'Deaktiviert','tcp.manual':'Manuell (IP/Port/Befehl)',
+            'tcp.preset':'Geräte-Vorlage','tcp.no.devices':'Keine Geräte',
+            'tcp.cmd.ph':'r1_on oder HEX:060e...',
+            'backup':'Backup',
+            'backup.hint':'Einstellungen exportieren oder importieren. Bei Firmware-Updates (ohne Filesystem) bleiben die Einstellungen erhalten.',
+            'export':'Exportieren','import':'Importieren',
+            'firmware.update':'Firmware Update','ota.link':'OTA Firmware Update öffnen',
+            'status.online':'Online','status.offline':'Offline','status.active':'Aktiv','status.off':'Aus',
+            'status.connecting':'Verbinde...','status.syncing':'Synchronisiere...',
+            'ntp.disabled':'NTP deaktiviert',
+            'signal.excellent':'Exzellent','signal.very.good':'Sehr gut',
+            'signal.good':'Gut','signal.medium':'Mittel','signal.weak':'Schwach',
+            'tca.found':'OK (0x20)','tca.notfound':'Nicht gefunden',
+            'modbus.connected':'Verbunden','modbus.disconnected':'Nicht verbunden','modbus.addr':'Adr.',
+            'fs.mismatch':' \u26a0 (erwartet v{0})',
+            'fs.mismatch.tooltip':'FS-Version stimmt nicht mit Firmware überein \u2014 bitte Filesystem neu flashen (pio run -t uploadfs)',
+            'relay':'Relais','input':'Input','relay.n':'Relais {0}',
+            'tcp.manual.summary':'TCP:Manuell',
+            'toast.relay.pulse':'Relais {0} Impuls',
+            'toast.modbus.relay.pulse':'Modbus Relais {0} Impuls',
+            'toast.switch.error':'Fehler beim Schalten','toast.pulse.error':'Fehler beim Impuls',
+            'toast.save.error':'Fehler beim Speichern','toast.restart.error':'Fehler beim Neustart',
+            'toast.inputs.saved':'Eingänge gespeichert','toast.labels.saved':'Beschriftungen gespeichert',
+            'toast.eth.saved':'Ethernet Konfiguration gespeichert',
+            'toast.wifi.saved':'WiFi Konfiguration gespeichert',
+            'toast.control.saved':'Steuerung Konfiguration gespeichert',
+            'toast.ntp.saved':'NTP Konfiguration gespeichert',
+            'toast.led.saved':'LED Konfiguration gespeichert',
+            'toast.modbus.saved':'Modbus Konfiguration gespeichert',
+            'toast.backup.exported':'Backup exportiert','toast.export.failed':'Export fehlgeschlagen',
+            'toast.restore.confirm':'Einstellungen aus Backup wiederherstellen?\n\nDas Gerät wird danach neu gestartet.',
+            'toast.restore.success':'Backup wiederhergestellt, Neustart...',
+            'toast.import.failed':'Import fehlgeschlagen','toast.invalid.backup':'Ungültige Backup-Datei',
+            'toast.restart.confirm':'Gerät wirklich neustarten?',
+            'toast.restarting':'Gerät wird neugestartet...',
+            'toast.device.online':'Gerät ist wieder online! Seite wird neu geladen...',
+            'toast.wait.reboot':'Warte auf Neustart... ({0}/{1})',
+            'toast.timeout':'Zeitlimit erreicht - bitte Seite manuell neu laden',
+            'toast.save.restart':'Einstellungen wurden gespeichert.\n\nJetzt neustarten um Änderungen zu übernehmen?',
+            'toast.modbus.error':'Modbus Fehler: {0}','toast.modbus.network':'Modbus Netzwerkfehler',
+            'toast.modbus.searching':'Suche Modbus Gerät...',
+            'toast.modbus.found':'Gerät gefunden: Adresse {0}',
+            'toast.modbus.notfound':'Kein Gerät gefunden','toast.scan.failed':'Scan fehlgeschlagen'
+          },
+          en: {
+            'pull.down':'Pull to refresh','pull.release':'Release to refresh','pull.refreshing':'Refreshing...',
+            'ws.connected':'WebSocket connected','ws.disconnected':'WebSocket disconnected',
+            'tab.control':'Control','tab.network':'Network','tab.settings':'Settings',
+            'relay.outputs':'Relay Outputs','pulse':'Pulse','digital.inputs':'Digital Inputs',
+            'modbus.relays':'Modbus Relays','command.log':'Command Log','refresh':'Refresh',
+            'log.time':'Time','log.source':'Source','log.command':'Command','log.empty':'No entries',
+            'network.status':'Network Status','ethernet':'Ethernet',
+            'eth.gateway':'ETH Gateway','eth.subnet':'ETH Subnet','eth.mac':'ETH MAC',
+            'wifi.sta':'WiFi STA','wifi.gateway':'WiFi Gateway','wifi.subnet':'WiFi Subnet',
+            'wifi.signal':'WiFi Signal','wifi.ap':'WiFi AP',
+            'hostname':'Hostname','dhcp.enabled':'DHCP enabled',
+            'static.ip':'Static IP','subnet':'Subnet','gateway':'Gateway','dns':'DNS',
+            'save.ethernet':'Save Ethernet',
+            'wifi':'WiFi','wifi.enabled':'WiFi enabled',
+            'ap.section':'Access Point (AP)','ap.enabled':'AP enabled',
+            'ap.password':'AP Password (empty = open, min. 8 chars)','ap.password.ph':'(open)',
+            'sta.section':'WiFi Connection (STA)',
+            'wifi.ssid':'WiFi SSID','wifi.ssid.ph':'(empty = disabled)','wifi.password':'WiFi Password',
+            'dhcp.sta':'DHCP (STA)','wifi.ip':'WiFi IP','wifi.subnet.f':'WiFi Subnet',
+            'wifi.gw':'WiFi Gateway','wifi.dns':'WiFi DNS','save.wifi':'Save WiFi',
+            'time.ntp':'Time / NTP','ntp.enabled':'NTP enabled','ntp.server':'NTP Server',
+            'timezone':'Timezone','tz.europe':'Europe','tz.americas':'Americas','tz.asia':'Asia/Pacific',
+            'current.time':'Current Time','save.ntp':'Save NTP',
+            'control':'Control','tcp.port':'TCP Port','pulse.duration':'Pulse Duration (ms)',
+            'save.control':'Save Control',
+            'modbus.rs485':'Modbus RS485','modbus.enabled':'Modbus enabled',
+            'modbus.address':'Device Address (1-247)','relay.count':'Relay Count',
+            'relays.6':'6 Relays','relays.8':'8 Relays','connection':'Connection',
+            'scan.address':'Scan Address','save.modbus':'Save Modbus',
+            'system.info':'System Info','firmware':'Firmware','web.interface':'Web Interface',
+            'hardware':'Hardware','uptime':'Uptime','network':'Network',
+            'restart.device':'Restart Device',
+            'status.led':'Status LED','led.enabled':'LED enabled','brightness':'Brightness',
+            'led.green':'Green','led.green.desc':'Ethernet connected',
+            'led.cyan':'Cyan','led.cyan.desc':'WiFi STA connected',
+            'led.blue':'Blue pulsing','led.blue.desc':'WiFi AP only',
+            'led.red':'Red blinking','led.red.desc':'No connection',
+            'led.orange':'Orange flash','led.orange.desc':'Command received',
+            'led.yellow':'Yellow flash','led.yellow.desc':'Relay activity',
+            'led.purple':'Purple pulsing','led.purple.desc':'OTA update in progress',
+            'led.magenta':'Magenta flash','led.magenta.desc':'Input sends TCP command',
+            'save.led':'Save LED',
+            'tcp.commands':'TCP Commands','relay.on':'Relay ON','relay.off':'Relay OFF',
+            'all.onoff':'All ON/OFF','all.pulse':'All Pulse','status.help':'Status / Help',
+            'modbus.tcp.commands':'Modbus TCP Commands',
+            'relay.labels':'Relay Labels','modbus.relay.labels':'Modbus Relay Labels',
+            'save.labels':'Save Labels',
+            'digital.inputs.config':'Digital Inputs',
+            'inputs.hint':'Configure label, relay assignment and TCP commands per input.',
+            'save.inputs':'Save Inputs',
+            'label.field':'Label:','relay.activate':'Activate relay:',
+            'tcp.send':'Send TCP command:',
+            'tcp.disabled':'Disabled','tcp.manual':'Manual (IP/Port/Command)',
+            'tcp.preset':'Device Preset','tcp.no.devices':'No devices',
+            'tcp.cmd.ph':'r1_on or HEX:060e...',
+            'backup':'Backup',
+            'backup.hint':'Export or import settings. Settings are preserved during firmware updates (without filesystem).',
+            'export':'Export','import':'Import',
+            'firmware.update':'Firmware Update','ota.link':'Open OTA Firmware Update',
+            'status.online':'Online','status.offline':'Offline','status.active':'Active','status.off':'Off',
+            'status.connecting':'Connecting...','status.syncing':'Syncing...',
+            'ntp.disabled':'NTP disabled',
+            'signal.excellent':'Excellent','signal.very.good':'Very good',
+            'signal.good':'Good','signal.medium':'Medium','signal.weak':'Weak',
+            'tca.found':'OK (0x20)','tca.notfound':'Not found',
+            'modbus.connected':'Connected','modbus.disconnected':'Not connected','modbus.addr':'Addr.',
+            'fs.mismatch':' \u26a0 (expected v{0})',
+            'fs.mismatch.tooltip':'FS version does not match firmware \u2014 please re-flash filesystem (pio run -t uploadfs)',
+            'relay':'Relay','input':'Input','relay.n':'Relay {0}',
+            'tcp.manual.summary':'TCP:Manual',
+            'toast.relay.pulse':'Relay {0} Pulse',
+            'toast.modbus.relay.pulse':'Modbus Relay {0} Pulse',
+            'toast.switch.error':'Switching error','toast.pulse.error':'Pulse error',
+            'toast.save.error':'Save error','toast.restart.error':'Restart error',
+            'toast.inputs.saved':'Inputs saved','toast.labels.saved':'Labels saved',
+            'toast.eth.saved':'Ethernet configuration saved',
+            'toast.wifi.saved':'WiFi configuration saved',
+            'toast.control.saved':'Control configuration saved',
+            'toast.ntp.saved':'NTP configuration saved',
+            'toast.led.saved':'LED configuration saved',
+            'toast.modbus.saved':'Modbus configuration saved',
+            'toast.backup.exported':'Backup exported','toast.export.failed':'Export failed',
+            'toast.restore.confirm':'Restore settings from backup?\n\nThe device will restart afterwards.',
+            'toast.restore.success':'Backup restored, restarting...',
+            'toast.import.failed':'Import failed','toast.invalid.backup':'Invalid backup file',
+            'toast.restart.confirm':'Really restart device?',
+            'toast.restarting':'Device is restarting...',
+            'toast.device.online':'Device is back online! Reloading page...',
+            'toast.wait.reboot':'Waiting for restart... ({0}/{1})',
+            'toast.timeout':'Timeout reached - please reload page manually',
+            'toast.save.restart':'Settings saved.\n\nRestart now to apply changes?',
+            'toast.modbus.error':'Modbus Error: {0}','toast.modbus.network':'Modbus network error',
+            'toast.modbus.searching':'Searching Modbus device...',
+            'toast.modbus.found':'Device found: Address {0}',
+            'toast.modbus.notfound':'No device found','toast.scan.failed':'Scan failed'
+          },
+          fr: {
+            'pull.down':'Tirer pour actualiser','pull.release':'Relâcher pour actualiser','pull.refreshing':'Actualisation...',
+            'ws.connected':'WebSocket connecté','ws.disconnected':'WebSocket déconnecté',
+            'tab.control':'Contrôle','tab.network':'Réseau','tab.settings':'Paramètres',
+            'relay.outputs':'Sorties Relais','pulse':'Impulsion','digital.inputs':'Entrées Numériques',
+            'modbus.relays':'Relais Modbus','command.log':'Journal des Commandes','refresh':'Actualiser',
+            'log.time':'Heure','log.source':'Source','log.command':'Commande','log.empty':'Aucune entrée',
+            'network.status':'État du Réseau','ethernet':'Ethernet',
+            'eth.gateway':'Passerelle ETH','eth.subnet':'Sous-réseau ETH','eth.mac':'ETH MAC',
+            'wifi.sta':'WiFi STA','wifi.gateway':'Passerelle WiFi','wifi.subnet':'Sous-réseau WiFi',
+            'wifi.signal':'Signal WiFi','wifi.ap':'WiFi AP',
+            'hostname':"Nom d'hôte",'dhcp.enabled':'DHCP activé',
+            'static.ip':'IP Statique','subnet':'Sous-réseau','gateway':'Passerelle','dns':'DNS',
+            'save.ethernet':'Enregistrer Ethernet',
+            'wifi':'WiFi','wifi.enabled':'WiFi activé',
+            'ap.section':"Point d'accès (AP)",'ap.enabled':'AP activé',
+            'ap.password':'Mot de passe AP (vide = ouvert, min. 8 car.)','ap.password.ph':'(ouvert)',
+            'sta.section':'Connexion WiFi (STA)',
+            'wifi.ssid':'SSID WiFi','wifi.ssid.ph':'(vide = désactivé)','wifi.password':'Mot de passe WiFi',
+            'dhcp.sta':'DHCP (STA)','wifi.ip':'WiFi IP','wifi.subnet.f':'Sous-réseau WiFi',
+            'wifi.gw':'Passerelle WiFi','wifi.dns':'DNS WiFi','save.wifi':'Enregistrer WiFi',
+            'time.ntp':'Heure / NTP','ntp.enabled':'NTP activé','ntp.server':'Serveur NTP',
+            'timezone':'Fuseau horaire','tz.europe':'Europe','tz.americas':'Amériques','tz.asia':'Asie/Pacifique',
+            'current.time':'Heure actuelle','save.ntp':'Enregistrer NTP',
+            'control':'Contrôle','tcp.port':'Port TCP','pulse.duration':"Durée d'impulsion (ms)",
+            'save.control':'Enregistrer Contrôle',
+            'modbus.rs485':'Modbus RS485','modbus.enabled':'Modbus activé',
+            'modbus.address':'Adresse appareil (1-247)','relay.count':'Nombre de relais',
+            'relays.6':'6 Relais','relays.8':'8 Relais','connection':'Connexion',
+            'scan.address':'Scanner adresse','save.modbus':'Enregistrer Modbus',
+            'system.info':'Info Système','firmware':'Firmware','web.interface':'Interface Web',
+            'hardware':'Matériel','uptime':'Temps de fonctionnement','network':'Réseau',
+            'restart.device':"Redémarrer l'appareil",
+            'status.led':'LED de Statut','led.enabled':'LED activée','brightness':'Luminosité',
+            'led.green':'Vert','led.green.desc':'Ethernet connecté',
+            'led.cyan':'Cyan','led.cyan.desc':'WiFi STA connecté',
+            'led.blue':'Bleu pulsant','led.blue.desc':'WiFi AP uniquement',
+            'led.red':'Rouge clignotant','led.red.desc':'Pas de connexion',
+            'led.orange':'Flash orange','led.orange.desc':'Commande reçue',
+            'led.yellow':'Flash jaune','led.yellow.desc':'Activité relais',
+            'led.purple':'Violet pulsant','led.purple.desc':'Mise à jour OTA en cours',
+            'led.magenta':'Flash magenta','led.magenta.desc':'Entrée envoie commande TCP',
+            'save.led':'Enregistrer LED',
+            'tcp.commands':'Commandes TCP','relay.on':'Relais ON','relay.off':'Relais OFF',
+            'all.onoff':'Tous ON/OFF','all.pulse':'Tous Impulsion','status.help':'Statut / Aide',
+            'modbus.tcp.commands':'Commandes Modbus TCP',
+            'relay.labels':'Étiquettes Relais','modbus.relay.labels':'Étiquettes Relais Modbus',
+            'save.labels':'Enregistrer étiquettes',
+            'digital.inputs.config':'Entrées Numériques',
+            'inputs.hint':'Configurer étiquette, affectation relais et commandes TCP par entrée.',
+            'save.inputs':'Enregistrer entrées',
+            'label.field':'Étiquette :','relay.activate':'Activer relais :',
+            'tcp.send':'Envoyer commande TCP :',
+            'tcp.disabled':'Désactivé','tcp.manual':'Manuel (IP/Port/Commande)',
+            'tcp.preset':"Modèle d'appareil",'tcp.no.devices':'Aucun appareil',
+            'tcp.cmd.ph':'r1_on ou HEX:060e...',
+            'backup':'Sauvegarde',
+            'backup.hint':'Exporter ou importer les paramètres. Les paramètres sont conservés lors des mises à jour firmware (sans filesystem).',
+            'export':'Exporter','import':'Importer',
+            'firmware.update':'Mise à jour Firmware','ota.link':'Ouvrir mise à jour OTA',
+            'status.online':'En ligne','status.offline':'Hors ligne','status.active':'Actif','status.off':'Arrêté',
+            'status.connecting':'Connexion...','status.syncing':'Synchronisation...',
+            'ntp.disabled':'NTP désactivé',
+            'signal.excellent':'Excellent','signal.very.good':'Très bon',
+            'signal.good':'Bon','signal.medium':'Moyen','signal.weak':'Faible',
+            'tca.found':'OK (0x20)','tca.notfound':'Non trouvé',
+            'modbus.connected':'Connecté','modbus.disconnected':'Non connecté','modbus.addr':'Adr.',
+            'fs.mismatch':' \u26a0 (attendu v{0})',
+            'fs.mismatch.tooltip':'La version FS ne correspond pas au firmware \u2014 veuillez re-flasher le filesystem (pio run -t uploadfs)',
+            'relay':'Relais','input':'Entrée','relay.n':'Relais {0}',
+            'tcp.manual.summary':'TCP:Manuel',
+            'toast.relay.pulse':'Relais {0} Impulsion',
+            'toast.modbus.relay.pulse':'Modbus Relais {0} Impulsion',
+            'toast.switch.error':'Erreur de commutation','toast.pulse.error':"Erreur d'impulsion",
+            'toast.save.error':"Erreur d'enregistrement",'toast.restart.error':'Erreur de redémarrage',
+            'toast.inputs.saved':'Entrées enregistrées','toast.labels.saved':'Étiquettes enregistrées',
+            'toast.eth.saved':'Configuration Ethernet enregistrée',
+            'toast.wifi.saved':'Configuration WiFi enregistrée',
+            'toast.control.saved':'Configuration contrôle enregistrée',
+            'toast.ntp.saved':'Configuration NTP enregistrée',
+            'toast.led.saved':'Configuration LED enregistrée',
+            'toast.modbus.saved':'Configuration Modbus enregistrée',
+            'toast.backup.exported':'Sauvegarde exportée','toast.export.failed':"Échec de l'export",
+            'toast.restore.confirm':"Restaurer les paramètres depuis la sauvegarde ?\n\nL'appareil redémarrera ensuite.",
+            'toast.restore.success':'Sauvegarde restaurée, redémarrage...',
+            'toast.import.failed':"Échec de l'import",'toast.invalid.backup':'Fichier de sauvegarde invalide',
+            'toast.restart.confirm':"Vraiment redémarrer l'appareil ?",
+            'toast.restarting':"Redémarrage de l'appareil...",
+            'toast.device.online':"L'appareil est de nouveau en ligne ! Rechargement...",
+            'toast.wait.reboot':'Attente du redémarrage... ({0}/{1})',
+            'toast.timeout':'Délai dépassé - veuillez recharger manuellement',
+            'toast.save.restart':'Paramètres enregistrés.\n\nRedémarrer maintenant pour appliquer ?',
+            'toast.modbus.error':'Erreur Modbus : {0}','toast.modbus.network':'Erreur réseau Modbus',
+            'toast.modbus.searching':'Recherche appareil Modbus...',
+            'toast.modbus.found':'Appareil trouvé : Adresse {0}',
+            'toast.modbus.notfound':'Aucun appareil trouvé','toast.scan.failed':'Échec du scan'
+          }
+        };
+
+        let currentLang = localStorage.getItem('cinerelais_lang') || 'de';
+
+        function t(key, ...args) {
+            let str = (I18N[currentLang] && I18N[currentLang][key]) || I18N['de'][key] || key;
+            args.forEach((arg, i) => { str = str.replace('{' + i + '}', arg); });
+            return str;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('cinerelais_lang', lang);
+            document.documentElement.lang = lang;
+            const sel = document.getElementById('langSelect');
+            if (sel) sel.value = lang;
+            applyTranslations();
+        }
+
+        function applyTranslations() {
+            // data-i18n → textContent
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            // data-i18n-placeholder → placeholder
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPlaceholder);
+            });
+            // data-i18n-title → title
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                el.title = t(el.dataset.i18nTitle);
+            });
+            // data-i18n-label (for optgroup)
+            document.querySelectorAll('[data-i18n-label]').forEach(el => {
+                el.label = t(el.dataset.i18nLabel);
+            });
+            // Brightness label with dynamic percent
+            const bp = document.getElementById('brightnessPercent');
+            if (bp) {
+                const lbl = bp.parentElement;
+                if (lbl && lbl.tagName === 'LABEL') {
+                    const pct = bp.textContent;
+                    lbl.innerHTML = t('brightness') + ' (<span id="brightnessPercent">' + pct + '</span>%)';
+                }
+            }
+            // Relay label placeholders
+            for (let i = 1; i <= 8; i++) {
+                const el = document.getElementById('relayLabel' + i);
+                if (el) el.placeholder = t('relay.n', i);
+            }
+            // Update dynamic content
+            updateRelayLabels();
+            updateInputLabels();
+            if (modbusEnabled) updateModbusLabels();
+            buildInputActionList();
+        }
 
         // Pulse mode state (default ON for cinema use)
         let pulseMode = true;
@@ -2015,7 +2392,7 @@
             const el = document.getElementById('ws-indicator');
             if (el) {
                 el.className = 'conn-badge ws-badge' + (wsConnected ? ' ws-online' : '');
-                el.title = wsConnected ? 'WebSocket verbunden (Live)' : 'WebSocket getrennt (Polling)';
+                el.title = wsConnected ? t('ws.connected') : t('ws.disconnected');
             }
         }
 
@@ -2042,7 +2419,7 @@
             for (let i = 1; i <= 8; i++) {
                 const btn = document.getElementById(`relay-${i}`);
                 if (btn) {
-                    const label = relayLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                    const label = relayLabels[i - 1] || (pulseMode ? t('pulse') : t('relay'));
                     btn.querySelector('span').textContent = label;
                 }
             }
@@ -2053,7 +2430,7 @@
             for (let i = 1; i <= 8; i++) {
                 const ind = document.getElementById(`input-${i}`);
                 if (ind) {
-                    const label = inputLabels[i - 1] || 'Input';
+                    const label = inputLabels[i - 1] || t('input');
                     ind.querySelector('span:last-child').textContent = label;
                 }
             }
@@ -2068,7 +2445,7 @@
                 const relayBtn = document.createElement('button');
                 relayBtn.className = 'relay-btn';
                 relayBtn.id = `relay-${i}`;
-                relayBtn.innerHTML = `${i}<span>Relais</span>`;
+                relayBtn.innerHTML = `${i}<span>${t('relay')}</span>`;
                 relayBtn.onclick = () => toggleRelay(i);
                 relayBtn.oncontextmenu = (e) => {
                     e.preventDefault();
@@ -2079,7 +2456,7 @@
                 const inputInd = document.createElement('div');
                 inputInd.className = 'input-indicator';
                 inputInd.id = `input-${i}`;
-                inputInd.innerHTML = `<span class="num">${i}</span><span>Input</span>`;
+                inputInd.innerHTML = `<span class="num">${i}</span><span>${t('input')}</span>`;
                 inputGrid.appendChild(inputInd);
             }
         }
@@ -2125,11 +2502,11 @@
                 const ethStatusEl = document.getElementById('info-eth-status');
                 const ethIpEl = document.getElementById('info-eth-ip');
                 if (data.ethConnected) {
-                    ethStatusEl.textContent = 'Online';
+                    ethStatusEl.textContent = t('status.online');
                     ethStatusEl.className = 'status-badge online';
                     ethIpEl.textContent = data.ethIP;
                 } else {
-                    ethStatusEl.textContent = 'Offline';
+                    ethStatusEl.textContent = t('status.offline');
                     ethStatusEl.className = 'status-badge offline';
                     ethIpEl.textContent = '';
                 }
@@ -2140,19 +2517,19 @@
                 const wifiStaStatusEl = document.getElementById('info-wifi-sta-status');
                 const wifiStaIpEl = document.getElementById('info-wifi-sta-ip');
                 if (data.wifiSTAConnected) {
-                    wifiStaStatusEl.textContent = 'Online';
+                    wifiStaStatusEl.textContent = t('status.online');
                     wifiStaStatusEl.className = 'status-badge online';
                     wifiStaIpEl.textContent = data.wifiSTAIP;
                     document.getElementById('info-wifi-gateway').textContent = data.wifiGateway || '-';
                     document.getElementById('info-wifi-subnet').textContent = data.wifiSubnet || '-';
                 } else if (data.wifiEnabled && data.wifiSSID) {
-                    wifiStaStatusEl.textContent = 'Verbinde...';
+                    wifiStaStatusEl.textContent = t('status.connecting');
                     wifiStaStatusEl.className = 'status-badge offline';
                     wifiStaIpEl.textContent = '';
                     document.getElementById('info-wifi-gateway').textContent = '-';
                     document.getElementById('info-wifi-subnet').textContent = '-';
                 } else {
-                    wifiStaStatusEl.textContent = 'Aus';
+                    wifiStaStatusEl.textContent = t('status.off');
                     wifiStaStatusEl.className = 'status-badge offline';
                     wifiStaIpEl.textContent = '';
                     document.getElementById('info-wifi-gateway').textContent = '-';
@@ -2162,11 +2539,11 @@
                 const wifiApStatusEl = document.getElementById('info-wifi-ap-status');
                 const wifiApIpEl = document.getElementById('info-wifi-ap-ip');
                 if (data.wifiAPActive) {
-                    wifiApStatusEl.textContent = 'Aktiv';
+                    wifiApStatusEl.textContent = t('status.active');
                     wifiApStatusEl.className = 'status-badge online';
                     wifiApIpEl.textContent = data.wifiAPIP;
                 } else {
-                    wifiApStatusEl.textContent = 'Aus';
+                    wifiApStatusEl.textContent = t('status.off');
                     wifiApStatusEl.className = 'status-badge offline';
                     wifiApIpEl.textContent = '';
                 }
@@ -2176,11 +2553,11 @@
                 if (rssiEl) {
                     if (data.wifiSTAConnected && data.wifiRSSI) {
                         const rssi = data.wifiRSSI;
-                        let strength = 'Schwach';
-                        if (rssi >= -50) strength = 'Exzellent';
-                        else if (rssi >= -60) strength = 'Sehr gut';
-                        else if (rssi >= -70) strength = 'Gut';
-                        else if (rssi >= -80) strength = 'Mittel';
+                        let strength = t('signal.weak');
+                        if (rssi >= -50) strength = t('signal.excellent');
+                        else if (rssi >= -60) strength = t('signal.very.good');
+                        else if (rssi >= -70) strength = t('signal.good');
+                        else if (rssi >= -80) strength = t('signal.medium');
                         rssiEl.textContent = `${rssi} dBm (${strength})`;
                     } else {
                         rssiEl.textContent = '-';
@@ -2195,12 +2572,12 @@
                 const fsVersionEl = document.getElementById('info-fs-version');
                 if (fsVersionEl) {
                     const mismatch = data.requiredFsVersion && data.requiredFsVersion !== FS_VERSION;
-                    fsVersionEl.textContent = 'v' + FS_VERSION + (mismatch ? ' ⚠ (erwartet v' + data.requiredFsVersion + ')' : '');
+                    fsVersionEl.textContent = 'v' + FS_VERSION + (mismatch ? t('fs.mismatch', data.requiredFsVersion) : '');
                     fsVersionEl.style.color = mismatch ? '#f59e0b' : '';
-                    fsVersionEl.title = mismatch ? 'FS-Version stimmt nicht mit Firmware überein — bitte Filesystem neu flashen (pio run -t uploadfs)' : '';
+                    fsVersionEl.title = mismatch ? t('fs.mismatch.tooltip') : '';
                 }
 
-                document.getElementById('info-tca9554').textContent = data.tca9554 ? 'OK (0x20)' : 'Nicht gefunden';
+                document.getElementById('info-tca9554').textContent = data.tca9554 ? t('tca.found') : t('tca.notfound');
 
                 // Hardware info
                 const hardwareEl = document.getElementById('info-hardware');
@@ -2211,7 +2588,7 @@
                 // Network summary in System Info
                 const sysEthEl = document.getElementById('info-sys-eth');
                 if (sysEthEl) {
-                    sysEthEl.textContent = data.ethConnected ? data.ethIP : 'Offline';
+                    sysEthEl.textContent = data.ethConnected ? data.ethIP : t('status.offline');
                 }
                 const sysMacEl = document.getElementById('info-sys-mac');
                 if (sysMacEl) {
@@ -2219,11 +2596,11 @@
                 }
                 const sysWifiEl = document.getElementById('info-sys-wifi');
                 if (sysWifiEl) {
-                    sysWifiEl.textContent = data.wifiSTAConnected ? data.wifiSTAIP : 'Offline';
+                    sysWifiEl.textContent = data.wifiSTAConnected ? data.wifiSTAIP : t('status.offline');
                 }
                 const sysApEl = document.getElementById('info-sys-ap');
                 if (sysApEl) {
-                    sysApEl.textContent = data.wifiAPActive ? data.wifiAPIP : 'Aus';
+                    sysApEl.textContent = data.wifiAPActive ? data.wifiAPIP : t('status.off');
                 }
 
                 // NTP / Current time
@@ -2232,9 +2609,9 @@
                     if (data.ntpSynced && data.currentTime) {
                         timeEl.textContent = data.currentTime;
                     } else if (data.ntpEnabled) {
-                        timeEl.textContent = 'Synchronisiere...';
+                        timeEl.textContent = t('status.syncing');
                     } else {
-                        timeEl.textContent = 'NTP deaktiviert';
+                        timeEl.textContent = t('ntp.disabled');
                     }
                 }
 
@@ -2284,12 +2661,12 @@
 
                     if (data.modbusConnected) {
                         statusEl.className = 'modbus-status online';
-                        statusText.textContent = `Adr. ${data.modbusAddress}`;
-                        if (infoStatus) infoStatus.textContent = 'Verbunden';
+                        statusText.textContent = `${t('modbus.addr')} ${data.modbusAddress}`;
+                        if (infoStatus) infoStatus.textContent = t('modbus.connected');
                     } else {
                         statusEl.className = 'modbus-status offline';
-                        statusText.textContent = 'Offline';
-                        if (infoStatus) infoStatus.textContent = 'Nicht verbunden';
+                        statusText.textContent = t('status.offline');
+                        if (infoStatus) infoStatus.textContent = t('modbus.disconnected');
                     }
 
                     // Update Modbus relay states
@@ -2504,7 +2881,7 @@
 
                 btn.classList.toggle('active');
             } catch (error) {
-                showToast('Fehler beim Schalten', 'error');
+                showToast(t('toast.switch.error'), 'error');
             }
         }
 
@@ -2521,7 +2898,7 @@
 
             // Try WebSocket first, fall back to HTTP
             if (wsSend(`r${relay}_pulse_${duration}`)) {
-                showToast(`Relais ${relay} Impuls`, 'success');
+                showToast(t('toast.relay.pulse', relay), 'success');
                 return;
             }
 
@@ -2536,9 +2913,9 @@
                     body: formData
                 });
 
-                showToast(`Relais ${relay} Impuls`, 'success');
+                showToast(t('toast.relay.pulse', relay), 'success');
             } catch (error) {
-                showToast('Fehler beim Impuls', 'error');
+                showToast(t('toast.pulse.error'), 'error');
             }
         }
 
@@ -2572,11 +2949,11 @@
                     btn.classList.toggle('active');
                 } else {
                     const data = await response.json();
-                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
+                    showToast(t('toast.modbus.error', data.error || '?'), 'error');
                 }
             } catch (error) {
                 console.error('Modbus toggle error:', error);
-                showToast('Modbus Netzwerkfehler', 'error');
+                showToast(t('toast.modbus.network'), 'error');
             }
         }
 
@@ -2593,7 +2970,7 @@
 
             // Try WebSocket first
             if (wsSend(`m1_r${relay}_pulse_${duration}`)) {
-                showToast(`Modbus Relais ${relay} Impuls`, 'success');
+                showToast(t('toast.modbus.relay.pulse', relay), 'success');
                 return;
             }
 
@@ -2609,31 +2986,31 @@
                 });
 
                 if (response.ok) {
-                    showToast(`Modbus Relais ${relay} Impuls`, 'success');
+                    showToast(t('toast.modbus.relay.pulse', relay), 'success');
                 } else {
                     const data = await response.json();
-                    showToast(`Modbus Fehler: ${data.error || 'Unbekannt'}`, 'error');
+                    showToast(t('toast.modbus.error', data.error || '?'), 'error');
                 }
             } catch (error) {
                 console.error('Modbus pulse error:', error);
-                showToast('Modbus Netzwerkfehler', 'error');
+                showToast(t('toast.modbus.network'), 'error');
             }
         }
 
         async function scanModbusAddress() {
-            showToast('Suche Modbus Geraet...', 'success');
+            showToast(t('toast.modbus.searching'), 'success');
             try {
                 const response = await fetch('/api/modbus/scan', { method: 'POST' });
                 const data = await response.json();
 
                 if (data.success) {
                     document.getElementById('modbusAddress').value = data.address;
-                    showToast(`Geraet gefunden: Adresse ${data.address}`, 'success');
+                    showToast(t('toast.modbus.found', data.address), 'success');
                 } else {
-                    showToast('Kein Geraet gefunden', 'error');
+                    showToast(t('toast.modbus.notfound'), 'error');
                 }
             } catch (error) {
-                showToast('Scan fehlgeschlagen', 'error');
+                showToast(t('toast.scan.failed'), 'error');
             }
         }
 
@@ -2664,7 +3041,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'relay-btn';
                 btn.id = `modbus-relay-${i}`;
-                const label = modbusLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                const label = modbusLabels[i - 1] || (pulseMode ? t('pulse') : t('relay'));
                 btn.innerHTML = `${i}<span>${label}</span>`;
                 btn.onclick = () => modbusToggleRelay(i);
                 btn.oncontextmenu = (e) => {
@@ -2679,7 +3056,7 @@
             for (let i = 1; i <= modbusRelayCount; i++) {
                 const btn = document.getElementById(`modbus-relay-${i}`);
                 if (btn) {
-                    const label = modbusLabels[i - 1] || (pulseMode ? 'Impuls' : 'Relais');
+                    const label = modbusLabels[i - 1] || (pulseMode ? t('pulse') : t('relay'));
                     btn.querySelector('span').textContent = label;
                 }
             }
@@ -2707,23 +3084,23 @@
                     </div>
                     <div class="input-action-content" id="input-action-content-${i}">
                         <div class="action-section">
-                            <label class="action-label">Beschriftung:</label>
+                            <label class="action-label">${t('label.field')}</label>
                             <input type="text" class="action-input" id="inputLabel${i}" placeholder="Input ${i}" maxlength="12"
                                    value="${inputLabels[i-1] || ''}"
                                    oninput="updateInputActionName(${i})">
                         </div>
                         <div class="action-section">
-                            <label class="action-label">Relais aktivieren:</label>
+                            <label class="action-label">${t('relay.activate')}</label>
                             <div class="relay-checkboxes" id="relay-checkboxes-${i}">
                                 ${buildRelayCheckboxes(i)}
                             </div>
                         </div>
                         <div class="action-section">
-                            <label class="action-label">TCP Befehl senden:</label>
+                            <label class="action-label">${t('tcp.send')}</label>
                             <select class="tcp-mode-select" id="tcp-mode-${i}" onchange="updateTcpMode(${i})">
-                                <option value="0" ${inputTcpMode[i-1] === 0 ? 'selected' : ''}>Deaktiviert</option>
-                                <option value="1" ${inputTcpMode[i-1] === 1 ? 'selected' : ''}>Manuell (IP/Port/Befehl)</option>
-                                <option value="2" ${inputTcpMode[i-1] === 2 ? 'selected' : ''}>Geraete-Vorlage</option>
+                                <option value="0" ${inputTcpMode[i-1] === 0 ? 'selected' : ''}>${t('tcp.disabled')}</option>
+                                <option value="1" ${inputTcpMode[i-1] === 1 ? 'selected' : ''}>${t('tcp.manual')}</option>
+                                <option value="2" ${inputTcpMode[i-1] === 2 ? 'selected' : ''}>${t('tcp.preset')}</option>
                             </select>
 
                             <!-- Manual mode -->
@@ -2734,7 +3111,7 @@
                                 <input type="number" class="tcp-port-input" id="tcp-port-${i}"
                                        placeholder="5000" value="${inputTcpPort[i-1] || ''}">
                                 <input type="text" class="tcp-cmd-input" id="tcp-cmd-${i}"
-                                       placeholder="r1_on oder HEX:060e..." value="${inputTcpCommand[i-1] || ''}">
+                                       placeholder="${t('tcp.cmd.ph')}" value="${inputTcpCommand[i-1] || ''}">
                             </div>
 
                             <!-- Preset mode -->
@@ -2768,7 +3145,7 @@
                 const selected = inputTcpDevice[inputNum - 1] === d ? 'selected' : '';
                 html += `<option value="${d}" ${selected}>${tcpDevices[d].name}</option>`;
             }
-            return html || '<option value="0">Keine Geraete</option>';
+            return html || `<option value="0">${t('tcp.no.devices')}</option>`;
         }
 
         function buildFunctionOptions(inputNum) {
@@ -2870,7 +3247,7 @@
             // TCP command
             const mode = inputTcpMode[inputNum - 1];
             if (mode === 1) {
-                parts.push('TCP:Manuell');
+                parts.push(t('tcp.manual.summary'));
             } else if (mode === 2 && tcpDevices.length > 0) {
                 const deviceIdx = inputTcpDevice[inputNum - 1];
                 if (deviceIdx < tcpDevices.length) {
@@ -2914,10 +3291,10 @@
                     body: formData
                 });
                 const result = await response.json();
-                showToast('Eingaenge gespeichert', 'success');
+                showToast(t('toast.inputs.saved'), 'success');
                 updateInputLabels();
             } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
+                showToast(t('toast.save.error'), 'error');
             }
         }
 
@@ -2934,13 +3311,13 @@
 
                 if (needsRestart) {
                     setTimeout(() => {
-                        if (confirm('Einstellungen wurden gespeichert.\n\nJetzt neustarten um Aenderungen zu uebernehmen?')) {
+                        if (confirm(t('toast.save.restart'))) {
                             restartDevice(true); // Skip second confirmation
                         }
                     }, 500);
                 }
             } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
+                showToast(t('toast.save.error'), 'error');
             }
         }
 
@@ -2954,7 +3331,7 @@
             formData.append('dns', document.getElementById('dns').value);
             formData.append('hostname', document.getElementById('hostnameInput').value);
 
-            await saveConfigAndAskRestart(formData, 'Ethernet Konfiguration gespeichert', true);
+            await saveConfigAndAskRestart(formData, t('toast.eth.saved'), true);
         }
 
         async function saveWiFiConfig() {
@@ -2973,7 +3350,7 @@
             formData.append('wifiSubnet', document.getElementById('wifiSubnet').value);
             formData.append('wifiDNS', document.getElementById('wifiDNS').value);
 
-            await saveConfigAndAskRestart(formData, 'WiFi Konfiguration gespeichert', true);
+            await saveConfigAndAskRestart(formData, t('toast.wifi.saved'), true);
         }
 
         async function saveControlConfig() {
@@ -2983,7 +3360,7 @@
 
             // TCP Port change needs restart, pulse duration doesn't
             const tcpPortChanged = document.getElementById('tcpPort').value != document.getElementById('info-tcpport').textContent;
-            await saveConfigAndAskRestart(formData, 'Steuerung Konfiguration gespeichert', tcpPortChanged);
+            await saveConfigAndAskRestart(formData, t('toast.control.saved'), tcpPortChanged);
         }
 
         async function saveNTPConfig() {
@@ -2992,7 +3369,7 @@
             formData.append('ntpServer', document.getElementById('ntpServer').value);
             formData.append('ntpTimezone', document.getElementById('ntpTimezone').value);
 
-            await saveConfigAndAskRestart(formData, 'NTP Konfiguration gespeichert', true);
+            await saveConfigAndAskRestart(formData, t('toast.ntp.saved'), true);
         }
 
         async function saveLEDConfig() {
@@ -3001,7 +3378,7 @@
             formData.append('ledBrightness', document.getElementById('ledBrightness').value);
 
             // LED changes need restart to apply
-            await saveConfigAndAskRestart(formData, 'LED Konfiguration gespeichert', true);
+            await saveConfigAndAskRestart(formData, t('toast.led.saved'), true);
         }
 
         async function saveModbusConfig() {
@@ -3010,7 +3387,7 @@
             formData.append('modbusAddress', document.getElementById('modbusAddress').value);
             formData.append('modbusRelayCount', document.getElementById('modbusRelayCount').value);
 
-            await saveConfigAndAskRestart(formData, 'Modbus Konfiguration gespeichert', true);
+            await saveConfigAndAskRestart(formData, t('toast.modbus.saved'), true);
         }
 
         async function saveLabelsConfig() {
@@ -3036,12 +3413,12 @@
                 });
 
                 const result = await response.json();
-                showToast(result.message || 'Beschriftungen gespeichert', 'success');
+                showToast(result.message || t('toast.labels.saved'), 'success');
 
                 updateRelayLabels();
                 updateModbusLabels();
             } catch (error) {
-                showToast('Fehler beim Speichern', 'error');
+                showToast(t('toast.save.error'), 'error');
             }
         }
 
@@ -3061,9 +3438,9 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                showToast('Backup exportiert', 'success');
+                showToast(t('toast.backup.exported'), 'success');
             } catch (error) {
-                showToast('Export fehlgeschlagen', 'error');
+                showToast(t('toast.export.failed'), 'error');
             }
         }
 
@@ -3075,7 +3452,7 @@
                 const text = await file.text();
                 const config = JSON.parse(text);
 
-                if (!confirm('Einstellungen aus Backup wiederherstellen?\n\nDas Geraet wird danach neu gestartet.')) {
+                if (!confirm(t('toast.restore.confirm'))) {
                     input.value = '';
                     return;
                 }
@@ -3096,16 +3473,16 @@
                 });
 
                 if (response.ok) {
-                    showToast('Backup wiederhergestellt, Neustart...', 'success');
+                    showToast(t('toast.restore.success'), 'success');
                     setTimeout(() => {
                         fetch('/api/restart', { method: 'POST' });
                         waitForReboot();
                     }, 1000);
                 } else {
-                    showToast('Import fehlgeschlagen', 'error');
+                    showToast(t('toast.import.failed'), 'error');
                 }
             } catch (error) {
-                showToast('Ungueltige Backup-Datei', 'error');
+                showToast(t('toast.invalid.backup'), 'error');
             }
 
             input.value = '';
@@ -3118,7 +3495,7 @@
                 const tbody = document.getElementById('log-table');
 
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="padding: 1rem; text-align: center; color: var(--text-dim);">Keine Eintraege</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="4" style="padding: 1rem; text-align: center; color: var(--text-dim);">${t('log.empty')}</td></tr>`;
                     return;
                 }
 
@@ -3142,14 +3519,14 @@
         }
 
         async function restartDevice(skipConfirm = false) {
-            if (skipConfirm || confirm('Geraet wirklich neustarten?')) {
+            if (skipConfirm || confirm(t('toast.restart.confirm'))) {
                 try {
                     await fetch('/api/restart', { method: 'POST' });
-                    showToast('Geraet wird neugestartet...', 'success');
+                    showToast(t('toast.restarting'), 'success');
                     // Wait and poll for device to come back online
                     waitForReboot();
                 } catch (error) {
-                    showToast('Fehler beim Neustart', 'error');
+                    showToast(t('toast.restart.error'), 'error');
                 }
             }
         }
@@ -3177,23 +3554,23 @@
                     clearTimeout(timeoutId);
                     if (response.ok && !reloading) {
                         reloading = true;
-                        showToast('Geraet ist wieder online! Seite wird neu geladen...', 'success');
+                        showToast(t('toast.device.online'), 'success');
                         setTimeout(() => window.location.reload(true), 1000);
                     }
                 })
                 .catch(() => {
                     clearTimeout(timeoutId);
                     if (attempts < maxAttempts && !reloading) {
-                        showToast(`Warte auf Neustart... (${attempts}/${maxAttempts})`, 'success');
+                        showToast(t('toast.wait.reboot', attempts, maxAttempts), 'success');
                         setTimeout(checkOnline, interval);
                     } else if (!reloading) {
-                        showToast('Zeitlimit erreicht - bitte Seite manuell neu laden', 'error');
+                        showToast(t('toast.timeout'), 'error');
                     }
                 });
             }
 
             // Wait 5 seconds before starting to poll (ESP32 needs time to reboot)
-            showToast('Geraet wird neugestartet...', 'success');
+            showToast(t('toast.restarting'), 'success');
             setTimeout(checkOnline, 5000);
         }
 
@@ -3232,10 +3609,10 @@
                     el.style.height = h + 'px';
                     if (h >= threshold * 0.9) {
                         el.classList.add('ready');
-                        textEl.textContent = 'Loslassen zum Aktualisieren';
+                        textEl.textContent = t('pull.release');
                     } else {
                         el.classList.remove('ready');
-                        textEl.textContent = 'Zum Aktualisieren ziehen';
+                        textEl.textContent = t('pull.down');
                     }
                 }
             }, {passive: true});
@@ -3244,7 +3621,7 @@
                 if (pulling && el.classList.contains('ready')) {
                     el.classList.remove('active');
                     el.classList.add('refreshing');
-                    textEl.textContent = 'Aktualisiere...';
+                    textEl.textContent = t('pull.refreshing');
                     setTimeout(() => location.reload(), 300);
                 } else {
                     el.classList.remove('active', 'ready');
@@ -3278,6 +3655,14 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            // Apply saved language immediately (before rendering)
+            const savedLang = localStorage.getItem('cinerelais_lang') || 'de';
+            currentLang = savedLang;
+            document.documentElement.lang = savedLang;
+            const langSel = document.getElementById('langSelect');
+            if (langSel) langSel.value = savedLang;
+            if (savedLang !== 'de') applyTranslations();
+
             createAppIcons();
             initGrids();
             loadConfig();
