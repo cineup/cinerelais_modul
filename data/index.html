@@ -3546,9 +3546,10 @@
 
                 tbody.innerHTML = data.map(entry => {
                     const isOut = entry.direction === 'OUT';
-                    const arrow = isOut ? '&rarr;' : '&larr;';
-                    const arrowColor = isOut ? 'var(--warning)' : 'var(--info)';
-                    const cmdColor = isOut ? 'var(--warning)' : 'var(--accent)';
+                    const isMap = entry.direction === 'MAP';
+                    const arrow = isMap ? '&#x21BB;' : (isOut ? '&rarr;' : '&larr;');
+                    const arrowColor = isMap ? 'var(--green)' : (isOut ? 'var(--warning)' : 'var(--info)');
+                    const cmdColor = isMap ? 'var(--green)' : (isOut ? 'var(--warning)' : 'var(--accent)');
                     return `
                     <tr>
                         <td style="color: var(--text-dim);">${entry.time}</td>
