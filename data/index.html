@@ -727,23 +727,39 @@
             border-bottom: 1px solid var(--border);
         }
 
-        /* OTA Link */
+        /* OTA Link — styled as button matching btn-full design */
         .ota-link {
             display: block;
+            width: 100%;
             text-align: center;
-            padding: 1rem;
-            background: var(--bg-dark);
-            border: 1px dashed var(--border);
-            border-radius: 8px;
-            color: var(--text-dim);
+            margin-top: 0.75rem;
+            padding: 0.65rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            font-family: inherit;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-left: 3px solid rgba(59, 130, 246, 0.3);
+            border-radius: 6px;
+            color: var(--info);
             text-decoration: none;
-            transition: all 0.2s ease;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
         }
 
         .ota-link:hover {
-            border-color: var(--info);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(59, 130, 246, 0.1));
+            border-color: rgba(59, 130, 246, 0.4);
+            border-left-color: var(--info);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
             color: var(--info);
-            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .ota-link:active {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.15));
+            transform: scale(0.98);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         /* Label Grid */
@@ -1923,6 +1939,7 @@
                     <div class="card-header">
                         <h2 class="card-title" data-i18n="firmware.update">Firmware Update</h2>
                     </div>
+                    <p style="color: var(--text-dim); font-size: 0.75rem; margin: 0 0 0.25rem 0;" data-i18n="ota.hint">Login: admin / flash</p>
                     <a href="/update" class="ota-link" data-i18n="ota.link">
                         OTA Firmware Update öffnen
                     </a>
@@ -1935,7 +1952,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.2.1";
+        const FS_VERSION = "1.2.2";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
 
@@ -2002,7 +2019,7 @@
             'backup':'Backup',
             'backup.hint':'Einstellungen exportieren oder importieren. Bei Firmware-Updates (ohne Filesystem) bleiben die Einstellungen erhalten.',
             'export':'Exportieren','import':'Importieren',
-            'firmware.update':'Firmware Update','ota.link':'OTA Firmware Update öffnen',
+            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'OTA Firmware Update öffnen',
             'status.online':'Online','status.offline':'Offline','status.active':'Aktiv','status.off':'Aus',
             'status.connecting':'Verbinde...','status.syncing':'Synchronisiere...',
             'ntp.disabled':'NTP deaktiviert',
@@ -2101,7 +2118,7 @@
             'backup':'Backup',
             'backup.hint':'Export or import settings. Settings are preserved during firmware updates (without filesystem).',
             'export':'Export','import':'Import',
-            'firmware.update':'Firmware Update','ota.link':'Open OTA Firmware Update',
+            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'Open OTA Firmware Update',
             'status.online':'Online','status.offline':'Offline','status.active':'Active','status.off':'Off',
             'status.connecting':'Connecting...','status.syncing':'Syncing...',
             'ntp.disabled':'NTP disabled',
@@ -2200,7 +2217,7 @@
             'backup':'Sauvegarde',
             'backup.hint':'Exporter ou importer les paramètres. Les paramètres sont conservés lors des mises à jour firmware (sans filesystem).',
             'export':'Exporter','import':'Importer',
-            'firmware.update':'Mise à jour Firmware','ota.link':'Ouvrir mise à jour OTA',
+            'firmware.update':'Mise à jour Firmware','ota.hint':'Login : admin / flash','ota.link':'Ouvrir mise à jour OTA',
             'status.online':'En ligne','status.offline':'Hors ligne','status.active':'Actif','status.off':'Arrêté',
             'status.connecting':'Connexion...','status.syncing':'Synchronisation...',
             'ntp.disabled':'NTP désactivé',
@@ -3544,6 +3561,8 @@
                     return;
                 }
 
+                // HTML-escape to prevent XSS from TCP command injection
+                const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
                 tbody.innerHTML = data.map(entry => {
                     const isOut = entry.direction === 'OUT';
                     const isMap = entry.direction === 'MAP';
@@ -3552,10 +3571,10 @@
                     const cmdColor = isMap ? 'var(--green)' : (isOut ? 'var(--warning)' : 'var(--accent)');
                     return `
                     <tr>
-                        <td style="color: var(--text-dim);">${entry.time}</td>
+                        <td style="color: var(--text-dim);">${esc(entry.time)}</td>
                         <td style="color: ${arrowColor}; font-weight: bold;">${arrow}</td>
-                        <td>${entry.source}</td>
-                        <td style="color: ${cmdColor};">${entry.command}</td>
+                        <td>${esc(entry.source)}</td>
+                        <td style="color: ${cmdColor};">${esc(entry.command)}</td>
                     </tr>
                     `;
                 }).join('');

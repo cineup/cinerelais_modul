@@ -275,6 +275,19 @@ const unsigned long INPUT_DEBOUNCE_MS = 50;  // 50ms debounce delay
 
 
 // ============================================
+// Helpers
+// ============================================
+// Validate and copy an IP address string; returns true if valid
+bool validateAndCopyIP(const String& value, char* dest, size_t destSize) {
+    IPAddress tmp;
+    if (tmp.fromString(value)) {
+        strlcpy(dest, value.c_str(), destSize);
+        return true;
+    }
+    return false;
+}
+
+// ============================================
 // Forward Declarations
 // ============================================
 void loadConfig();
@@ -423,20 +436,20 @@ void setup() {
             changed = true;
         }
         if (request->hasParam("staticIP", true)) {
-            strlcpy(config.ethIP, request->getParam("staticIP", true)->value().c_str(), sizeof(config.ethIP));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("staticIP", true)->value(), config.ethIP, sizeof(config.ethIP)))
+                changed = true;
         }
         if (request->hasParam("gateway", true)) {
-            strlcpy(config.ethGateway, request->getParam("gateway", true)->value().c_str(), sizeof(config.ethGateway));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("gateway", true)->value(), config.ethGateway, sizeof(config.ethGateway)))
+                changed = true;
         }
         if (request->hasParam("subnet", true)) {
-            strlcpy(config.ethSubnet, request->getParam("subnet", true)->value().c_str(), sizeof(config.ethSubnet));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("subnet", true)->value(), config.ethSubnet, sizeof(config.ethSubnet)))
+                changed = true;
         }
         if (request->hasParam("dns", true)) {
-            strlcpy(config.ethDNS, request->getParam("dns", true)->value().c_str(), sizeof(config.ethDNS));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("dns", true)->value(), config.ethDNS, sizeof(config.ethDNS)))
+                changed = true;
         }
 
         // WiFi config - same checkbox handling
@@ -472,20 +485,20 @@ void setup() {
             changed = true;
         }
         if (request->hasParam("wifiIP", true)) {
-            strlcpy(config.wifiIP, request->getParam("wifiIP", true)->value().c_str(), sizeof(config.wifiIP));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("wifiIP", true)->value(), config.wifiIP, sizeof(config.wifiIP)))
+                changed = true;
         }
         if (request->hasParam("wifiGateway", true)) {
-            strlcpy(config.wifiGateway, request->getParam("wifiGateway", true)->value().c_str(), sizeof(config.wifiGateway));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("wifiGateway", true)->value(), config.wifiGateway, sizeof(config.wifiGateway)))
+                changed = true;
         }
         if (request->hasParam("wifiSubnet", true)) {
-            strlcpy(config.wifiSubnet, request->getParam("wifiSubnet", true)->value().c_str(), sizeof(config.wifiSubnet));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("wifiSubnet", true)->value(), config.wifiSubnet, sizeof(config.wifiSubnet)))
+                changed = true;
         }
         if (request->hasParam("wifiDNS", true)) {
-            strlcpy(config.wifiDNS, request->getParam("wifiDNS", true)->value().c_str(), sizeof(config.wifiDNS));
-            changed = true;
+            if (validateAndCopyIP(request->getParam("wifiDNS", true)->value(), config.wifiDNS, sizeof(config.wifiDNS)))
+                changed = true;
         }
 
         // LED settings
@@ -906,7 +919,7 @@ void setup() {
     // Serve static files
     webServer->serveStatic("/", LittleFS, "/");
 
-    ElegantOTA.begin(webServer);
+    ElegantOTA.begin(webServer, "admin", "flash");
     webServer->begin();
     Serial.println("Web Server OK");
 
@@ -1328,15 +1341,15 @@ String getConfigJSON() {
     doc["wifiEnabled"] = config.wifiEnabled;
     doc["wifiAPEnabled"] = config.wifiAPEnabled;
     doc["wifiSSID"] = config.wifiSSID;
-    doc["wifiAPPassword"] = config.wifiAPPassword;
     doc["wifiDHCP"] = config.wifiDHCP;
     doc["wifiIP"] = config.wifiIP;
     doc["wifiGateway"] = config.wifiGateway;
     doc["wifiSubnet"] = config.wifiSubnet;
     doc["wifiDNS"] = config.wifiDNS;
 
-    // Don't send password
+    // Don't send passwords to browser
     doc["wifiPassword"] = "";
+    doc["wifiAPPassword"] = "";
 
     // LED
     doc["ledEnabled"] = config.ledEnabled;
