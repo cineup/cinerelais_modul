@@ -227,6 +227,11 @@ bool ntpSynced = false;
 bool restartPending = false;
 unsigned long restartTime = 0;
 
+// Modbus scan state machine (non-blocking)
+uint8_t modbusScanCurrent = 0;   // 0 = idle, 1-32 = scanning that address
+int modbusScanResult = 0;        // 0 = scanning, >0 = found address, -1 = not found
+unsigned long modbusScanNextTime = 0;
+
 // Command Log (circular buffer, newest first)
 struct LogEntry {
     char timestamp[20];   // "DD.MM.YYYY HH:MM:SS" or uptime
@@ -303,7 +308,8 @@ void modbusPulseRelay(int relay, uint16_t duration);
 void modbusPulseAllRelays(uint16_t duration);
 void updateModbusPulses();
 void modbusReadRelays();
-int modbusScanAddress();
+void modbusScanStart();
+void modbusScanStep();
 void setupNTP();
 void processInputMappings();
 void sendInputTcpCommand(int inputIndex);
@@ -838,16 +844,32 @@ void setup() {
         }
     });
 
-    // API: Modbus Scan
+    // API: Modbus Scan — POST starts scan, GET returns result
     webServer->on("/api/modbus/scan", HTTP_POST, [](AsyncWebServerRequest *request){
-        int addr = modbusScanAddress();
+        if (modbusScanCurrent > 0) {
+            request->send(200, "application/json", "{\"scanning\":true,\"progress\":" + String(modbusScanCurrent) + "}");
+            return;
+        }
+        modbusScanStart();
+        request->send(200, "application/json", "{\"scanning\":true,\"progress\":1}");
+    });
+    webServer->on("/api/modbus/scan", HTTP_GET, [](AsyncWebServerRequest *request){
         JsonDocument doc;
-        if (addr > 0) {
+        if (modbusScanCurrent > 0) {
+            doc["scanning"] = true;
+            doc["progress"] = modbusScanCurrent;
+        } else if (modbusScanResult > 0) {
+            doc["scanning"] = false;
             doc["success"] = true;
-            doc["address"] = addr;
-        } else {
+            doc["address"] = modbusScanResult;
+        } else if (modbusScanResult == -1) {
+            doc["scanning"] = false;
             doc["success"] = false;
             doc["error"] = "No device found";
+        } else {
+            doc["scanning"] = false;
+            doc["success"] = false;
+            doc["error"] = "No scan performed";
         }
         String output;
         serializeJson(doc, output);
@@ -921,6 +943,7 @@ void loop() {
     updatePulses();
     updateModbusPulses();
     modbusReadRelays();
+    modbusScanStep();  // Non-blocking Modbus address scan
     processInputMappings();  // Handle input-to-relay mappings
     checkWiFiConnection();
 
@@ -1148,7 +1171,7 @@ void checkWiFiConnection() {
 // Status & Config JSON
 // ============================================
 String getStatusJSON() {
-    readDigitalInputs();
+    // inputStates[] are already updated by processInputMappings() in loop()
 
     JsonDocument doc;
     doc["hostname"] = config.hostname;
@@ -1591,14 +1614,17 @@ void saveConfig() {
         inputTcpFunctionArr.add(config.inputTcpFunction[i]);
     }
 
-    File file = LittleFS.open(CONFIG_FILE, "w");
+    // Atomic save: write to temp file, then rename (prevents corruption on power loss)
+    File file = LittleFS.open("/config.tmp", "w");
     if (!file) {
-        Serial.println("ERROR: Cannot open config file for writing");
+        Serial.println("ERROR: Cannot open temp config file for writing");
         return;
     }
 
     serializeJson(doc, file);
     file.close();
+    LittleFS.remove(CONFIG_FILE);
+    LittleFS.rename("/config.tmp", CONFIG_FILE);
     Serial.println("Config saved");
 }
 
@@ -1606,25 +1632,31 @@ void saveConfig() {
 // TCA9554 Relay Control
 // ============================================
 void tca9554Init() {
-    Wire.beginTransmission(TCA9554_ADDR);
-    Wire.write(TCA9554_CONFIG_REG);
-    Wire.write(0x00);
-    uint8_t err = Wire.endTransmission();
+    // Retry up to 3 times (I2C bus may need time after power-on)
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        Wire.beginTransmission(TCA9554_ADDR);
+        Wire.write(TCA9554_CONFIG_REG);
+        Wire.write(0x00);
+        uint8_t err = Wire.endTransmission();
 
-    if (err != 0) {
-        Serial.printf("ERROR: TCA9554 not found (error %d)\n", err);
-        tca9554Found = false;
-        return;
+        if (err == 0) {
+            tca9554Found = true;
+            Serial.printf("TCA9554 found at 0x%02X (attempt %d)\n", TCA9554_ADDR, attempt);
+
+            Wire.beginTransmission(TCA9554_ADDR);
+            Wire.write(TCA9554_OUTPUT_REG);
+            Wire.write(0x00);
+            Wire.endTransmission();
+            relayRegister = 0x00;
+            return;
+        }
+
+        Serial.printf("TCA9554 not found (attempt %d/3, error %d)\n", attempt, err);
+        if (attempt < 3) delay(100);
     }
 
-    tca9554Found = true;
-    Serial.printf("TCA9554 found at 0x%02X\n", TCA9554_ADDR);
-
-    Wire.beginTransmission(TCA9554_ADDR);
-    Wire.write(TCA9554_OUTPUT_REG);
-    Wire.write(0x00);
-    Wire.endTransmission();
-    relayRegister = 0x00;
+    tca9554Found = false;
+    Serial.println("ERROR: TCA9554 init failed after 3 attempts — relays unavailable");
 }
 
 void setRelay(int relay, bool state) {
@@ -2155,10 +2187,30 @@ bool modbusFlashNative(int relay) {
     Serial1.write(frame, 8);
     delay(50);  // Wait for device to process and respond
 
-    // Drain response echo (device mirrors the request frame)
+    // Verify response: device should echo back the same 8-byte frame
+    uint8_t response[8];
+    int rxLen = 0;
+    unsigned long rxStart = millis();
+    while (rxLen < 8 && millis() - rxStart < 100) {
+        if (Serial1.available()) {
+            response[rxLen++] = Serial1.read();
+        }
+    }
+    // Drain any extra bytes
     while (Serial1.available()) Serial1.read();
 
-    modbusConnected = true;
+    bool verified = false;
+    if (rxLen == 8 && memcmp(frame, response, 8) == 0) {
+        verified = true;
+        modbusConnected = true;
+    } else if (rxLen > 0) {
+        // Got a response but it doesn't match — still likely connected
+        Serial.printf("Modbus: Flash response mismatch (got %d bytes)\n", rxLen);
+        modbusConnected = true;
+    } else {
+        Serial.println("Modbus: Flash no response — device may be offline");
+        modbusConnected = false;
+    }
 
     char logCmd[40];
     snprintf(logCmd, sizeof(logCmd), "mr%d_flash_%d", relay, config.pulseDuration);
@@ -2166,7 +2218,7 @@ bool modbusFlashNative(int relay) {
     snprintf(logSource, sizeof(logSource), "Modbus @%d", config.modbusAddress);
     addLogEntry(logSource, logCmd, "OUT");
 
-    return true;
+    return verified || modbusConnected;
 }
 
 void modbusPulseRelay(int relay, uint16_t duration) {
@@ -2218,34 +2270,50 @@ void modbusReadRelays() {
     }
 }
 
-// Scan for Modbus device address (1-247)
-int modbusScanAddress() {
-    Serial.println("Modbus: Scanning for device...");
-
+// Start a non-blocking Modbus address scan (called from API handler)
+void modbusScanStart() {
+    Serial.println("Modbus: Starting non-blocking scan...");
     // Initialize Serial1 if not already done
     Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
-    delay(100);
+    modbusScanCurrent = 1;
+    modbusScanResult = 0;  // 0 = in progress
+    modbusScanNextTime = millis() + 100;  // Initial delay for Serial1 init
+}
 
-    for (uint8_t addr = 1; addr <= 32; addr++) {  // Scan first 32 addresses
-        yield();  // Feed watchdog
-        modbusNode.begin(addr, Serial1);
-        delay(20);
+// Step the Modbus scan state machine (called from loop())
+void modbusScanStep() {
+    if (modbusScanCurrent == 0) return;  // Idle
+    if (millis() < modbusScanNextTime) return;  // Wait between probes
 
-        // Try reading coils (Function Code 0x01) at address 0x0000
-        uint8_t result = modbusNode.readCoils(0x0000, 1);
-        if (result == modbusNode.ku8MBSuccess) {
-            Serial.printf("Modbus: Found device at address %d\n", addr);
-            return addr;
+    modbusNode.begin(modbusScanCurrent, Serial1);
+    uint8_t result = modbusNode.readCoils(0x0000, 1);
+
+    if (result == modbusNode.ku8MBSuccess) {
+        Serial.printf("Modbus: Found device at address %d\n", modbusScanCurrent);
+        modbusScanResult = modbusScanCurrent;
+        modbusScanCurrent = 0;  // Done
+        // Restore original Modbus address
+        if (config.modbusEnabled) {
+            modbusNode.begin(config.modbusAddress, Serial1);
         }
-
-        // Print progress every 8 addresses
-        if (addr % 8 == 0) {
-            Serial.printf("Modbus: Scanned 1-%d, no device yet...\n", addr);
-        }
+        return;
     }
 
-    Serial.println("Modbus: No device found");
-    return -1;
+    if (modbusScanCurrent % 8 == 0) {
+        Serial.printf("Modbus: Scanned 1-%d, no device yet...\n", modbusScanCurrent);
+    }
+
+    modbusScanCurrent++;
+    if (modbusScanCurrent > 32) {
+        Serial.println("Modbus: No device found");
+        modbusScanResult = -1;
+        modbusScanCurrent = 0;  // Done
+        // Restore original Modbus address
+        if (config.modbusEnabled) {
+            modbusNode.begin(config.modbusAddress, Serial1);
+        }
+    }
+    modbusScanNextTime = millis() + 30;  // 30ms between probes
 }
 
 // ============================================
@@ -2270,6 +2338,13 @@ void setupTcpServer() {
     tcpServer = new AsyncServer(config.tcpPort);
 
     tcpServer->onClient([](void* arg, AsyncClient* client) {
+        // Limit concurrent TCP clients to prevent heap exhaustion
+        if (tcpClients.size() >= 8) {
+            Serial.println("TCP: Client limit reached, rejecting");
+            client->close(true);
+            return;
+        }
+
         Serial.printf("TCP client connected: %s\n", client->remoteIP().toString().c_str());
         tcpClients.push_back(client);
 
@@ -2472,14 +2547,16 @@ String processCommand(const String& cmd) {
         return "ERROR: Invalid Modbus command";
     }
 
-    // Modbus scan command
+    // Modbus scan command (non-blocking)
     if (cmd == "modbus_scan") {
-        int addr = modbusScanAddress();
-        if (addr > 0) {
-            return "OK: Modbus device found at address " + String(addr);
-        } else {
-            return "ERROR: No Modbus device found";
+        if (modbusScanCurrent > 0) {
+            return "OK: Scan in progress (" + String(modbusScanCurrent) + "/32)";
         }
+        if (modbusScanResult > 0) {
+            return "OK: Modbus device found at address " + String(modbusScanResult);
+        }
+        modbusScanStart();
+        return "OK: Modbus scan started (use 'modbus_scan' again to check result)";
     }
 
     if (cmd == "status") {
