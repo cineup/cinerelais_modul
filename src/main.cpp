@@ -2341,7 +2341,7 @@ void setupTcpServer() {
         // Limit concurrent TCP clients to prevent heap exhaustion
         if (tcpClients.size() >= 8) {
             Serial.println("TCP: Client limit reached, rejecting");
-            client->close(true);
+            client->close();
             return;
         }
 
