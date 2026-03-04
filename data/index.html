@@ -2918,9 +2918,13 @@
             const btn = document.getElementById(`relay-${relay}`);
             const duration = document.getElementById('pulseDuration').value || 500;
 
+            // Suppress status-driven UI updates during pulse to prevent double flash
+            const suppressMs = Math.max(Number(duration) + 500, 1000);
+            relaySkipUntil[relay - 1] = Date.now() + suppressMs;
+
             // Visual feedback immediately
             if (btn) {
-                btn.classList.remove('pulse-flash');
+                btn.classList.remove('pulse-flash', 'active');
                 void btn.offsetWidth; // Force reflow to restart animation
                 btn.classList.add('pulse-flash');
             }
