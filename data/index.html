@@ -2228,7 +2228,12 @@
           }
         };
 
-        let currentLang = localStorage.getItem('cinerelais_lang') || 'de';
+        function detectBrowserLang() {
+            const lang = (navigator.language || navigator.userLanguage || 'en').slice(0, 2).toLowerCase();
+            return I18N[lang] ? lang : 'en';
+        }
+
+        let currentLang = localStorage.getItem('cinerelais_lang') || detectBrowserLang();
 
         function t(key, ...args) {
             let str = (I18N[currentLang] && I18N[currentLang][key]) || I18N['de'][key] || key;
@@ -3427,6 +3432,7 @@
             try {
                 const response = await fetch('/api/config');
                 const config = await response.json();
+                config.language = currentLang;
 
                 const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -3457,9 +3463,15 @@
                     return;
                 }
 
-                // Convert config object to FormData
+                // Restore language preference from backup
+                if (config.language && I18N[config.language]) {
+                    setLanguage(config.language);
+                }
+
+                // Convert config object to FormData (skip client-only fields)
                 const formData = new FormData();
                 for (const [key, value] of Object.entries(config)) {
+                    if (key === 'language') continue;
                     if (typeof value === 'object') {
                         formData.append(key, JSON.stringify(value));
                     } else {
@@ -3655,13 +3667,13 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            // Apply saved language immediately (before rendering)
-            const savedLang = localStorage.getItem('cinerelais_lang') || 'de';
-            currentLang = savedLang;
-            document.documentElement.lang = savedLang;
+            // Apply saved or detected language immediately (before rendering)
+            const initLang = localStorage.getItem('cinerelais_lang') || detectBrowserLang();
+            currentLang = initLang;
+            document.documentElement.lang = initLang;
             const langSel = document.getElementById('langSelect');
-            if (langSel) langSel.value = savedLang;
-            if (savedLang !== 'de') applyTranslations();
+            if (langSel) langSel.value = initLang;
+            if (initLang !== 'de') applyTranslations();
 
             createAppIcons();
             initGrids();
