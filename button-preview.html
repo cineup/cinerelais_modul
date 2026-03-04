@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Button-Varianten Vorschau</title>
+<style>
+    :root {
+        --bg-dark: #0a0c14;
+        --bg-card: #0d2339;
+        --bg-card-hover: #112d4a;
+        --border: #1a3a5a;
+        --border-hover: #1e4d73;
+        --text: #e4e4e7;
+        --text-dim: #7a9bbd;
+        --accent: #3399ff;
+        --accent-dim: #0d4080;
+        --danger: #ef4444;
+        --green: #22c55e;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background: var(--bg-dark);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 2rem;
+    }
+
+    h1 { font-size: 1.5rem; margin-bottom: 2rem; color: var(--text-dim); }
+    h2 { font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent); }
+    h3 { font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-dim); font-weight: 400; }
+
+    .variant {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .variant-label {
+        display: inline-block;
+        background: var(--accent);
+        color: #000;
+        font-weight: 700;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        margin-bottom: 1rem;
+    }
+
+    .row {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .card-mock {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        width: 320px;
+    }
+
+    .card-mock label {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        margin-bottom: 0.35rem;
+    }
+
+    .card-mock input {
+        width: 100%;
+        padding: 0.5rem;
+        background: var(--bg-dark);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .desc {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        margin-top: 0.75rem;
+        line-height: 1.5;
+        padding-left: 0.5rem;
+        border-left: 2px solid var(--border);
+    }
+
+    /* =========================================================
+       AKTUELL — so sieht es jetzt aus
+       ========================================================= */
+    .current .save-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.6rem;
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        color: #000;
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .current .save-btn:hover {
+        background: #4da8ff;
+        border-color: #4da8ff;
+    }
+    .current .refresh-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg-dark);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .current .refresh-btn:hover {
+        background: var(--bg-card-hover);
+        border-color: var(--accent);
+    }
+
+    /* =========================================================
+       VARIANTE A — Outline / Ghost Style
+       Dezenter, professioneller Look. Akzentfarbe nur als Rand.
+       ========================================================= */
+    .var-a .save-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: transparent;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-a .save-btn:hover {
+        background: rgba(51, 153, 255, 0.1);
+    }
+    .var-a .save-btn:active {
+        background: rgba(51, 153, 255, 0.2);
+        transform: scale(0.98);
+    }
+
+    .var-a .refresh-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-a .refresh-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(51, 153, 255, 0.05);
+    }
+    .var-a .refresh-btn:active {
+        background: rgba(51, 153, 255, 0.15);
+        transform: scale(0.97);
+    }
+
+    /* =========================================================
+       VARIANTE B — Subtle Fill
+       Leichter Hintergrund mit Akzent, weicher und modern.
+       ========================================================= */
+    .var-b .save-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: rgba(51, 153, 255, 0.12);
+        border: 1px solid rgba(51, 153, 255, 0.3);
+        border-radius: 8px;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-b .save-btn:hover {
+        background: rgba(51, 153, 255, 0.2);
+        border-color: rgba(51, 153, 255, 0.5);
+    }
+    .var-b .save-btn:active {
+        background: rgba(51, 153, 255, 0.3);
+        transform: scale(0.98);
+    }
+
+    .var-b .refresh-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-b .refresh-btn:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: var(--text-dim);
+    }
+    .var-b .refresh-btn:active {
+        background: rgba(255, 255, 255, 0.12);
+        transform: scale(0.97);
+    }
+
+    /* =========================================================
+       VARIANTE C — Gradient Accent
+       Moderner Gradient, dezenter als solid fill, mit Tiefe.
+       ========================================================= */
+    .var-c .save-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: linear-gradient(135deg, rgba(51, 153, 255, 0.15), rgba(51, 153, 255, 0.05));
+        border: 1px solid rgba(51, 153, 255, 0.25);
+        border-radius: 8px;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .var-c .save-btn:hover {
+        background: linear-gradient(135deg, rgba(51, 153, 255, 0.25), rgba(51, 153, 255, 0.1));
+        border-color: rgba(51, 153, 255, 0.4);
+        box-shadow: 0 2px 8px rgba(51, 153, 255, 0.15);
+    }
+    .var-c .save-btn:active {
+        background: linear-gradient(135deg, rgba(51, 153, 255, 0.3), rgba(51, 153, 255, 0.15));
+        transform: scale(0.98);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .var-c .refresh-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+        color: var(--text);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .var-c .refresh-btn:hover {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+        border-color: var(--text-dim);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+    .var-c .refresh-btn:active {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+        transform: scale(0.97);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Danger buttons per variant */
+    .var-a .danger-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: transparent;
+        border: 1px solid var(--danger);
+        border-radius: 8px;
+        color: var(--danger);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-a .danger-btn:hover { background: rgba(239, 68, 68, 0.1); }
+    .var-a .danger-btn:active { background: rgba(239, 68, 68, 0.2); transform: scale(0.98); }
+
+    .var-b .danger-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        color: var(--danger);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .var-b .danger-btn:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); }
+    .var-b .danger-btn:active { background: rgba(239, 68, 68, 0.3); transform: scale(0.98); }
+
+    .var-c .danger-btn {
+        width: 100%;
+        margin-top: 0.75rem;
+        padding: 0.65rem 1rem;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        border-radius: 8px;
+        color: var(--danger);
+        font-weight: 600;
+        font-size: 0.8rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .var-c .danger-btn:hover { background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(239, 68, 68, 0.1)); border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15); }
+    .var-c .danger-btn:active { background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.15)); transform: scale(0.98); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+</style>
+</head>
+<body>
+
+<h1>Button-Varianten Vorschau — CineRelais</h1>
+
+<!-- AKTUELL -->
+<div class="variant current">
+    <div class="variant-label">AKTUELL</div>
+    <h2>Aktueller Zustand</h2>
+    <div class="row">
+        <div class="card-mock">
+            <label>Hostname</label>
+            <input type="text" value="cinerelais1" readonly>
+            <button class="save-btn">Ethernet speichern</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <button class="refresh-btn">Aktualisieren</button>
+        </div>
+    </div>
+    <div class="desc">
+        Speichern: Solider blauer Hintergrund, schwarze Schrift — wirkt etwas plump.<br>
+        Aktualisieren: Nur Hover-Effekt, kein sichtbarer Klick-Feedback.
+    </div>
+</div>
+
+<!-- VARIANTE A -->
+<div class="variant var-a">
+    <div class="variant-label">VARIANTE A</div>
+    <h2>Outline / Ghost</h2>
+    <div class="row">
+        <div class="card-mock">
+            <label>Hostname</label>
+            <input type="text" value="cinerelais1" readonly>
+            <button class="save-btn">Ethernet speichern</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <button class="refresh-btn">Aktualisieren</button>
+            <div class="card-mock" style="width:auto;padding:0.75rem;">
+                <button class="danger-btn">Gerät neustarten</button>
+            </div>
+        </div>
+    </div>
+    <div class="desc">
+        Transparenter Hintergrund, nur Akzent-Rand und -Schrift.<br>
+        Klick: <code>scale(0.98)</code> + dunklerer Fill. Minimalistisch und clean.<br>
+        Passt gut zum Dark Theme — der Button drängt sich nicht auf.
+    </div>
+</div>
+
+<!-- VARIANTE B -->
+<div class="variant var-b">
+    <div class="variant-label">VARIANTE B</div>
+    <h2>Subtle Fill</h2>
+    <div class="row">
+        <div class="card-mock">
+            <label>Hostname</label>
+            <input type="text" value="cinerelais1" readonly>
+            <button class="save-btn">Ethernet speichern</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <button class="refresh-btn">Aktualisieren</button>
+            <div class="card-mock" style="width:auto;padding:0.75rem;">
+                <button class="danger-btn">Gerät neustarten</button>
+            </div>
+        </div>
+    </div>
+    <div class="desc">
+        Leicht getönter Hintergrund (12% Akzent) mit halbtransparentem Rand.<br>
+        Klick: Intensiverer Fill + <code>scale(0.98)</code>. Weich und modern.<br>
+        Guter Kompromiss zwischen sichtbar und dezent.
+    </div>
+</div>
+
+<!-- VARIANTE C -->
+<div class="variant var-c">
+    <div class="variant-label">VARIANTE C</div>
+    <h2>Gradient Accent</h2>
+    <div class="row">
+        <div class="card-mock">
+            <label>Hostname</label>
+            <input type="text" value="cinerelais1" readonly>
+            <button class="save-btn">Ethernet speichern</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+            <button class="refresh-btn">Aktualisieren</button>
+            <div class="card-mock" style="width:auto;padding:0.75rem;">
+                <button class="danger-btn">Gerät neustarten</button>
+            </div>
+        </div>
+    </div>
+    <div class="desc">
+        Subtiler Gradient (135°) mit leichtem <code>box-shadow</code> für Tiefe.<br>
+        Hover: Stärkerer Gradient + Glow-Shadow. Klick: <code>scale(0.98)</code> + flacherer Shadow.<br>
+        Am hochwertigsten — hat physische Tiefe, ohne überladen zu wirken.
+    </div>
+</div>
+
+</body>
+</html>

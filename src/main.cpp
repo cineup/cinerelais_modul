@@ -186,6 +186,8 @@ AsyncWebServer* webServer = nullptr;
 AsyncServer* tcpServer = nullptr;
 Adafruit_NeoPixel* rgbLed = nullptr;
 std::vector<AsyncClient*> tcpClients;
+AsyncWebSocket* ws = nullptr;
+bool wsBroadcastNeeded = false;  // Thread-safe flag for WebSocket broadcast in loop()
 
 bool tca9554Found = false;
 bool relayStates[8] = {false};
@@ -303,6 +305,10 @@ int modbusScanAddress();
 void setupNTP();
 void processInputMappings();
 void sendInputTcpCommand(int inputIndex);
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+               AwsEventType type, void *arg, uint8_t *data, size_t len);
+void wsBroadcast();
+void wsNotify();
 
 // ============================================
 // Setup
@@ -355,6 +361,12 @@ void setup() {
     // Web Server
     Serial.println("Starting Web Server...");
     webServer = new AsyncWebServer(80);
+
+    // WebSocket
+    ws = new AsyncWebSocket("/ws");
+    ws->onEvent(onWsEvent);
+    webServer->addHandler(ws);
+    Serial.println("WebSocket handler registered on /ws");
 
     // Serve index.html
     webServer->on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -635,7 +647,7 @@ void setup() {
 
         JsonDocument doc;
         doc["success"] = true;
-        doc["message"] = "Konfiguration gespeichert. Neustart fuer Aenderungen.";
+        doc["message"] = "ok";
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);
@@ -930,6 +942,12 @@ void loop() {
         setStatusLED();
     }
 
+    // WebSocket: broadcast status to all connected clients when state changed
+    if (wsBroadcastNeeded) {
+        wsBroadcastNeeded = false;
+        wsBroadcast();
+    }
+
     delay(10);
 }
 
@@ -950,21 +968,25 @@ void onEthEvent(arduino_event_id_t event, arduino_event_info_t info) {
             ethConnected = true;
             Serial.printf("ETH: Got IP %s\n", ETH.localIP().toString().c_str());
             ledUpdateNeeded = true;  // Thread-safe: set flag, update in loop()
+            wsBroadcastNeeded = true;
             break;
         case ARDUINO_EVENT_ETH_LOST_IP:
             ethConnected = false;
             Serial.println("ETH: Lost IP");
             ledUpdateNeeded = true;
+            wsBroadcastNeeded = true;
             break;
         case ARDUINO_EVENT_ETH_DISCONNECTED:
             ethConnected = false;
             Serial.println("ETH: Link Down");
             ledUpdateNeeded = true;
+            wsBroadcastNeeded = true;
             break;
         case ARDUINO_EVENT_ETH_STOP:
             ethConnected = false;
             Serial.println("ETH: Stopped");
             ledUpdateNeeded = true;
+            wsBroadcastNeeded = true;
             break;
         default:
             break;
@@ -1102,6 +1124,7 @@ void checkWiFiConnection() {
         wifiSTAConnected = false;
         Serial.println("WiFi STA disconnected, attempting reconnect...");
         ledUpdateNeeded = true;
+        wsBroadcastNeeded = true;
     }
 
     if (WiFi.status() != WL_CONNECTED) {
@@ -1110,6 +1133,7 @@ void checkWiFiConnection() {
         wifiSTAConnected = true;
         Serial.printf("WiFi STA reconnected: %s\n", WiFi.localIP().toString().c_str());
         ledUpdateNeeded = true;
+        wsBroadcastNeeded = true;
     }
 }
 
@@ -1613,6 +1637,7 @@ void setRelay(int relay, bool state) {
 
     relayStates[bit] = state;
     Serial.printf("Relay %d: %s\n", relay, state ? "ON" : "OFF");
+    wsNotify();
 }
 
 void setAllRelays(bool state) {
@@ -1629,6 +1654,7 @@ void setAllRelays(bool state) {
         relayStates[i] = state;
     }
     Serial.printf("All relays: %s\n", state ? "ON" : "OFF");
+    wsNotify();
 }
 
 void pulseRelay(int relay, uint16_t duration) {
@@ -1664,6 +1690,7 @@ void updatePulses() {
         Wire.write(TCA9554_OUTPUT_REG);
         Wire.write(relayRegister);
         Wire.endTransmission();
+        wsNotify();
     }
 }
 
@@ -1712,6 +1739,7 @@ void processInputMappings() {
                 // Stable for debounce period - accept new state
                 inputDebouncedStates[i] = inputStates[i];
                 inputDebounceTime[i] = 0;
+                wsNotify();  // Input state changed — push to WS clients
 
                 // Handle TCP command on rising edge (input became active)
                 if (inputDebouncedStates[i] && config.inputTcpMode[i] != 0) {
@@ -1741,6 +1769,23 @@ void processInputMappings() {
 
             if (shouldBeOn != wasOn) {
                 setRelay(r + 1, shouldBeOn);
+
+                // Log which input(s) triggered this relay change
+                char logSource[32] = "";
+                for (int di = 0; di < 8; di++) {
+                    if (config.inputRelayMap[di] & (1 << r)) {
+                        if (inputDebouncedStates[di] == shouldBeOn) {
+                            if (logSource[0] != '\0') strlcat(logSource, "+", sizeof(logSource));
+                            char tmp[4];
+                            snprintf(tmp, sizeof(tmp), "DI%d", di + 1);
+                            strlcat(logSource, tmp, sizeof(logSource));
+                        }
+                    }
+                }
+                if (logSource[0] == '\0') strlcpy(logSource, "INPUT", sizeof(logSource));
+                char logCmd[16];
+                snprintf(logCmd, sizeof(logCmd), "r%d_%s", r + 1, shouldBeOn ? "on" : "off");
+                addLogEntry(logSource, logCmd, "MAP");
             }
         }
         inputControlledRelays = newInputControlled;
@@ -1867,7 +1912,7 @@ void sendInputTcpCommand(int inputIndex) {
         }
         Serial.printf("TCP Input: Response: %s\n", response);
         addLogEntry(lastLogTarget, response, "IN");
-        c->close(true);
+        c->close();
     }, nullptr);
 
     client->onDisconnect([](void* arg, AsyncClient* c) {
@@ -1882,7 +1927,7 @@ void sendInputTcpCommand(int inputIndex) {
 
     client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
         Serial.println("TCP Input: Timeout (no response)");
-        c->close(true);
+        c->close();
     }, nullptr);
 
     client->setRxTimeout(2);  // 2 second timeout for response
@@ -1989,6 +2034,7 @@ bool modbusSetRelay(int relay, bool state) {
         modbusRelayStates[relay - 1] = state;
         modbusConnected = true;
         Serial.printf("Modbus Relay %d: %s\n", relay, state ? "ON" : "OFF");
+        wsNotify();
 
         // Log Modbus command
         char logCmd[32];
@@ -2001,6 +2047,7 @@ bool modbusSetRelay(int relay, bool state) {
     } else {
         modbusConnected = false;
         Serial.printf("Modbus Relay %d: FAILED - %s (0x%02X)\n", relay, modbusErrorString(result), result);
+        wsNotify();
         return false;
     }
 }
@@ -2031,6 +2078,7 @@ bool modbusSetAllRelays(bool state) {
         }
         modbusConnected = true;
         Serial.printf("Modbus All relays: %s\n", state ? "ON" : "OFF");
+        wsNotify();
 
         char logCmd[32];
         snprintf(logCmd, sizeof(logCmd), "m1_all_%s", state ? "on" : "off");
@@ -2042,6 +2090,7 @@ bool modbusSetAllRelays(bool state) {
     } else {
         modbusConnected = false;
         Serial.printf("Modbus All relays FAILED: %s (0x%02X)\n", modbusErrorString(result), result);
+        wsNotify();
         return false;
     }
 }
@@ -2138,12 +2187,18 @@ void modbusReadRelays() {
     // Waveshare: Function Code 0x01 (Read Coils) at address 0x0000
     uint8_t result = modbusNode.readCoils(0x0000, config.modbusRelayCount);
     if (result == modbusNode.ku8MBSuccess) {
+        bool wasConnected = modbusConnected;
         modbusConnected = true;
         uint16_t data = modbusNode.getResponseBuffer(0);
+        bool stateChanged = !wasConnected;
         for (int i = 0; i < config.modbusRelayCount && i < 8; i++) {
-            modbusRelayStates[i] = (data >> i) & 0x01;
+            bool newState = (data >> i) & 0x01;
+            if (modbusRelayStates[i] != newState) stateChanged = true;
+            modbusRelayStates[i] = newState;
         }
+        if (stateChanged) wsNotify();
     } else {
+        if (modbusConnected) wsNotify();  // Connection lost
         modbusConnected = false;
     }
 }
@@ -2235,6 +2290,63 @@ void setupTcpServer() {
 
     tcpServer->begin();
     Serial.printf("TCP server started on port %d\n", config.tcpPort);
+}
+
+// ============================================
+// WebSocket
+// ============================================
+void wsNotify() {
+    wsBroadcastNeeded = true;
+}
+
+void wsBroadcast() {
+    if (ws && ws->count() > 0) {
+        String status = getStatusJSON();
+        ws->textAll(status);
+        ws->cleanupClients(4);  // Limit to 4 concurrent WS clients
+    }
+}
+
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+               AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    switch (type) {
+        case WS_EVT_CONNECT:
+            Serial.printf("WS client #%u connected from %s\n",
+                          client->id(), client->remoteIP().toString().c_str());
+            // Send full status to newly connected client
+            client->text(getStatusJSON());
+            break;
+
+        case WS_EVT_DISCONNECT:
+            Serial.printf("WS client #%u disconnected\n", client->id());
+            break;
+
+        case WS_EVT_DATA: {
+            AwsFrameInfo *info = (AwsFrameInfo*)arg;
+            if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+                String cmd = String((char*)data).substring(0, len);
+                cmd.trim();
+                cmd.toLowerCase();
+                if (cmd.length() > 0) {
+                    Serial.printf("WS cmd from #%u: %s\n", client->id(), cmd.c_str());
+                    String response = processCommand(cmd);
+                    if (cmd != "status" && cmd != "help") {
+                        flashEventLED();
+                        addLogEntry(client->remoteIP().toString().c_str(), cmd.c_str(), "IN");
+                    }
+                    client->text(response);
+                }
+            }
+            break;
+        }
+
+        case WS_EVT_ERROR:
+            Serial.printf("WS client #%u error\n", client->id());
+            break;
+
+        case WS_EVT_PONG:
+            break;
+    }
 }
 
 String processCommand(const String& cmd) {
