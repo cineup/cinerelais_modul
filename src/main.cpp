@@ -647,7 +647,7 @@ void setup() {
 
         JsonDocument doc;
         doc["success"] = true;
-        doc["message"] = "Konfiguration gespeichert. Neustart fuer Aenderungen.";
+        doc["message"] = "ok";
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);

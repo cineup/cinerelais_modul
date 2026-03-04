@@ -2303,6 +2303,9 @@
         // Pulse mode state (default ON for cinema use)
         let pulseMode = true;
 
+        // Debounce relay UI updates after manual toggle to prevent flicker
+        const relaySkipUntil = new Array(8).fill(0);
+
         // Labels for relays and inputs
         let relayLabels = ['', '', '', '', '', '', '', ''];
         let inputLabels = ['', '', '', '', '', '', '', ''];
@@ -2647,8 +2650,10 @@
                 const seconds = uptime % 60;
                 document.getElementById('info-uptime').textContent = `${hours}h ${minutes}m ${seconds}s`;
 
-                // Relay states
+                // Relay states (skip recently toggled buttons to avoid flicker)
+                const now = Date.now();
                 data.relays.forEach((state, index) => {
+                    if (now < relaySkipUntil[index]) return;
                     const btn = document.getElementById(`relay-${index + 1}`);
                     if (btn) {
                         btn.classList.toggle('active', state);
@@ -2884,6 +2889,9 @@
 
             const btn = document.getElementById(`relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
+
+            // Suppress status-driven UI updates briefly to avoid flicker
+            relaySkipUntil[relay - 1] = Date.now() + 500;
 
             // Try WebSocket first, fall back to HTTP
             if (wsSend(`r${relay}_${newState}`)) {
@@ -3329,7 +3337,7 @@
                 });
 
                 const result = await response.json();
-                showToast(result.message || successMsg, 'success');
+                showToast(successMsg, 'success');
 
                 if (needsRestart) {
                     setTimeout(() => {
