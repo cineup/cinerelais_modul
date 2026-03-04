@@ -309,6 +309,11 @@
             opacity: 0.8;
         }
 
+        .relay-btn.pending {
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(51, 153, 255, 0.3);
+        }
+
         .relay-btn.active {
             background: var(--accent);
             border-color: var(--accent);
@@ -1932,7 +1937,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.2.0";
+        const FS_VERSION = "1.2.1";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
 
@@ -2649,12 +2654,13 @@
                 const seconds = uptime % 60;
                 document.getElementById('info-uptime').textContent = `${hours}h ${minutes}m ${seconds}s`;
 
-                // Relay states (skip recently toggled buttons to avoid flicker)
+                // Relay states (skip during pulse animation, clear pending on update)
                 const now = Date.now();
                 data.relays.forEach((state, index) => {
-                    if (now < relaySkipUntil[index]) return;
+                    if (now < relaySkipUntil[index]) return; // Skip during pulse animation
                     const btn = document.getElementById(`relay-${index + 1}`);
                     if (btn) {
+                        btn.classList.remove('pending');
                         btn.classList.toggle('active', state);
                     }
                 });
@@ -2700,6 +2706,7 @@
                         data.modbusRelays.forEach((state, index) => {
                             const btn = document.getElementById(`modbus-relay-${index + 1}`);
                             if (btn) {
+                                btn.classList.remove('pending');
                                 btn.classList.toggle('active', state);
                             }
                         });
@@ -2889,12 +2896,11 @@
             const btn = document.getElementById(`relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
 
-            // Suppress status-driven UI updates briefly to avoid flicker
-            relaySkipUntil[relay - 1] = Date.now() + 500;
+            // Show pending state (border only) — fill comes from status update
+            if (btn) btn.classList.add('pending');
 
             // Try WebSocket first, fall back to HTTP
             if (wsSend(`r${relay}_${newState}`)) {
-                btn.classList.toggle('active');
                 return;
             }
 
@@ -2907,9 +2913,8 @@
                     method: 'POST',
                     body: formData
                 });
-
-                btn.classList.toggle('active');
             } catch (error) {
+                if (btn) btn.classList.remove('pending');
                 showToast(t('toast.switch.error'), 'error');
             }
         }
@@ -2962,9 +2967,11 @@
             const btn = document.getElementById(`modbus-relay-${relay}`);
             const newState = btn.classList.contains('active') ? 'off' : 'on';
 
+            // Show pending state (border only) — fill comes from status update
+            if (btn) btn.classList.add('pending');
+
             // Try WebSocket first
             if (wsSend(`m1_r${relay}_${newState}`)) {
-                btn.classList.toggle('active');
                 return;
             }
 
@@ -2978,13 +2985,13 @@
                     body: formData
                 });
 
-                if (response.ok) {
-                    btn.classList.toggle('active');
-                } else {
+                if (!response.ok) {
+                    if (btn) btn.classList.remove('pending');
                     const data = await response.json();
                     showToast(t('toast.modbus.error', data.error || '?'), 'error');
                 }
             } catch (error) {
+                if (btn) btn.classList.remove('pending');
                 console.error('Modbus toggle error:', error);
                 showToast(t('toast.modbus.network'), 'error');
             }
