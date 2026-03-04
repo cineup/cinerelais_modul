@@ -45,10 +45,12 @@
 
         /* Header */
         header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
             position: sticky;
             top: 0;
             z-index: 100;
-            padding: 1rem 1.5rem 0;
         }
 
         .header-content {
@@ -59,11 +61,6 @@
             align-items: center;
             gap: 1rem;
             flex-wrap: wrap;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px 12px 0 0;
-            border-bottom: none;
-            padding: 1rem 1.5rem;
         }
 
         .header-left {
@@ -179,6 +176,8 @@
 
         /* Tab Navigation */
         .tab-nav {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
             padding: 0 1.5rem;
         }
 
@@ -190,11 +189,6 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-top: none;
-            border-radius: 0 0 12px 12px;
-            padding: 0 0.5rem;
         }
 
         .tab-nav-inner::-webkit-scrollbar {
