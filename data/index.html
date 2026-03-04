@@ -1294,6 +1294,11 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="relay-grid"></div>
+                    <div class="relay-actions">
+                        <button class="btn" onclick="allRelays('on')" data-i18n="all.on">Alle EIN</button>
+                        <button class="btn" onclick="allRelays('off')" data-i18n="all.off">Alle AUS</button>
+                        <button class="btn" onclick="allRelays('pulse')" data-i18n="all.pulse">Alle Impuls</button>
+                    </div>
                 </div>
 
                 <!-- Digital Inputs -->
@@ -1974,7 +1979,7 @@
             'pull.down':'Zum Aktualisieren ziehen','pull.release':'Loslassen zum Aktualisieren','pull.refreshing':'Aktualisiere...',
             'ws.connected':'WebSocket verbunden','ws.disconnected':'WebSocket getrennt',
             'tab.control':'Steuerung','tab.network':'Netzwerk','tab.settings':'Einstellungen',
-            'relay.outputs':'Relais Ausgänge','pulse':'Impuls','digital.inputs':'Digitale Eingänge',
+            'relay.outputs':'Relais Ausgänge','pulse':'Impuls','all.on':'Alle EIN','all.off':'Alle AUS','all.pulse':'Alle Impuls','digital.inputs':'Digitale Eingänge',
             'modbus.relays':'Modbus Relais','command.log':'Befehlsprotokoll','refresh':'Aktualisieren',
             'log.time':'Zeit','log.source':'Quelle','log.command':'Befehl','log.empty':'Keine Einträge',
             'network.status':'Netzwerk Status','ethernet':'Ethernet',
@@ -2073,7 +2078,7 @@
             'pull.down':'Pull to refresh','pull.release':'Release to refresh','pull.refreshing':'Refreshing...',
             'ws.connected':'WebSocket connected','ws.disconnected':'WebSocket disconnected',
             'tab.control':'Control','tab.network':'Network','tab.settings':'Settings',
-            'relay.outputs':'Relay Outputs','pulse':'Pulse','digital.inputs':'Digital Inputs',
+            'relay.outputs':'Relay Outputs','pulse':'Pulse','all.on':'All ON','all.off':'All OFF','all.pulse':'All Pulse','digital.inputs':'Digital Inputs',
             'modbus.relays':'Modbus Relays','command.log':'Command Log','refresh':'Refresh',
             'log.time':'Time','log.source':'Source','log.command':'Command','log.empty':'No entries',
             'network.status':'Network Status','ethernet':'Ethernet',
@@ -2172,7 +2177,7 @@
             'pull.down':'Tirer pour actualiser','pull.release':'Relâcher pour actualiser','pull.refreshing':'Actualisation...',
             'ws.connected':'WebSocket connecté','ws.disconnected':'WebSocket déconnecté',
             'tab.control':'Contrôle','tab.network':'Réseau','tab.settings':'Paramètres',
-            'relay.outputs':'Sorties Relais','pulse':'Impulsion','digital.inputs':'Entrées Numériques',
+            'relay.outputs':'Sorties Relais','pulse':'Impulsion','all.on':'Tous ON','all.off':'Tous OFF','all.pulse':'Tous Impulsion','digital.inputs':'Entrées Numériques',
             'modbus.relays':'Relais Modbus','command.log':'Journal des Commandes','refresh':'Actualiser',
             'log.time':'Heure','log.source':'Source','log.command':'Commande','log.empty':'Aucune entrée',
             'network.status':'État du Réseau','ethernet':'Ethernet',
@@ -2365,6 +2370,7 @@
         let wsReconnectDelay = 1000;
         let wsConnected = false;
         let statusInterval = null;
+        let logInterval = null;
 
         function connectWebSocket() {
             if (wsConnection && wsConnection.readyState <= WebSocket.OPEN) return;
@@ -2384,7 +2390,7 @@
                 console.log('WebSocket connected');
                 wsConnected = true;
                 wsReconnectDelay = 1000;
-                setPollingInterval(10000);  // Slow polling as fallback
+                stopPolling();  // WS provides live updates, no polling needed
                 updateWsIndicator();
             };
 
@@ -2428,6 +2434,10 @@
             statusInterval = setInterval(updateStatus, ms);
         }
 
+        function stopPolling() {
+            if (statusInterval) { clearInterval(statusInterval); statusInterval = null; }
+        }
+
         // Send command via WebSocket (falls back to false if not connected)
         function wsSend(cmd) {
             if (wsConnected && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
@@ -2454,6 +2464,14 @@
             // Update content
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            // Only poll log when control tab is active
+            if (tabName === 'control') {
+                loadLog();
+                if (!logInterval) logInterval = setInterval(loadLog, 10000);
+            } else {
+                if (logInterval) { clearInterval(logInterval); logInterval = null; }
+            }
         }
 
         // Toggle pulse mode
@@ -2979,6 +2997,17 @@
                 showToast(t('toast.relay.pulse', relay), 'success');
             } catch (error) {
                 showToast(t('toast.pulse.error'), 'error');
+            }
+        }
+
+        async function allRelays(state) {
+            if (wsSend('all_' + state)) return;
+            try {
+                const formData = new FormData();
+                formData.append('state', state);
+                await fetch('/api/relays', { method: 'POST', body: formData });
+            } catch (error) {
+                showToast(t('toast.save.error'), 'error');
             }
         }
 
@@ -3746,7 +3775,7 @@
             togglePulseMode(); // Apply default pulse mode
             setPollingInterval(2000);  // Start with fast polling
             connectWebSocket();        // Upgrade to WebSocket (slows polling on connect)
-            setInterval(loadLog, 10000);
+            logInterval = setInterval(loadLog, 10000);
         });
     </script>
 </body>
