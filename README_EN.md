@@ -206,8 +206,9 @@ modbus_scan     # Scan for Modbus device
 
 1. Open web interface
 2. Click "OTA Firmware Update"
-3. Select `.bin` file and upload
-4. Device restarts automatically
+3. Login: User `admin`, Password `flash`
+4. Select `.bin` file and upload
+5. Device restarts automatically
 
 ### Status LED
 
