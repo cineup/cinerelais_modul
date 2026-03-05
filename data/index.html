@@ -1294,11 +1294,6 @@
                         </div>
                     </div>
                     <div class="relay-grid" id="relay-grid"></div>
-                    <div class="relay-actions">
-                        <button class="btn" onclick="allRelays('on')" data-i18n="all.on">Alle EIN</button>
-                        <button class="btn" onclick="allRelays('off')" data-i18n="all.off">Alle AUS</button>
-                        <button class="btn" onclick="allRelays('pulse')" data-i18n="all.pulse">Alle Impuls</button>
-                    </div>
                 </div>
 
                 <!-- Digital Inputs -->
@@ -1944,6 +1939,7 @@
                     <div class="card-header">
                         <h2 class="card-title" data-i18n="firmware.update">Firmware Update</h2>
                     </div>
+                    <p style="color: var(--text-dim); font-size: 0.75rem; margin: 0 0 0.25rem 0;" data-i18n="ota.hint">Login: admin / flash</p>
                     <a href="/update" class="ota-link" data-i18n="ota.link">
                         OTA Firmware Update öffnen
                     </a>
@@ -1979,7 +1975,7 @@
             'pull.down':'Zum Aktualisieren ziehen','pull.release':'Loslassen zum Aktualisieren','pull.refreshing':'Aktualisiere...',
             'ws.connected':'WebSocket verbunden','ws.disconnected':'WebSocket getrennt',
             'tab.control':'Steuerung','tab.network':'Netzwerk','tab.settings':'Einstellungen',
-            'relay.outputs':'Relais Ausgänge','pulse':'Impuls','all.on':'Alle EIN','all.off':'Alle AUS','all.pulse':'Alle Impuls','digital.inputs':'Digitale Eingänge',
+            'relay.outputs':'Relais Ausgänge','pulse':'Impuls','digital.inputs':'Digitale Eingänge',
             'modbus.relays':'Modbus Relais','command.log':'Befehlsprotokoll','refresh':'Aktualisieren',
             'log.time':'Zeit','log.source':'Quelle','log.command':'Befehl','log.empty':'Keine Einträge',
             'network.status':'Netzwerk Status','ethernet':'Ethernet',
@@ -2034,7 +2030,7 @@
             'backup':'Backup',
             'backup.hint':'Einstellungen exportieren oder importieren. Bei Firmware-Updates (ohne Filesystem) bleiben die Einstellungen erhalten.',
             'export':'Exportieren','import':'Importieren',
-            'firmware.update':'Firmware Update','ota.link':'OTA Firmware Update öffnen',
+            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'OTA Firmware Update öffnen',
             'status.online':'Online','status.offline':'Offline','status.active':'Aktiv','status.off':'Aus',
             'status.connecting':'Verbinde...','status.syncing':'Synchronisiere...',
             'ntp.disabled':'NTP deaktiviert',
@@ -2078,7 +2074,7 @@
             'pull.down':'Pull to refresh','pull.release':'Release to refresh','pull.refreshing':'Refreshing...',
             'ws.connected':'WebSocket connected','ws.disconnected':'WebSocket disconnected',
             'tab.control':'Control','tab.network':'Network','tab.settings':'Settings',
-            'relay.outputs':'Relay Outputs','pulse':'Pulse','all.on':'All ON','all.off':'All OFF','all.pulse':'All Pulse','digital.inputs':'Digital Inputs',
+            'relay.outputs':'Relay Outputs','pulse':'Pulse','digital.inputs':'Digital Inputs',
             'modbus.relays':'Modbus Relays','command.log':'Command Log','refresh':'Refresh',
             'log.time':'Time','log.source':'Source','log.command':'Command','log.empty':'No entries',
             'network.status':'Network Status','ethernet':'Ethernet',
@@ -2133,7 +2129,7 @@
             'backup':'Backup',
             'backup.hint':'Export or import settings. Settings are preserved during firmware updates (without filesystem).',
             'export':'Export','import':'Import',
-            'firmware.update':'Firmware Update','ota.link':'Open OTA Firmware Update',
+            'firmware.update':'Firmware Update','ota.hint':'Login: admin / flash','ota.link':'Open OTA Firmware Update',
             'status.online':'Online','status.offline':'Offline','status.active':'Active','status.off':'Off',
             'status.connecting':'Connecting...','status.syncing':'Syncing...',
             'ntp.disabled':'NTP disabled',
@@ -2177,7 +2173,7 @@
             'pull.down':'Tirer pour actualiser','pull.release':'Relâcher pour actualiser','pull.refreshing':'Actualisation...',
             'ws.connected':'WebSocket connecté','ws.disconnected':'WebSocket déconnecté',
             'tab.control':'Contrôle','tab.network':'Réseau','tab.settings':'Paramètres',
-            'relay.outputs':'Sorties Relais','pulse':'Impulsion','all.on':'Tous ON','all.off':'Tous OFF','all.pulse':'Tous Impulsion','digital.inputs':'Entrées Numériques',
+            'relay.outputs':'Sorties Relais','pulse':'Impulsion','digital.inputs':'Entrées Numériques',
             'modbus.relays':'Relais Modbus','command.log':'Journal des Commandes','refresh':'Actualiser',
             'log.time':'Heure','log.source':'Source','log.command':'Commande','log.empty':'Aucune entrée',
             'network.status':'État du Réseau','ethernet':'Ethernet',
@@ -2232,7 +2228,7 @@
             'backup':'Sauvegarde',
             'backup.hint':'Exporter ou importer les paramètres. Les paramètres sont conservés lors des mises à jour firmware (sans filesystem).',
             'export':'Exporter','import':'Importer',
-            'firmware.update':'Mise à jour Firmware','ota.link':'Ouvrir mise à jour OTA',
+            'firmware.update':'Mise à jour Firmware','ota.hint':'Login : admin / flash','ota.link':'Ouvrir mise à jour OTA',
             'status.online':'En ligne','status.offline':'Hors ligne','status.active':'Actif','status.off':'Arrêté',
             'status.connecting':'Connexion...','status.syncing':'Synchronisation...',
             'ntp.disabled':'NTP désactivé',
@@ -2997,17 +2993,6 @@
                 showToast(t('toast.relay.pulse', relay), 'success');
             } catch (error) {
                 showToast(t('toast.pulse.error'), 'error');
-            }
-        }
-
-        async function allRelays(state) {
-            if (wsSend('all_' + state)) return;
-            try {
-                const formData = new FormData();
-                formData.append('state', state);
-                await fetch('/api/relays', { method: 'POST', body: formData });
-            } catch (error) {
-                showToast(t('toast.save.error'), 'error');
             }
         }
 
