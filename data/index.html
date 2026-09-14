@@ -1398,7 +1398,7 @@
 
                     <div class="form-group">
                         <label data-i18n="hostname">Hostname</label>
-                        <input type="text" id="hostnameInput" placeholder="CineRelais">
+                        <input type="text" id="hostnameInput" placeholder="CineRelais" maxlength="31">
                     </div>
 
                     <div class="toggle-container">
@@ -1951,7 +1951,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.2.2";
+        const FS_VERSION = "1.2.3";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
 
@@ -3394,8 +3394,10 @@
                         }
                     }, 500);
                 }
+                return result;
             } catch (error) {
                 showToast(t('toast.save.error'), 'error');
+                return null;
             }
         }
 
@@ -3409,7 +3411,11 @@
             formData.append('dns', document.getElementById('dns').value);
             formData.append('hostname', document.getElementById('hostnameInput').value);
 
-            await saveConfigAndAskRestart(formData, t('toast.eth.saved'), true);
+            const result = await saveConfigAndAskRestart(formData, t('toast.eth.saved'), true);
+            // Firmware sanitizes the hostname (DHCP/mDNS/AP-SSID) - show what was stored
+            if (result && result.hostname) {
+                document.getElementById('hostnameInput').value = result.hostname;
+            }
         }
 
         async function saveWiFiConfig() {
