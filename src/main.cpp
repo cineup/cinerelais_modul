@@ -8,6 +8,7 @@
 #include <SPI.h>
 #include <ETH.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 // Ethernet enabled - requires Arduino Core 3.x (pioarduino platform)
 // #define ETHERNET_DISABLED 1
@@ -19,6 +20,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <ModbusMaster.h>
 #include <vector>
+#include <ctype.h>
 #include <esp_netif.h>
 #include "driver/uart.h"
 #include "config.h"
@@ -136,7 +138,7 @@ struct Config {
 };
 
 Config config = {
-    "CineRelais",   // hostname
+    DEFAULT_HOSTNAME,  // hostname
     5000,           // tcpPort
     500,            // pulseDuration
     // Ethernet
@@ -291,6 +293,29 @@ bool validateAndCopyIP(const String& value, char* dest, size_t destSize) {
     return false;
 }
 
+// Sanitize a hostname for DHCP / mDNS / AP-SSID use (RFC 952/1123: letters,
+// digits and hyphens only). Invalid characters (spaces, dots, umlauts, ...)
+// collapse into a single '-'; leading/trailing hyphens are trimmed. Falls back
+// to DEFAULT_HOSTNAME if nothing usable remains, so the AP never gets an empty
+// SSID. dest and src must not overlap.
+void sanitizeHostname(const char* src, char* dest, size_t destSize) {
+    size_t out = 0;
+    for (size_t i = 0; src[i] != '\0' && out < destSize - 1; i++) {
+        char c = src[i];
+        if (isalnum((unsigned char)c)) {
+            dest[out++] = c;
+        } else if (out > 0 && dest[out - 1] != '-') {
+            dest[out++] = '-';
+        }
+    }
+    while (out > 0 && dest[out - 1] == '-') out--;  // trim trailing hyphens
+    dest[out] = '\0';
+
+    if (out == 0) {
+        strlcpy(dest, DEFAULT_HOSTNAME, destSize);
+    }
+}
+
 // ============================================
 // Forward Declarations
 // ============================================
@@ -311,6 +336,7 @@ void setupDigitalInputs();
 void readDigitalInputs();
 void setupWiFi();
 void checkWiFiConnection();
+void setupMDNS();
 String processCommand(const String& cmd);
 String getStatusJSON();
 String getConfigJSON();
@@ -377,6 +403,9 @@ void setup() {
     // WiFi
     setupWiFi();
 
+    // mDNS (<hostname>.local)
+    setupMDNS();
+
     // NTP Time Sync
     setupNTP();
 
@@ -413,7 +442,8 @@ void setup() {
         bool changed = false;
 
         if (request->hasParam("hostname", true)) {
-            strlcpy(config.hostname, request->getParam("hostname", true)->value().c_str(), sizeof(config.hostname));
+            sanitizeHostname(request->getParam("hostname", true)->value().c_str(),
+                             config.hostname, sizeof(config.hostname));
             changed = true;
         }
         if (request->hasParam("tcpPort", true)) {
@@ -673,6 +703,7 @@ void setup() {
         JsonDocument doc;
         doc["success"] = true;
         doc["message"] = "ok";
+        doc["hostname"] = config.hostname;  // may differ from input after sanitizing
         String output;
         serializeJson(doc, output);
         request->send(200, "application/json", output);
@@ -1095,6 +1126,10 @@ void setupWiFi() {
         return;
     }
 
+    // Hostname must be set before WiFi.mode()/begin() so it is used in DHCP requests
+    WiFi.setHostname(config.hostname);
+    WiFi.softAPsetHostname(config.hostname);
+
     bool hasSSID = strlen(config.wifiSSID) > 0;
 
     // Determine WiFi mode
@@ -1182,6 +1217,19 @@ void checkWiFiConnection() {
         ledUpdateNeeded = true;
         wsBroadcastNeeded = true;
     }
+}
+
+// ============================================
+// mDNS Setup (<hostname>.local)
+// ============================================
+void setupMDNS() {
+    if (!MDNS.begin(config.hostname)) {
+        Serial.println("mDNS: Failed to start");
+        return;
+    }
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("cinerelais", "tcp", config.tcpPort);
+    Serial.printf("mDNS: http://%s.local\n", config.hostname);
 }
 
 // ============================================
@@ -1441,7 +1489,9 @@ void loadConfig() {
         return;
     }
 
-    strlcpy(config.hostname, doc["hostname"] | "CineRelais", sizeof(config.hostname));
+    char rawHostname[sizeof(config.hostname)];
+    strlcpy(rawHostname, doc["hostname"] | DEFAULT_HOSTNAME, sizeof(rawHostname));
+    sanitizeHostname(rawHostname, config.hostname, sizeof(config.hostname));
     config.tcpPort = doc["tcpPort"] | 5000;
     config.pulseDuration = doc["pulseDuration"] | 500;
 

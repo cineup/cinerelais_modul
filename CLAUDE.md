@@ -163,11 +163,15 @@ Stored as `/config.json` on LittleFS. Fields:
 
 | Field | Type | Default |
 |-------|------|---------|
-| `useDHCP` | bool | `true` |
-| `staticIP` | string | `192.168.1.100` |
-| `gateway` | string | `192.168.1.1` |
-| `subnet` | string | `255.255.255.0` |
-| `dns` | string | `8.8.8.8` |
+| `hostname` | string | `CineRelais` (= `DEFAULT_HOSTNAME`) |
+| `tcpPort` | uint16 | `5000` |
+| `pulseDuration` | uint16 | `500` (ms) |
+| `ethEnabled` | bool | `true` |
+| `ethDHCP` | bool | `true` |
+| `ethIP` | string | `192.168.1.100` |
+| `ethGateway` | string | `192.168.1.1` |
+| `ethSubnet` | string | `255.255.255.0` |
+| `ethDNS` | string | `8.8.8.8` |
 | `wifiEnabled` | bool | `true` |
 | `wifiAPEnabled` | bool | `true` |
 | `wifiSSID` | string | `""` (empty = no STA) |
@@ -178,14 +182,40 @@ Stored as `/config.json` on LittleFS. Fields:
 | `wifiGateway` | string | `192.168.4.1` |
 | `wifiSubnet` | string | `255.255.255.0` |
 | `wifiDNS` | string | `8.8.8.8` |
-| `hostname` | string | `cinerelais1` |
-| `tcpPort` | uint16 | `5000` |
-| `pulseDuration` | uint16 | `500` (ms) |
+| `ledEnabled` | bool | `true` |
+| `ledBrightness` | uint8 | `51` (20% of 255) |
 | `ntpEnabled` | bool | `true` |
 | `ntpServer` | string | `pool.ntp.org` |
 | `ntpTimezone` | string | `CET-1CEST,M3.5.0,M10.5.0/3` |
-| `ledEnabled` | bool | `true` |
-| `ledBrightness` | uint8 | `51` (20% of 255) |
+| `relayLabels` | string[8] | `["", ...]` |
+| `inputLabels` | string[8] | `["", ...]` |
+| `modbusEnabled` | bool | `false` |
+| `modbusAddress` | uint8 | `1` (valid 1-247) |
+| `modbusRelayCount` | uint8 | `8` (valid 1-8) |
+| `modbusLabels` | string[8] | `["", ...]` |
+| `inputRelayMap` | uint8[8] | `[0, ...]` (0 = no mapping) |
+| `inputTcpMode` | uint8[8] | `[0, ...]` (0 = disabled) |
+| `inputTcpHost` | string[8] | `["", ...]` |
+| `inputTcpPort` | uint16[8] | `[0, ...]` |
+| `inputTcpCommand` | string[8] | `["", ...]` |
+| `inputTcpDevice` | uint8[8] | `[0, ...]` |
+| `inputTcpFunction` | uint8[8] | `[0, ...]` |
+
+Defaults live in the `Config config = {...}` initializer in `src/main.cpp`; the
+hostname default comes from `DEFAULT_HOSTNAME` in `src/config.h`.
+
+**Note on Ethernet field names:** the stored keys are `ethDHCP` / `ethIP` /
+`ethGateway` / `ethSubnet` / `ethDNS`, but the `POST /api/config` form
+parameters for the same values are still named `useDHCP` / `staticIP` /
+`gateway` / `subnet` / `dns`.
+
+**Hostname sanitizing:** `sanitizeHostname()` normalizes the hostname on
+`POST /api/config` and in `loadConfig()` — letters, digits and hyphens only
+(RFC 952/1123), everything else collapses into a single `-`, leading/trailing
+hyphens are trimmed, max 31 chars. An empty or otherwise unusable value falls
+back to `DEFAULT_HOSTNAME`, so the SoftAP never gets an empty SSID. The
+hostname is used for the AP SSID, the DHCP hostname (Ethernet + WiFi) and
+mDNS (`<hostname>.local`).
 
 Network changes require device restart to take effect.
 
@@ -343,3 +373,5 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 | 2026-02-03 | Added RGB LED status indicator: network status (green/cyan/blue/red), command flash (orange), relay activity (yellow), OTA (purple pulsing) |
 | 2026-02-14 | Added dual-version system (`FIRMWARE_VERSION` + `FS_VERSION`); GUI shows both with amber mismatch warning; version management workflow documented |
 | 2026-02-14 | Added Magenta LED flash for outgoing Input-TCP commands; LED legend in GUI updated; Modbus TCP command reference card added to GUI |
+| 2026-09-14 | Hostname now applied to WiFi STA/AP (`WiFi.setHostname()` / `WiFi.softAPsetHostname()`); added mDNS (`<hostname>.local`) with http + cinerelais services |
+| 2026-09-14 | Hostname sanitizing (`sanitizeHostname()`): DHCP/mDNS/AP-SSID-safe names (RFC 952/1123), applied on config POST and on load; empty/invalid falls back to `DEFAULT_HOSTNAME` instead of an empty AP SSID |
