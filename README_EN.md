@@ -108,7 +108,7 @@ The 8 relays (RO1-RO8) are controlled via TCA9554 pins P0-P7.
 
 1. Upload firmware and filesystem
 2. The module starts a WiFi Access Point:
-   - SSID: `cinerelais1` (= hostname)
+   - SSID: `CineRelais` (= hostname)
    - Password: open (no password)
 3. Connect to the AP and open `http://192.168.4.1`
 4. Configure Ethernet/WiFi in the web interface
@@ -232,7 +232,7 @@ LED brightness is configurable in the web interface (default: 20%).
 
 | Parameter | Default |
 |-----------|---------|
-| Hostname | cinerelais1 |
+| Hostname | CineRelais |
 | DHCP (Ethernet) | Enabled |
 | WiFi | Enabled |
 | WiFi AP | Enabled |
