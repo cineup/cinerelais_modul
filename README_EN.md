@@ -11,6 +11,7 @@ Firmware for the Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO modul
 - **Ethernet (W5500)** with DHCP or static IP
 - **WiFi** — AP mode for initial setup, optional STA mode
 - **Web interface** for configuration and control
+- **mDNS** — reachable via `<hostname>.local` instead of the IP address
 - **TCP command interface** for relay control
 - **OTA firmware updates** via web interface
 - **8 Digital inputs** (optocoupler-isolated)
@@ -113,6 +114,8 @@ The 8 relays (RO1-RO8) are controlled via TCA9554 pins P0-P7.
 3. Connect to the AP and open `http://192.168.4.1`
 4. Configure Ethernet/WiFi in the web interface
 5. Restart the device
+6. The module is then also reachable via mDNS: `http://CineRelais.local`
+   (or `http://<hostname>.local`) — no need to know the IP address
 
 ### Web Interface
 
@@ -120,6 +123,10 @@ After startup, the web interface is available at:
 - **Ethernet**: IP from DHCP or configured static IP
 - **WiFi AP**: `http://192.168.4.1`
 - **WiFi STA**: IP from DHCP or configured static IP
+- **mDNS**: `http://<hostname>.local` (over Ethernet and WiFi)
+
+The hostname is also sent as the DHCP hostname, so the module shows up in the
+router's device list under its name instead of `esp32-xxxxxx`.
 
 **Features:**
 - Toggle relays on/off (click) or pulse (right-click)
@@ -252,6 +259,11 @@ All settings can be changed via the web interface. Configuration is stored in fl
 
 **Important:** A restart is required after changing network settings!
 
+**Hostname:** Letters, digits and hyphens are allowed (max. 31 characters). Any
+other character is converted to `-` when saving (`Saal 1` becomes `Saal-1`),
+because the hostname is used for the AP SSID, DHCP and mDNS. If no valid
+character remains, `CineRelais` is used.
+
 ## API Endpoints
 
 | Endpoint | Method | Description |
@@ -305,6 +317,14 @@ curl -X POST -d "wifiSSID=MyNetwork&wifiPassword=secret" http://192.168.1.100/ap
 - Check IP address in serial monitor
 - For WiFi AP: use `192.168.4.1`
 - Clear browser cache
+
+### `<hostname>.local` Cannot Be Resolved
+- Check the serial monitor for `mDNS: http://<hostname>.local`
+- Windows requires Bonjour (e.g. via iTunes or Bonjour Print Services); macOS,
+  iOS, Android and most Linux distributions (Avahi) support mDNS natively
+- mDNS uses multicast and is blocked by many VLAN/guest networks and WiFi
+  controllers — use the IP address directly if in doubt
+- Client and module must be in the same subnet (mDNS is not routed)
 
 ## License
 

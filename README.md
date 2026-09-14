@@ -11,6 +11,7 @@ Firmware für das Waveshare ESP32-S3-ETH-8DI-8RO / ESP32-S3-POE-ETH-8DI-8RO Modu
 - **Ethernet (W5500)** mit DHCP oder statischer IP
 - **WiFi** — AP-Modus für Erstkonfiguration, optionaler STA-Modus
 - **Web-Interface** zur Konfiguration und Steuerung
+- **mDNS** — Zugriff über `<Hostname>.local` statt über die IP-Adresse
 - **TCP-Befehlsschnittstelle** für Relaissteuerung
 - **OTA-Firmware-Updates** über das Web-Interface
 - **8 Digitale Eingänge** (optokoppler-isoliert)
@@ -113,6 +114,8 @@ Die 8 Relais (RO1-RO8) werden über die TCA9554-Pins P0-P7 gesteuert.
 3. Mit dem AP verbinden und `http://192.168.4.1` aufrufen
 4. Im Web-Interface Ethernet/WiFi konfigurieren
 5. Gerät neustarten
+6. Danach ist das Modul zusätzlich über mDNS erreichbar: `http://CineRelais.local`
+   (bzw. `http://<Hostname>.local`) — ohne die IP-Adresse zu kennen
 
 ### Web-Interface
 
@@ -120,6 +123,10 @@ Nach dem Start ist das Web-Interface erreichbar:
 - **Ethernet**: IP aus DHCP oder konfigurierte statische IP
 - **WiFi AP**: `http://192.168.4.1`
 - **WiFi STA**: IP aus DHCP oder konfigurierte statische IP
+- **mDNS**: `http://<Hostname>.local` (über Ethernet und WLAN)
+
+Der Hostname wird außerdem als DHCP-Name übermittelt — das Modul erscheint damit
+in der Geräteliste des Routers unter seinem Namen statt als `esp32-xxxxxx`.
 
 **Funktionen:**
 - Relais ein-/ausschalten (Klick) oder pulsen (Rechtsklick)
@@ -252,6 +259,11 @@ Alle Einstellungen können über das Web-Interface geändert werden. Die Konfigu
 
 **Wichtig:** Nach Änderung der Netzwerk-Einstellungen ist ein Neustart erforderlich!
 
+**Hostname:** Erlaubt sind Buchstaben, Ziffern und Bindestriche (max. 31 Zeichen).
+Andere Zeichen werden beim Speichern automatisch zu `-` umgewandelt (aus `Saal 1`
+wird `Saal-1`), da der Hostname für AP-SSID, DHCP und mDNS verwendet wird. Bleibt
+kein gültiges Zeichen übrig, wird `CineRelais` gesetzt.
+
 ## API-Endpunkte
 
 | Endpunkt | Methode | Beschreibung |
@@ -305,6 +317,14 @@ curl -X POST -d "wifiSSID=MeinWLAN&wifiPassword=geheim" http://192.168.1.100/api
 - IP-Adresse im Serial Monitor prüfen
 - Bei WiFi AP: `192.168.4.1` verwenden
 - Browser-Cache leeren
+
+### `<Hostname>.local` wird nicht gefunden
+- Serial Monitor auf `mDNS: http://<Hostname>.local` prüfen
+- Windows benötigt Bonjour (z.B. über iTunes oder Bonjour Print Services);
+  macOS, iOS, Android und die meisten Linux-Distributionen (Avahi) können mDNS nativ
+- mDNS arbeitet per Multicast und wird von vielen VLAN-/Gast-Netzen und WLAN-Controllern
+  geblockt — im Zweifel die IP-Adresse direkt verwenden
+- Client und Modul müssen im selben Subnetz sein (mDNS wird nicht geroutet)
 
 ## Lizenz
 
