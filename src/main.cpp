@@ -55,13 +55,17 @@ const DeviceCommand IMS3000_COMMANDS[] = {
 };
 
 // AP20 Audio Processor Commands (Port 14500, ASCII protocol)
+// Datasat AP20 "Automation Serial" command set per TN-H413 rev.C:
+// @MUTED [0|1]<CR> and @FADER [+|-][tenths]<CR>, both CR-terminated,
+// single command per action (no chaining needed - @FADER takes the
+// step size directly as its numeric argument, in tenths of dB).
 const DeviceCommand AP20_COMMANDS[] = {
     {"Mute",       "@MUTED 1\r"},
     {"Unmute",     "@MUTED 0\r"},
-    {"Volume +1",  "@VOLUME +1\r"},
-    {"Volume -1",  "@VOLUME -1\r"},
-    {"Volume +5",  "@VOLUME +5\r"},
-    {"Volume -5",  "@VOLUME -5\r"}
+    {"Volume +1",  "@FADER +1\r"},
+    {"Volume -1",  "@FADER -1\r"},
+    {"Volume +5",  "@FADER +5\r"},
+    {"Volume -5",  "@FADER -5\r"}
 };
 
 // Device Presets Array (add new devices here)

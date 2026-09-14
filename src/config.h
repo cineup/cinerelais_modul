@@ -60,7 +60,7 @@ const int DI_PINS[8] = {
 // Version
 // ============================================
 
-#define FIRMWARE_VERSION        "1.1.1"
+#define FIRMWARE_VERSION        "1.1.3"
 // Minimum FS (web interface) version required by this firmware.
 // Bump this when index.html changes are mandatory alongside a firmware update.
 #define REQUIRED_FS_VERSION     "1.2.0"
