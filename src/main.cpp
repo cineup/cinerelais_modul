@@ -8,6 +8,7 @@
 #include <SPI.h>
 #include <ETH.h>
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 // Ethernet enabled - requires Arduino Core 3.x (pioarduino platform)
 // #define ETHERNET_DISABLED 1
@@ -311,6 +312,7 @@ void setupDigitalInputs();
 void readDigitalInputs();
 void setupWiFi();
 void checkWiFiConnection();
+void setupMDNS();
 String processCommand(const String& cmd);
 String getStatusJSON();
 String getConfigJSON();
@@ -376,6 +378,9 @@ void setup() {
 
     // WiFi
     setupWiFi();
+
+    // mDNS (<hostname>.local)
+    setupMDNS();
 
     // NTP Time Sync
     setupNTP();
@@ -1095,6 +1100,10 @@ void setupWiFi() {
         return;
     }
 
+    // Hostname must be set before WiFi.mode()/begin() so it is used in DHCP requests
+    WiFi.setHostname(config.hostname);
+    WiFi.softAPsetHostname(config.hostname);
+
     bool hasSSID = strlen(config.wifiSSID) > 0;
 
     // Determine WiFi mode
@@ -1182,6 +1191,19 @@ void checkWiFiConnection() {
         ledUpdateNeeded = true;
         wsBroadcastNeeded = true;
     }
+}
+
+// ============================================
+// mDNS Setup (<hostname>.local)
+// ============================================
+void setupMDNS() {
+    if (!MDNS.begin(config.hostname)) {
+        Serial.println("mDNS: Failed to start");
+        return;
+    }
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("cinerelais", "tcp", config.tcpPort);
+    Serial.printf("mDNS: http://%s.local\n", config.hostname);
 }
 
 // ============================================

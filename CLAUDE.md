@@ -343,3 +343,4 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 | 2026-02-03 | Added RGB LED status indicator: network status (green/cyan/blue/red), command flash (orange), relay activity (yellow), OTA (purple pulsing) |
 | 2026-02-14 | Added dual-version system (`FIRMWARE_VERSION` + `FS_VERSION`); GUI shows both with amber mismatch warning; version management workflow documented |
 | 2026-02-14 | Added Magenta LED flash for outgoing Input-TCP commands; LED legend in GUI updated; Modbus TCP command reference card added to GUI |
+| 2026-09-14 | Hostname now applied to WiFi STA/AP (`WiFi.setHostname()` / `WiFi.softAPsetHostname()`); added mDNS (`<hostname>.local`) with http + cinerelais services |
