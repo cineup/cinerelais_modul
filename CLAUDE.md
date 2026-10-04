@@ -55,8 +55,12 @@ pio device monitor
 - **Platform**: espressif32
 - **Board**: esp32-s3-devkitc-1 (240MHz)
 - **Framework**: Arduino
-- **Filesystem**: LittleFS (16MB flash, `default_16MB.csv` partition table)
-- **Build flags**: `CORE_DEBUG_LEVEL=3`, `ARDUINO_USB_CDC_ON_BOOT=1`, `BOARD_HAS_PSRAM`
+- **Filesystem**: LittleFS, board default 8MB layout (`default_8MB.csv`: 2× 3.3MB app, 1.5MB LittleFS)
+- **Build flags**: `CORE_DEBUG_LEVEL=3`, `ARDUINO_USB_CDC_ON_BOOT=1`, `ELEGANTOTA_USE_ASYNC_WEBSERVER=1` (no PSRAM enabled)
+
+**Hardware vs. build config:** the board's module is an ESP32-S3-WROOM-1U-N16R8
+(16MB flash, 8MB octal PSRAM), but the build still uses the devkitc-1 defaults
+(8MB flash, no PSRAM). Works fine, see *Planned: 16MB flash / PSRAM* below.
 
 ### Dependencies (lib_deps)
 
@@ -325,7 +329,7 @@ The WS2812 RGB LED on GPIO 38 provides visual feedback:
 1. **Read before modifying** — Always read existing files before proposing changes
 2. **Minimal changes** — Make only the changes requested; avoid unnecessary refactoring
 3. **Preserve conventions** — English code, German UI/docs; keep section comment style
-4. **Hardware awareness** — This runs on ESP32-S3 with 16MB flash; consider memory constraints and real-time requirements
+4. **Hardware awareness** — This runs on ESP32-S3 (16MB flash on board, build currently uses 8MB layout); consider memory constraints and real-time requirements
 5. **TCA9554 relay control** — Relays are NOT direct GPIO; always use `tca9554Write()` or `tca9554WriteAll()`
 6. **Safety first** — Relay modules control physical equipment; never bypass safety checks or remove input validation on relay indices (1-8)
 7. **Single-file architecture** — `main.cpp` is monolithic by design; don't split into multiple files unless explicitly requested
@@ -385,6 +389,22 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 - `MINOR`: Neue Funktion, rückwärtskompatibel
 - `MAJOR`: Breaking change (Protokoll, Config-Format, Hardware)
 
+## Planned: 16MB Flash / PSRAM
+
+Postponed until all modules can be flashed via USB on site (decided 2026-10-04).
+
+- **Flash**: switch to `board_build.partitions = default_16MB.csv` and
+  `board_upload.flash_size = 16MB` (2× 6.4MB app, 3.4MB LittleFS).
+  - The partition table can **not** be changed via OTA → USB flash per module.
+  - LittleFS moves to another offset → `config.json` is lost (hostname, labels,
+    mappings, Modbus/WiFi settings). Back up `GET /api/config` per module first and
+    re-enter afterwards. The Ethernet MAC comes from eFuse and does not change, so
+    DHCP reservations stay valid.
+  - Low urgency: firmware uses ~1.3MB of 3.3MB per app slot.
+- **PSRAM (optional, separate step)**: `board_build.arduino.memory_type = qio_opi` +
+  `-DBOARD_HAS_PSRAM`; test on one module first. Octal PSRAM uses GPIO 33-37 (no
+  conflict with current pin map).
+
 ## Maintenance Log
 
 | Date | Change |
@@ -402,3 +422,4 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 | 2026-09-14 | Hostname sanitizing (`sanitizeHostname()`): DHCP/mDNS/AP-SSID-safe names (RFC 952/1123), applied on config POST and on load; empty/invalid falls back to `DEFAULT_HOSTNAME` instead of an empty AP SSID |
 | 2026-09-14 | UI polish: header status badges stay on one line on mobile (no stretched WS badge), softened the status-dot glow, and split the Netzwerk block out of System Info into its own card (settings cards no longer stretch to the tallest in the row) |
 | 2026-10-04 | Fixed `AsyncClient` leak in TCP command server (accepted clients never deleted → heap exhaustion, module only answered ping), double delete in Input-TCP `onError`/`onDisconnect`, keepalive for half-open clients; added health check task with auto-reboot, `resetReason`/`healthReboot`/`minFreeHeap`/`maxAllocHeap` in `/api/status`, memory + last restart in GUI (FW 1.1.6, FS 1.2.5) |
+| 2026-10-04 | Corrected build config docs (8MB layout, no PSRAM; board has N16R8); documented postponed 16MB/PSRAM migration |
