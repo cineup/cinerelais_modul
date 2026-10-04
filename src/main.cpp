@@ -22,6 +22,9 @@
 #include <vector>
 #include <ctype.h>
 #include <esp_netif.h>
+#include <esp_system.h>
+#include <esp_heap_caps.h>
+#include <lwip/sockets.h>
 #include "driver/uart.h"
 #include "config.h"
 
@@ -233,6 +236,14 @@ bool ntpSynced = false;
 bool restartPending = false;
 unsigned long restartTime = 0;
 
+// Health check (self-test + auto-reboot)
+enum HealthRebootReason : uint8_t { HEALTH_REBOOT_NONE = 0, HEALTH_REBOOT_TCP, HEALTH_REBOOT_HEAP, HEALTH_REBOOT_LOOP };
+#define HEALTH_REBOOT_MAGIC 0xC1E4BEEF
+RTC_NOINIT_ATTR uint32_t healthRebootMagic;   // Survives software reset
+RTC_NOINIT_ATTR uint8_t healthRebootReasonRtc;
+uint8_t lastHealthReboot = HEALTH_REBOOT_NONE; // Reason of the reboot that started this run
+volatile unsigned long loopHeartbeat = 0;      // Updated every loop() iteration
+
 // Modbus scan state machine (non-blocking)
 uint8_t modbusScanCurrent = 0;   // 0 = idle, 1-32 = scanning that address
 int modbusScanResult = 0;        // 0 = scanning, >0 = found address, -1 = not found
@@ -360,6 +371,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                AwsEventType type, void *arg, uint8_t *data, size_t len);
 void wsBroadcast();
 void wsNotify();
+void setupHealthCheck();
+const char* healthRebootName(uint8_t reason);
+const char* resetReasonName();
 
 // ============================================
 // Setup
@@ -371,6 +385,13 @@ void setup() {
     Serial.println("\n\n========================================");
     Serial.println("CineRelais Controller");
     Serial.println("========================================\n");
+
+    // Remember whether the last reset was a health-check reboot
+    if (healthRebootMagic == HEALTH_REBOOT_MAGIC && esp_reset_reason() == ESP_RST_SW) {
+        lastHealthReboot = healthRebootReasonRtc;
+        Serial.printf("Last reboot triggered by health check (reason %d)\n", lastHealthReboot);
+    }
+    healthRebootMagic = 0;
 
     // LittleFS
     Serial.println("Mounting LittleFS...");
@@ -962,6 +983,9 @@ void setup() {
     Serial.println("Starting TCP Server...");
     setupTcpServer();
 
+    // Health check (self-test + auto-reboot)
+    setupHealthCheck();
+
     // Set LED based on connection status (20% brightness)
     setStatusLED();
 
@@ -987,6 +1011,7 @@ void setup() {
 // Loop
 // ============================================
 void loop() {
+    loopHeartbeat = millis();
     ElegantOTA.loop();
     updatePulses();
     updateModbusPulses();
@@ -1353,6 +1378,10 @@ String getStatusJSON() {
     doc["chipCores"] = ESP.getChipCores();
     doc["flashSize"] = ESP.getFlashChipSize() / 1024 / 1024;  // MB
     doc["freeHeap"] = ESP.getFreeHeap() / 1024;  // KB
+    doc["minFreeHeap"] = ESP.getMinFreeHeap() / 1024;  // KB, lowest since boot
+    doc["maxAllocHeap"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT) / 1024;  // KB
+    doc["resetReason"] = resetReasonName();
+    doc["healthReboot"] = healthRebootName(lastHealthReboot);
 
     // Modbus status
     doc["modbusEnabled"] = config.modbusEnabled;
@@ -2031,11 +2060,9 @@ void sendInputTcpCommand(int inputIndex) {
         delete c;
     }, ctx);
 
+    // AsyncTCP calls onDisconnect right after onError - cleanup happens there only
     client->onError([](void* arg, AsyncClient* c, int8_t error) {
-        TcpCmdContext* ctx = (TcpCmdContext*)arg;
         Serial.printf("TCP Input: Error %d\n", error);
-        delete ctx;
-        delete c;
     }, ctx);
 
     client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
@@ -2399,28 +2426,192 @@ void readDigitalInputs() {
 }
 
 // ============================================
+// Health Check (self-test + auto-reboot)
+// ============================================
+// Runs in its own low-priority task so loop() and relay timing never block.
+// Detects: TCP server not answering (AsyncTCP task hung, PCBs/heap exhausted),
+// heap too fragmented/exhausted, loop() stalled. Reboots after
+// HEALTH_MAX_FAILURES consecutive failures.
+
+const char* healthRebootName(uint8_t reason) {
+    switch (reason) {
+        case HEALTH_REBOOT_TCP:  return "tcp";
+        case HEALTH_REBOOT_HEAP: return "heap";
+        case HEALTH_REBOOT_LOOP: return "loop";
+        default:                 return "";
+    }
+}
+
+const char* resetReasonName() {
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return "poweron";
+        case ESP_RST_EXT:       return "external";
+        case ESP_RST_SW:        return "software";
+        case ESP_RST_PANIC:     return "panic";
+        case ESP_RST_INT_WDT:
+        case ESP_RST_TASK_WDT:
+        case ESP_RST_WDT:       return "watchdog";
+        case ESP_RST_BROWNOUT:  return "brownout";
+        case ESP_RST_DEEPSLEEP: return "deepsleep";
+        default:                return "other";
+    }
+}
+
+// Connect to our own TCP command server via loopback, send "help", expect a reply.
+// Non-blocking connect + timeouts so a hung stack can't block this task forever.
+bool healthProbeTcp() {
+    int sock = lwip_socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return false;
+
+    bool ok = false;
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(config.tcpPort);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    struct timeval tv;
+    tv.tv_sec = HEALTH_CHECK_TIMEOUT / 1000;
+    tv.tv_usec = (HEALTH_CHECK_TIMEOUT % 1000) * 1000;
+
+    int flags = lwip_fcntl(sock, F_GETFL, 0);
+    lwip_fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+
+    int res = lwip_connect(sock, (struct sockaddr*)&addr, sizeof(addr));
+    if (res < 0 && errno == EINPROGRESS) {
+        fd_set wfds;
+        FD_ZERO(&wfds);
+        FD_SET(sock, &wfds);
+        res = (lwip_select(sock + 1, nullptr, &wfds, nullptr, &tv) > 0) ? 0 : -1;
+        if (res == 0) {
+            int err = 0;
+            socklen_t len = sizeof(err);
+            lwip_getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &len);
+            if (err != 0) res = -1;
+        }
+    }
+
+    if (res == 0) {
+        lwip_fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
+        lwip_setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        lwip_setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        if (lwip_send(sock, "help\n", 5, 0) == 5) {
+            char buf[16];
+            ok = lwip_recv(sock, buf, sizeof(buf), 0) > 0;
+        }
+    }
+
+    lwip_close(sock);
+    return ok;
+}
+
+void healthReboot(uint8_t reason) {
+    Serial.printf("HEALTH: Rebooting (reason: %s)\n", healthRebootName(reason));
+    healthRebootReasonRtc = reason;
+    healthRebootMagic = HEALTH_REBOOT_MAGIC;
+    // Prefer the deferred restart in loop(); fall back to a direct restart
+    // if loop() doesn't get there (e.g. loop() itself is stuck)
+    restartTime = millis() + 500;
+    restartPending = true;
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP.restart();
+}
+
+void healthCheckTask(void* param) {
+    // The TCP probe only counts towards a reboot once it has succeeded at least
+    // once since boot - a probe that can never work (e.g. no loopback) must not
+    // cause a reboot loop.
+    bool tcpProbeArmed = false;
+    uint8_t tcpFailures = 0;
+    uint8_t heapFailures = 0;
+
+    vTaskDelay(pdMS_TO_TICKS(HEALTH_CHECK_START_DELAY));
+
+    for (;;) {
+        // loop() stalled?
+        if (millis() - loopHeartbeat > HEALTH_LOOP_STALL_TIMEOUT) {
+            Serial.println("HEALTH: loop() stalled");
+            healthReboot(HEALTH_REBOOT_LOOP);
+        }
+
+        // TCP command server reachable?
+        if (healthProbeTcp()) {
+            if (!tcpProbeArmed) Serial.println("HEALTH: TCP self-test OK, armed");
+            tcpProbeArmed = true;
+            tcpFailures = 0;
+        } else if (tcpProbeArmed) {
+            tcpFailures++;
+            Serial.printf("HEALTH: TCP self-test failed (%d/%d)\n", tcpFailures, HEALTH_MAX_FAILURES);
+            if (tcpFailures >= HEALTH_MAX_FAILURES) healthReboot(HEALTH_REBOOT_TCP);
+        } else {
+            Serial.println("HEALTH: TCP self-test failed (not armed yet, ignored)");
+        }
+
+        // Heap exhausted / too fragmented?
+        size_t maxBlock = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (maxBlock < HEALTH_MIN_HEAP_BLOCK) {
+            heapFailures++;
+            Serial.printf("HEALTH: Low heap, largest block %u bytes (%d/%d)\n",
+                          (unsigned)maxBlock, heapFailures, HEALTH_MAX_FAILURES);
+            if (heapFailures >= HEALTH_MAX_FAILURES) healthReboot(HEALTH_REBOOT_HEAP);
+        } else {
+            heapFailures = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(HEALTH_CHECK_INTERVAL));
+    }
+}
+
+void setupHealthCheck() {
+#if HEALTH_CHECK_ENABLED
+    xTaskCreatePinnedToCore(healthCheckTask, "health", 4096, nullptr, 1, nullptr, 1);
+    Serial.printf("Health check: enabled (every %ds, reboot after %d failures)\n",
+                  HEALTH_CHECK_INTERVAL / 1000, HEALTH_MAX_FAILURES);
+#else
+    Serial.println("Health check: disabled");
+#endif
+}
+
+// ============================================
 // TCP Command Server
 // ============================================
 void setupTcpServer() {
     tcpServer = new AsyncServer(config.tcpPort);
 
     tcpServer->onClient([](void* arg, AsyncClient* client) {
+        // Health check loopback probe: never rejected, not logged
+        bool isLoopback = (client->remoteIP() == IPAddress(127, 0, 0, 1));
+
         // Limit concurrent TCP clients to prevent heap exhaustion
-        if (tcpClients.size() >= 8) {
+        if (!isLoopback && tcpClients.size() >= 8) {
             Serial.println("TCP: Client limit reached, rejecting");
+            // Server-accepted clients are owned by us: free on disconnect
+            client->onDisconnect([](void* arg, AsyncClient* c) {
+                delete c;
+            }, nullptr);
             client->close();
             return;
         }
 
-        Serial.printf("TCP client connected: %s\n", client->remoteIP().toString().c_str());
-        tcpClients.push_back(client);
+        // Loopback probes are not tracked in tcpClients; arg marks them for quiet logging
+        void* probeArg = isLoopback ? (void*)1 : nullptr;
+        if (!isLoopback) {
+            Serial.printf("TCP client connected: %s\n", client->remoteIP().toString().c_str());
+            tcpClients.push_back(client);
+        }
+
+        // Detect dead peers (half-open connections) so they don't block a slot forever
+        client->setKeepAlive(TCP_CLIENT_KEEPALIVE_MS, TCP_CLIENT_KEEPALIVE_COUNT);
+        client->onTimeout([](void* arg, AsyncClient* c, uint32_t time) {
+            Serial.println("TCP client ACK timeout, closing");
+            c->close();
+        }, nullptr);
 
         client->onData([](void* arg, AsyncClient* c, void* data, size_t len) {
             String cmd = String((char*)data, len);
             cmd.trim();
             cmd.toLowerCase();
             if (cmd.length() > 0) {
-                Serial.printf("TCP cmd: %s\n", cmd.c_str());
+                if (!arg) Serial.printf("TCP cmd: %s\n", cmd.c_str());
                 String response = processCommand(cmd);
                 if (cmd != "status" && cmd != "help") {
                     flashEventLED();
@@ -2431,17 +2622,19 @@ void setupTcpServer() {
                     c->write((response + "\n").c_str());
                 }
             }
-        }, nullptr);
+        }, probeArg);
 
         client->onDisconnect([](void* arg, AsyncClient* c) {
-            Serial.println("TCP client disconnected");
+            if (!arg) Serial.println("TCP client disconnected");
             for (auto it = tcpClients.begin(); it != tcpClients.end(); ++it) {
                 if (*it == c) {
                     tcpClients.erase(it);
                     break;
                 }
             }
-        }, nullptr);
+            // Free the client object (AsyncTCP does not delete accepted clients)
+            delete c;
+        }, probeArg);
 
     }, nullptr);
 

@@ -226,6 +226,31 @@ Network changes require device restart to take effect.
 - **Offline mode**: If NTP sync fails, timestamps show uptime instead
 - **Status**: Shown in web interface System Info and `/api/status`
 
+### Health Check (Self-Test + Auto-Reboot)
+
+`healthCheckTask` (own FreeRTOS task, low priority, core 1) starts 2 min after boot
+and runs every 60 s (`HEALTH_*` defines in `src/config.h`):
+
+- **TCP probe**: loopback connect to `127.0.0.1:<tcpPort>`, sends `help`, expects a
+  reply within 3 s. Only counts towards a reboot after it has succeeded once since
+  boot (prevents reboot loops if loopback can never work). Loopback clients bypass
+  the 8-client limit and are not tracked in `tcpClients` / not logged.
+- **Heap**: largest free internal block < `HEALTH_MIN_HEAP_BLOCK` (8 KB).
+- **loop() stall**: no `loop()` iteration for 30 s (`loopHeartbeat`).
+
+3 consecutive failures → reason stored in `RTC_NOINIT_ATTR` vars, deferred restart via
+`restartPending` (direct `ESP.restart()` fallback after 5 s). Exposed in `/api/status`
+as `resetReason` (`poweron`/`external`/`software`/`panic`/`watchdog`/`brownout`/...)
+and `healthReboot` (`""`/`tcp`/`heap`/`loop`), plus `minFreeHeap` / `maxAllocHeap` (KB).
+Shown in the web interface System Info ("Speicher", "Letzter Neustart").
+
+**AsyncTCP ownership rules** (ESP32Async/AsyncTCP 3.x):
+- Server-accepted `AsyncClient`s are owned by us → `delete c` in `onDisconnect`
+  (also for clients rejected at the 8-client limit).
+- `_error()` calls `onError` **and then** `onDisconnect` → never delete in `onError`.
+- TCP command clients use keepalive (`TCP_CLIENT_KEEPALIVE_*`) to drop dead peers;
+  idle but alive clients stay connected.
+
 ### Command Log
 
 - Circular buffer storing last 50 commands
@@ -376,3 +401,4 @@ Semantisches Versioning `MAJOR.MINOR.PATCH`:
 | 2026-09-14 | Hostname now applied to WiFi STA/AP (`WiFi.setHostname()` / `WiFi.softAPsetHostname()`); added mDNS (`<hostname>.local`) with http + cinerelais services |
 | 2026-09-14 | Hostname sanitizing (`sanitizeHostname()`): DHCP/mDNS/AP-SSID-safe names (RFC 952/1123), applied on config POST and on load; empty/invalid falls back to `DEFAULT_HOSTNAME` instead of an empty AP SSID |
 | 2026-09-14 | UI polish: header status badges stay on one line on mobile (no stretched WS badge), softened the status-dot glow, and split the Netzwerk block out of System Info into its own card (settings cards no longer stretch to the tallest in the row) |
+| 2026-10-04 | Fixed `AsyncClient` leak in TCP command server (accepted clients never deleted → heap exhaustion, module only answered ping), double delete in Input-TCP `onError`/`onDisconnect`, keepalive for half-open clients; added health check task with auto-reboot, `resetReason`/`healthReboot`/`minFreeHeap`/`maxAllocHeap` in `/api/status`, memory + last restart in GUI (FW 1.1.6, FS 1.2.5) |

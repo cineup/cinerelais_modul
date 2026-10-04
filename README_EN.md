@@ -318,6 +318,15 @@ curl -X POST -d "wifiSSID=MyNetwork&wifiPassword=secret" http://192.168.1.100/ap
 - For WiFi AP: use `192.168.4.1`
 - Clear browser cache
 
+### Module Only Answers Ping
+- Since firmware 1.1.6 a self-test checks every minute that the TCP server responds and
+  enough memory is free. After 3 consecutive failures the module reboots automatically
+  (relays return to their boot state = off).
+- Reason of the last restart and memory status: web interface → System Info
+  ("Memory", "Last restart") or `resetReason`, `healthReboot`, `freeHeap`,
+  `minFreeHeap`, `maxAllocHeap` in `/api/status`
+- To disable: set `HEALTH_CHECK_ENABLED` to `0` in `src/config.h`
+
 ### `<hostname>.local` Cannot Be Resolved
 - Check the serial monitor for `mDNS: http://<hostname>.local`
 - Windows requires Bonjour (e.g. via iTunes or Bonjour Print Services); macOS,

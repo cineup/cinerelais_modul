@@ -1749,6 +1749,14 @@
                             <span class="info-label" data-i18n="uptime">Betriebszeit</span>
                             <span class="info-value" id="info-uptime">-</span>
                         </div>
+                        <div class="info-item">
+                            <span class="info-label" data-i18n="memory">Speicher</span>
+                            <span class="info-value" id="info-memory" style="word-break: normal">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label" data-i18n="last.restart">Letzter Neustart</span>
+                            <span class="info-value" id="info-reset" style="word-break: normal">-</span>
+                        </div>
                     </div>
 
                     <button class="btn btn-full btn-danger-full" onclick="restartDevice()" data-i18n="restart.device">
@@ -2004,7 +2012,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.2.4";
+        const FS_VERSION = "1.2.5";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
 
@@ -2055,6 +2063,14 @@
             'scan.address':'Adresse scannen','save.modbus':'Modbus speichern',
             'system.info':'System Info','firmware':'Firmware','web.interface':'Web-Interface',
             'hardware':'Hardware','uptime':'Betriebszeit','network':'Netzwerk',
+            'memory':'Speicher','last.restart':'Letzter Neustart',
+            'mem.format':'{0} KB frei · min {1} KB · Block {2} KB',
+            'mem.tooltip':'Frei = aktuell freier Heap · min = niedrigster Wert seit Start · Block = größter zusammenhängender Block (wird er knapp, startet das Modul automatisch neu)',
+            'reset.poweron':'Stromzufuhr','reset.external':'Reset-Taste','reset.software':'Software',
+            'reset.panic':'Absturz','reset.watchdog':'Watchdog','reset.brownout':'Unterspannung',
+            'reset.deepsleep':'Deep Sleep','reset.other':'Sonstiges',
+            'health.tcp':'Auto-Reboot: TCP-Selbsttest fehlgeschlagen','health.heap':'Auto-Reboot: Speicher knapp',
+            'health.loop':'Auto-Reboot: Hauptschleife hing',
             'restart.device':'Gerät neustarten',
             'status.led':'Status LED','led.enabled':'LED aktiviert','brightness':'Helligkeit',
             'led.green':'Grün','led.green.desc':'Ethernet verbunden',
@@ -2154,6 +2170,14 @@
             'scan.address':'Scan Address','save.modbus':'Save Modbus',
             'system.info':'System Info','firmware':'Firmware','web.interface':'Web Interface',
             'hardware':'Hardware','uptime':'Uptime','network':'Network',
+            'memory':'Memory','last.restart':'Last restart',
+            'mem.format':'{0} KB free · min {1} KB · block {2} KB',
+            'mem.tooltip':'Free = current free heap · min = lowest since boot · block = largest contiguous block (if it runs low, the module reboots automatically)',
+            'reset.poweron':'Power on','reset.external':'Reset button','reset.software':'Software',
+            'reset.panic':'Crash','reset.watchdog':'Watchdog','reset.brownout':'Brownout',
+            'reset.deepsleep':'Deep sleep','reset.other':'Other',
+            'health.tcp':'Auto reboot: TCP self-test failed','health.heap':'Auto reboot: low memory',
+            'health.loop':'Auto reboot: main loop hung',
             'restart.device':'Restart Device',
             'status.led':'Status LED','led.enabled':'LED enabled','brightness':'Brightness',
             'led.green':'Green','led.green.desc':'Ethernet connected',
@@ -2253,6 +2277,14 @@
             'scan.address':'Scanner adresse','save.modbus':'Enregistrer Modbus',
             'system.info':'Info Système','firmware':'Firmware','web.interface':'Interface Web',
             'hardware':'Matériel','uptime':'Temps de fonctionnement','network':'Réseau',
+            'memory':'Mémoire','last.restart':'Dernier redémarrage',
+            'mem.format':'{0} Ko libres · min {1} Ko · bloc {2} Ko',
+            'mem.tooltip':'Libre = tas libre actuel · min = plus bas depuis le démarrage · bloc = plus grand bloc contigu (s\'il devient trop petit, le module redémarre automatiquement)',
+            'reset.poweron':'Mise sous tension','reset.external':'Bouton reset','reset.software':'Logiciel',
+            'reset.panic':'Plantage','reset.watchdog':'Watchdog','reset.brownout':'Sous-tension',
+            'reset.deepsleep':'Veille profonde','reset.other':'Autre',
+            'health.tcp':'Redémarrage auto : auto-test TCP échoué','health.heap':'Redémarrage auto : mémoire insuffisante',
+            'health.loop':'Redémarrage auto : boucle principale bloquée',
             'restart.device':"Redémarrer l'appareil",
             'status.led':'LED de Statut','led.enabled':'LED activée','brightness':'Luminosité',
             'led.green':'Vert','led.green.desc':'Ethernet connecté',
@@ -2744,6 +2776,33 @@
                 const minutes = Math.floor((uptime % 3600) / 60);
                 const seconds = uptime % 60;
                 document.getElementById('info-uptime').textContent = `${hours}h ${minutes}m ${seconds}s`;
+
+                // Memory (fields missing on older firmware -> '-')
+                const memEl = document.getElementById('info-memory');
+                if (memEl) {
+                    if (data.maxAllocHeap !== undefined) {
+                        memEl.textContent = t('mem.format', data.freeHeap, data.minFreeHeap, data.maxAllocHeap);
+                        memEl.style.color = data.maxAllocHeap < 16 ? 'var(--danger)'
+                                          : data.maxAllocHeap < 32 ? 'var(--warning)' : '';
+                        memEl.title = t('mem.tooltip');
+                    } else {
+                        memEl.textContent = '-';
+                    }
+                }
+
+                // Last restart reason (amber if triggered by the health check)
+                const resetEl = document.getElementById('info-reset');
+                if (resetEl) {
+                    if (data.healthReboot) {
+                        resetEl.textContent = t('health.' + data.healthReboot);
+                        resetEl.style.color = 'var(--warning)';
+                    } else if (data.resetReason) {
+                        resetEl.textContent = t('reset.' + data.resetReason);
+                        resetEl.style.color = ['panic', 'watchdog', 'brownout'].includes(data.resetReason) ? 'var(--warning)' : '';
+                    } else {
+                        resetEl.textContent = '-';
+                    }
+                }
 
                 // Relay states (skip during pulse animation, clear pending on update)
                 const now = Date.now();
