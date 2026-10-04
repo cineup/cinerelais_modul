@@ -318,6 +318,15 @@ curl -X POST -d "wifiSSID=MeinWLAN&wifiPassword=geheim" http://192.168.1.100/api
 - Bei WiFi AP: `192.168.4.1` verwenden
 - Browser-Cache leeren
 
+### Modul antwortet nur noch auf Ping
+- Ab Firmware 1.1.6 prüft ein Selbsttest jede Minute, ob der TCP-Server antwortet und
+  genug Speicher frei ist. Nach 3 Fehlschlägen in Folge startet das Modul automatisch neu
+  (Relais gehen dabei in den Boot-Zustand = aus).
+- Grund des letzten Neustarts und Speicherstand: Web-Interface → System Info
+  („Speicher“, „Letzter Neustart“) bzw. `resetReason`, `healthReboot`, `freeHeap`,
+  `minFreeHeap`, `maxAllocHeap` in `/api/status`
+- Abschalten: `HEALTH_CHECK_ENABLED` in `src/config.h` auf `0` setzen
+
 ### `<Hostname>.local` wird nicht gefunden
 - Serial Monitor auf `mDNS: http://<Hostname>.local` prüfen
 - Windows benötigt Bonjour (z.B. über iTunes oder Bonjour Print Services);

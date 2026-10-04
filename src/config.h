@@ -60,7 +60,7 @@ const int DI_PINS[8] = {
 // Version
 // ============================================
 
-#define FIRMWARE_VERSION        "1.1.5"
+#define FIRMWARE_VERSION        "1.1.6"
 // Minimum FS (web interface) version required by this firmware.
 // Bump this when index.html changes are mandatory alongside a firmware update.
 #define REQUIRED_FS_VERSION     "1.2.0"
@@ -83,6 +83,21 @@ const int DI_PINS[8] = {
 
 // Command log
 #define COMMAND_LOG_SIZE        50
+
+// TCP command server: keepalive probes detect dead peers (half-open
+// connections) and free their slot; idle but alive clients stay connected
+#define TCP_CLIENT_KEEPALIVE_MS    30000   // idle time / probe interval
+#define TCP_CLIENT_KEEPALIVE_COUNT 4       // unanswered probes before close
+
+// Health check: periodic self-test, reboots the module if the TCP stack hangs
+// or the heap runs out (set HEALTH_CHECK_ENABLED to 0 to disable)
+#define HEALTH_CHECK_ENABLED    1
+#define HEALTH_CHECK_START_DELAY 120000  // ms after boot before first check
+#define HEALTH_CHECK_INTERVAL   60000   // ms between checks
+#define HEALTH_CHECK_TIMEOUT    3000    // ms for loopback connect/response
+#define HEALTH_MAX_FAILURES     3       // consecutive failures before reboot
+#define HEALTH_MIN_HEAP_BLOCK   8192    // bytes, largest free internal block
+#define HEALTH_LOOP_STALL_TIMEOUT 30000 // ms without loop() iteration = hung
 
 // LED defaults
 #define DEFAULT_LED_ENABLED     true
