@@ -2012,7 +2012,7 @@
 
     <script>
         // Web interface (FS) version — bump this when index.html is updated
-        const FS_VERSION = "1.2.5";
+        const FS_VERSION = "1.2.6";
         // Minimum firmware version required by this web interface
         const REQUIRED_FW_VERSION = "1.1.0";
 
@@ -3624,12 +3624,22 @@
                 const response = await fetch('/api/config');
                 const config = await response.json();
                 config.language = currentLang;
+                // Read-only / not restorable: device presets come from firmware,
+                // passwords are never sent to the browser (always empty here)
+                delete config.tcpDevices;
+                delete config.wifiPassword;
+                delete config.wifiAPPassword;
+
+                // File name: <hostname>_backup_<YYYY-MM-DD>.json (local date)
+                const now = new Date();
+                const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                const host = (config.hostname || 'CineRelais').replace(/[^A-Za-z0-9_-]/g, '_');
 
                 const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `cinerelais_backup_${new Date().toISOString().slice(0,10)}.json`;
+                a.download = `${host}_backup_${date}.json`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -3648,6 +3658,9 @@
             try {
                 const text = await file.text();
                 const config = JSON.parse(text);
+                if (!config || typeof config !== 'object' || Array.isArray(config)) {
+                    throw new Error('invalid backup');
+                }
 
                 if (!confirm(t('toast.restore.confirm'))) {
                     input.value = '';
@@ -3662,7 +3675,11 @@
                 // Convert config object to FormData (skip client-only fields)
                 const formData = new FormData();
                 for (const [key, value] of Object.entries(config)) {
-                    if (key === 'language') continue;
+                    if (key === 'language' || key === 'tcpDevices') continue;
+                    // Older backups contain empty password fields (the API never
+                    // exports passwords) - don't wipe the device's passwords with them
+                    if ((key === 'wifiPassword' || key === 'wifiAPPassword') && !value) continue;
+                    if (value === null || value === undefined) continue;
                     if (typeof value === 'object') {
                         formData.append(key, JSON.stringify(value));
                     } else {
