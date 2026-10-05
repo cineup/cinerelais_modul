@@ -221,6 +221,12 @@ back to `DEFAULT_HOSTNAME`, so the SoftAP never gets an empty SSID. The
 hostname is used for the AP SSID, the DHCP hostname (Ethernet + WiFi) and
 mDNS (`<hostname>.local`).
 
+**Backup (web UI):** export = `GET /api/config` + `language`, saved as
+`<hostname>_backup_<YYYY-MM-DD>.json`; import re-POSTs every field to
+`/api/config` and restarts. WiFi passwords are never exported (API returns them
+empty) and empty password fields are skipped on import; `tcpDevices` (firmware
+presets) and `ethEnabled` (no POST handler, no UI) are not restored.
+
 Network changes require device restart to take effect.
 
 ### NTP Time Synchronization
@@ -423,3 +429,4 @@ Postponed until all modules can be flashed via USB on site (decided 2026-10-04).
 | 2026-09-14 | UI polish: header status badges stay on one line on mobile (no stretched WS badge), softened the status-dot glow, and split the Netzwerk block out of System Info into its own card (settings cards no longer stretch to the tallest in the row) |
 | 2026-10-04 | Fixed `AsyncClient` leak in TCP command server (accepted clients never deleted → heap exhaustion, module only answered ping), double delete in Input-TCP `onError`/`onDisconnect`, keepalive for half-open clients; added health check task with auto-reboot, `resetReason`/`healthReboot`/`minFreeHeap`/`maxAllocHeap` in `/api/status`, memory + last restart in GUI (FW 1.1.6, FS 1.2.5) |
 | 2026-10-04 | Corrected build config docs (8MB layout, no PSRAM; board has N16R8); documented postponed 16MB/PSRAM migration |
+| 2026-10-05 | Backup export: file name `<hostname>_backup_<YYYY-MM-DD>.json`, `tcpDevices`/passwords no longer exported; import no longer wipes WiFi passwords with the empty values from the backup; System Info "Speicher" compacted to `frei / min / Block KB` (FS 1.2.6) |
